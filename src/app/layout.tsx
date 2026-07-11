@@ -15,23 +15,46 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AEVIX - AI operating layer for modern businesses",
+  metadataBase: new URL("https://aevix.vercel.app"),
+  title: {
+    default: "AEVIX — цифровые системы для малого бизнеса",
+    template: "%s — AEVIX",
+  },
   description:
-    "AEVIX designs AI systems, client automation and executive dashboards that turn daily operations into measurable business leverage.",
+    "AEVIX создает AI-консультантов, Telegram и WhatsApp-ботов, сайты, CRM-интеграции, запись, напоминания и сбор отзывов для малого бизнеса.",
+  applicationName: "AEVIX",
+  creator: "Kossybayev Alan",
   keywords: [
     "AEVIX",
-    "AI automation",
-    "digital product",
-    "business operating system",
-    "AI dashboard",
+    "AI-консультант",
+    "автоматизация заявок",
+    "Telegram бот для бизнеса",
+    "WhatsApp бот для бизнеса",
+    "CRM интеграция",
+    "сайт для малого бизнеса",
   ],
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
-    title: "AEVIX - AI operating layer",
+    title: "AEVIX — цифровые системы для малого бизнеса",
     description:
-      "A premium digital product experience for business owners who want AI to handle real operational work.",
+      "AI-консультанты, боты, сайты, CRM-интеграции, запись, напоминания и сбор отзывов для малого бизнеса.",
+    url: "https://aevix.vercel.app",
+    siteName: "AEVIX",
+    locale: "ru_RU",
     type: "website",
   },
-  metadataBase: new URL("https://aevix.ai"),
+  twitter: {
+    card: "summary",
+    title: "AEVIX — цифровые системы для малого бизнеса",
+    description:
+      "AEVIX помогает убрать повторяющуюся работу: заявки, ответы, запись, напоминания и CRM-сценарии.",
+  },
+  icons: {
+    icon: "/icon.svg",
+  },
+  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({

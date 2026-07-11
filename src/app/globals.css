@@ -15,6 +15,7 @@
 
 html {
   scroll-behavior: auto;
+  scroll-padding-top: 6rem;
 }
 
 body {
@@ -75,6 +76,36 @@ body::before {
   transform: perspective(1100px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
 }
 
+:focus-visible {
+  outline: 2px solid rgba(122, 92, 255, 0.45);
+  outline-offset: 3px;
+}
+
+button,
+a,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 767px) {
+  body {
+    background: linear-gradient(135deg, #fffaf2 0%, #f7f1e8 58%, #ede4d7 100%);
+  }
+
+  body::before {
+    opacity: 0.18;
+  }
+
+  .scene {
+    min-height: auto;
+    padding: 6.5rem 1rem 4rem;
+  }
+
+  .perspective-card {
+    transform: none !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -83,5 +114,9 @@ body::before {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .perspective-card {
+    transform: none !important;
   }
 }
