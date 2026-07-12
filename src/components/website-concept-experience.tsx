@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
   ArrowRight,
   Check,
   Expand,
+  Info,
   Laptop,
   Maximize2,
   MessageCircle,
@@ -95,7 +96,7 @@ function toggleKnown<T extends string>(items: T[], item: T) {
   return items.includes(item) ? items.filter((current) => current !== item) : [...items, item];
 }
 
-function ConceptSection({ section }: { section: WebsiteConceptSection }) {
+function ConceptSection({ section, onDemoAction }: { section: WebsiteConceptSection; onDemoAction: () => void }) {
   if (section.type === "gallery") {
     return (
       <section className="concept-section concept-gallery">
@@ -120,7 +121,18 @@ function ConceptSection({ section }: { section: WebsiteConceptSection }) {
         <p>{section.type === "booking" ? "Следующий шаг" : "Контакты"}</p>
         <h3>{section.title}</h3>
         <span>{section.text}</span>
-        <button type="button">{section.type === "booking" ? "Выбрать время" : "Связаться"}</button>
+        {section.type === "booking" ? (
+          <div className="concept-mock-form" aria-label="Демонстрационная форма записи">
+            <span>Услуга</span><span>Дата и время</span><span>Имя и контакт</span>
+          </div>
+        ) : (
+          <div className="concept-contact-details">
+            <span>Часы работы: по расписанию</span>
+            <span>Адрес будет указан здесь</span>
+            <div aria-label="Место для карты">Карта и маршрут</div>
+          </div>
+        )}
+        <button type="button" onClick={onDemoAction}>{section.type === "booking" ? "Выбрать время" : "Связаться"}</button>
       </section>
     );
   }
@@ -160,16 +172,41 @@ function ConceptSection({ section }: { section: WebsiteConceptSection }) {
   );
 }
 
-function ConceptPreview({ concept, mode, revealIndex }: { concept: WebsiteConcept; mode: PreviewMode; revealIndex: number }) {
+function ConceptPreview({
+  concept,
+  mode,
+  revealIndex,
+  activePageId,
+  onPageChange,
+  onDemoAction,
+}: {
+  concept: WebsiteConcept;
+  mode: PreviewMode;
+  revealIndex: number;
+  activePageId: string;
+  onPageChange: (pageId: string) => void;
+  onDemoAction: () => void;
+}) {
+  const stageRef = useRef<HTMLDivElement>(null);
   const style = {
     "--concept-bg": concept.palette.background,
     "--concept-surface": concept.palette.surface,
     "--concept-text": concept.palette.text,
     "--concept-accent": concept.palette.accent,
   } as CSSProperties;
+  const activePage = concept.pages.find((page) => page.id === activePageId) ?? concept.pages[0];
+  const pageIndex = concept.pages.findIndex((page) => page.id === activePage.id);
+  const nextPage = concept.pages[Math.min(pageIndex + 1, concept.pages.length - 1)];
+
+  useEffect(() => {
+    stageRef.current?.scrollTo({
+      top: 0,
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    });
+  }, [activePageId]);
 
   return (
-    <div className="concept-preview-stage">
+    <div ref={stageRef} className="concept-preview-stage">
       <motion.div
         layout
         className={cn("concept-device", `concept-device-${mode}`)}
@@ -178,18 +215,24 @@ function ConceptPreview({ concept, mode, revealIndex }: { concept: WebsiteConcep
         <div className={cn("concept-site", `concept-template-${concept.template}`)} style={style}>
           <header className={cn("concept-nav concept-preview-piece", revealIndex >= 0 && "is-visible")}>
             <strong>{concept.businessName}</strong>
-            <div><span>Услуги</span><span>О нас</span><span>Контакты</span></div>
-            <button type="button">Связаться</button>
+            <nav aria-label="Навигация демонстрационного сайта">
+              {concept.navigation.map((item) => (
+                <button key={item.pageId} type="button" aria-current={item.pageId === activePage.id ? "page" : undefined} onClick={() => onPageChange(item.pageId)}>
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+            <button type="button" onClick={onDemoAction}>Связаться</button>
           </header>
-          <main>
+          <motion.main key={activePage.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }}>
             <section className={cn("concept-hero concept-preview-piece", revealIndex >= 3 && "is-visible")}>
               <div className="concept-hero-copy">
-                <p>{concept.hero.eyebrow}</p>
-                <h2>{concept.hero.title}</h2>
-                <span>{concept.hero.subtitle}</span>
+                <p>{activePage.hero.eyebrow}</p>
+                <h2>{activePage.hero.title}</h2>
+                <span>{activePage.hero.subtitle}</span>
                 <div>
-                  <button type="button">{concept.hero.primaryCta}</button>
-                  <button type="button">{concept.hero.secondaryCta}</button>
+                  <button type="button" onClick={onDemoAction}>{activePage.hero.primaryCta}</button>
+                  <button type="button" onClick={() => nextPage.id === activePage.id ? onDemoAction() : onPageChange(nextPage.id)}>{activePage.hero.secondaryCta}</button>
                 </div>
               </div>
               <div className="concept-hero-visual" aria-hidden="true">
@@ -199,11 +242,11 @@ function ConceptPreview({ concept, mode, revealIndex }: { concept: WebsiteConcep
               </div>
             </section>
             <div className={cn("concept-preview-piece", revealIndex >= 4 && "is-visible")}>
-              {concept.sections.map((section, index) => (
-                <ConceptSection key={`${section.type}-${index}`} section={section} />
+              {activePage.sections.map((section, index) => (
+                <ConceptSection key={`${section.type}-${index}`} section={section} onDemoAction={onDemoAction} />
               ))}
             </div>
-          </main>
+          </motion.main>
           <footer className={cn("concept-footer concept-preview-piece", revealIndex >= 4 && "is-visible")}>
             <strong>{concept.businessName}</strong>
             <span>Концепт сайта, подготовленный AEVIX</span>
@@ -226,11 +269,14 @@ export function WebsiteConceptExperience() {
   const [fullscreen, setFullscreen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [showExamples, setShowExamples] = useState(false);
+  const [activePageId, setActivePageId] = useState("home");
+  const [demoMessage, setDemoMessage] = useState<string | null>(null);
   const [previewRevealIndex, setPreviewRevealIndex] = useState(previewRevealStages.length - 1);
   const hasConcept = concept !== null;
 
   useEffect(() => {
     if (!hasConcept) return;
+    setActivePageId(concept?.pages[0]?.id ?? "home");
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setPreviewRevealIndex(previewRevealStages.length - 1);
       return;
@@ -247,7 +293,13 @@ export function WebsiteConceptExperience() {
       });
     }, 210);
     return () => window.clearInterval(timer);
-  }, [hasConcept]);
+  }, [concept?.pages, hasConcept]);
+
+  useEffect(() => {
+    if (!demoMessage) return;
+    const timer = window.setTimeout(() => setDemoMessage(null), 2800);
+    return () => window.clearTimeout(timer);
+  }, [demoMessage]);
 
   const canContinue = useMemo(() => {
     if (step === 0) return input.businessName.trim().length >= 2;
@@ -320,6 +372,18 @@ export function WebsiteConceptExperience() {
     window.setTimeout(() => document.getElementById("контакты")?.scrollIntoView({ behavior: "smooth" }), 120);
   };
 
+  const activePageIndex = concept ? Math.max(0, concept.pages.findIndex((page) => page.id === activePageId)) : 0;
+
+  const movePreviewPage = (offset: number) => {
+    if (!concept) return;
+    const nextIndex = Math.min(Math.max(activePageIndex + offset, 0), concept.pages.length - 1);
+    setActivePageId(concept.pages[nextIndex].id);
+  };
+
+  const showDemoAction = () => {
+    setDemoMessage("Это демонстрация интерфейса. Функция будет подключена в готовом проекте.");
+  };
+
   return (
     <>
       <div className="concept-trigger-group mt-7">
@@ -334,7 +398,10 @@ export function WebsiteConceptExperience() {
 
       <PremiumModal
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={() => {
+          if (fullscreen) setFullscreen(false);
+          else setOpen(false);
+        }}
         titleId="website-concept-title"
         expanded={fullscreen}
         panelClassName={concept && !fullscreen ? "md:h-[92svh] md:max-w-[96vw]" : undefined}
@@ -360,6 +427,22 @@ export function WebsiteConceptExperience() {
                 )}
               </div>
               <div className="concept-toolbar-actions">
+                <span className="concept-draft-badge"><Info className="h-3.5 w-3.5" /> Предварительный макет</span>
+                <div
+                  className="concept-page-switch"
+                  role="tablist"
+                  aria-label="Страницы концепта"
+                  onKeyDown={(event) => {
+                    if (event.key === "ArrowRight") { event.preventDefault(); movePreviewPage(1); }
+                    if (event.key === "ArrowLeft") { event.preventDefault(); movePreviewPage(-1); }
+                  }}
+                >
+                  {concept.navigation.map((item) => (
+                    <button key={item.pageId} type="button" role="tab" aria-selected={item.pageId === activePageId} onClick={() => setActivePageId(item.pageId)}>
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
                 <div className="concept-mode-switch" aria-label="Размер preview">
                   {([
                     ["desktop", Monitor, "Desktop"],
@@ -390,6 +473,10 @@ export function WebsiteConceptExperience() {
               </div>
             </div>
             {notice ? <p className="concept-notice">{notice}</p> : null}
+            <div className="concept-disclaimer">
+              <Info className="h-4 w-4" />
+              <p>Этот сайт является предварительным визуальным макетом, а не готовым продуктом. Здесь показаны дизайн, структура и общий пользовательский опыт. Формы, оплата, запись, интеграции и другие бизнес-функции подключаются на этапе полноценной разработки.</p>
+            </div>
             <div className="concept-reveal-rail" aria-label="Сборка preview">
               {previewRevealStages.map((stage, index) => (
                 <span key={stage} className={index <= previewRevealIndex ? "is-complete" : undefined}>
@@ -397,9 +484,22 @@ export function WebsiteConceptExperience() {
                 </span>
               ))}
             </div>
-            <div className="min-h-0 flex-1 overflow-hidden">
-              <ConceptPreview concept={concept} mode={previewMode} revealIndex={previewRevealIndex} />
+            <div className="concept-page-status">
+              <button type="button" onClick={() => movePreviewPage(-1)} disabled={activePageIndex === 0} aria-label="Предыдущая страница"><ArrowLeft className="h-4 w-4" /></button>
+              <span>{concept.pages[activePageIndex]?.name} · {activePageIndex + 1} из {concept.pages.length}</span>
+              <button type="button" onClick={() => movePreviewPage(1)} disabled={activePageIndex === concept.pages.length - 1} aria-label="Следующая страница"><ArrowRight className="h-4 w-4" /></button>
             </div>
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <ConceptPreview
+                concept={concept}
+                mode={previewMode}
+                revealIndex={previewRevealIndex}
+                activePageId={activePageId}
+                onPageChange={setActivePageId}
+                onDemoAction={showDemoAction}
+              />
+            </div>
+            {demoMessage ? <div className="concept-demo-toast" role="status">{demoMessage}</div> : null}
             <div className="concept-workspace-footer">
               <Button type="button" variant="glass" onClick={() => { setConcept(null); setFullscreen(false); }}>
                 <ArrowLeft className="mr-2 h-4 w-4" /> Изменить параметры

@@ -30,7 +30,11 @@ const SYSTEM_INSTRUCTIONS = `Ты — арт-директор digital-студи
 - создай короткий, естественный и премиальный текст без технического жаргона;
 - сохрани указанное название и тип бизнеса;
 - palette должна содержать только HEX-цвета формата #RRGGBB;
-- обязательно включи services, about, contacts и pricing либо booking;
+- создай от 2 до 3 связанных страниц, первая страница всегда имеет id home;
+- navigation должна содержать ровно по одному пункту для каждой страницы;
+- названия страниц адаптируй под бизнес: услуги, меню, каталог, запись или контакты;
+- каждая страница должна иметь короткий hero и от 1 до 5 содержательных секций;
+- во всем сайте обязательно включи services, about, contacts и pricing либо booking;
 - контактные данные пользователя не передаются и не нужны.`;
 
 function getClientId(request: Request) {
@@ -110,7 +114,7 @@ export async function POST(request: Request) {
         model: "gpt-4.1-mini",
         instructions: SYSTEM_INSTRUCTIONS,
         input: JSON.stringify(input),
-        max_output_tokens: 1800,
+        max_output_tokens: 2600,
         text: {
           format: {
             type: "json_schema",
@@ -135,20 +139,23 @@ export async function POST(request: Request) {
       });
     }
 
-    const coreTypes: ConceptSectionType[] = [
+    const generatedTypes = new Set(concept.pages.flatMap((page) => page.sections.map((section) => section.type)));
+    const requiredTypes: ConceptSectionType[] = [
       "services",
       "about",
-      input.goals.includes("Записывать клиентов") ? "booking" : "pricing",
       "contacts",
+      input.goals.includes("Записывать клиентов") ? "booking" : "pricing",
     ];
-    const coreSections = coreTypes.map(
-      (type) => concept.sections.find((section) => section.type === type)
-        ?? fallback.sections.find((section) => section.type === type)!,
-    );
-    const additionalSections = concept.sections.filter((section) => !coreTypes.includes(section.type));
+    if (requiredTypes.some((type) => !generatedTypes.has(type))) {
+      return NextResponse.json({
+        concept: fallback,
+        source: "fallback",
+        notice: "AI вернул неполную структуру страниц. Показан безопасный локальный концепт.",
+      });
+    }
 
     return NextResponse.json({
-      concept: { ...concept, sections: [...coreSections, ...additionalSections].slice(0, 8) },
+      concept,
       source: "ai",
     });
   } catch {

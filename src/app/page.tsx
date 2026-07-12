@@ -1093,6 +1093,7 @@ function AiConsultantScene() {
   const [error, setError] = useState<string | null>(null);
   const [expandedNode, setExpandedNode] = useState<number | null>(null);
   const [userScrolledAway, setUserScrolledAway] = useState(false);
+  const [hasUnreadContent, setHasUnreadContent] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const canSend = input.trim().length > 0 && input.trim().length <= 1500 && !isThinking;
@@ -1123,13 +1124,20 @@ function AiConsultantScene() {
   }, []);
 
   useEffect(() => {
-    if (userScrolledAway) return;
+    if (userScrolledAway) {
+      setHasUnreadContent(true);
+      return;
+    }
     const element = scrollRef.current;
     if (!element) return;
-    element.scrollTo({
-      top: element.scrollHeight,
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    const frame = window.requestAnimationFrame(() => {
+      element.scrollTo({
+        top: element.scrollHeight,
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      });
+      setHasUnreadContent(false);
     });
+    return () => window.cancelAnimationFrame(frame);
   }, [analysis, isThinking, messages, stageIndex, userScrolledAway]);
 
   const onMessagesScroll = () => {
@@ -1137,7 +1145,20 @@ function AiConsultantScene() {
     if (!element) return;
 
     const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
-    setUserScrolledAway(distanceFromBottom > 96);
+    const scrolledAway = distanceFromBottom > 96;
+    setUserScrolledAway(scrolledAway);
+    if (!scrolledAway) setHasUnreadContent(false);
+  };
+
+  const scrollToLatestMessage = () => {
+    const element = scrollRef.current;
+    if (!element) return;
+    setUserScrolledAway(false);
+    setHasUnreadContent(false);
+    element.scrollTo({
+      top: element.scrollHeight,
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    });
   };
 
   const sendAnalysis = async (messageOverride?: string) => {
@@ -1275,7 +1296,7 @@ function AiConsultantScene() {
         </div>
         <div
           data-reveal
-          className="aevix-ai-panel relative overflow-hidden rounded-[2.25rem] border border-white/70 bg-white/58 p-3 shadow-[0_32px_110px_rgba(76,63,118,0.18)] backdrop-blur-2xl md:p-5"
+          className="aevix-ai-panel aevix-chat-shell relative overflow-hidden rounded-[2.25rem] border border-white/70 bg-white/58 p-3 shadow-[0_32px_110px_rgba(76,63,118,0.18)] backdrop-blur-2xl md:p-5"
         >
           <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
           <div className="relative mb-3 flex items-center justify-between rounded-[1.5rem] border border-ink/6 bg-white/72 px-4 py-3 shadow-[0_18px_45px_rgba(9,8,7,0.05)]">
@@ -1296,7 +1317,9 @@ function AiConsultantScene() {
           <div
             ref={scrollRef}
             onScroll={onMessagesScroll}
-            className="aevix-ai-scroll relative flex max-h-[min(58dvh,40rem)] min-h-[24rem] flex-col gap-3 overflow-y-auto overscroll-contain scroll-smooth rounded-[1.65rem] border border-ink/6 bg-gradient-to-b from-white/78 to-white/42 p-3 pr-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] max-md:max-h-[calc(100dvh-22rem)] max-md:min-h-[19rem]"
+            tabIndex={0}
+            aria-label="История диалога с AI-консультантом"
+            className="aevix-ai-scroll aevix-chat-conversation relative flex min-h-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto overscroll-contain scroll-smooth rounded-[1.65rem] border border-ink/6 bg-gradient-to-b from-white/78 to-white/42 p-3 pr-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]"
           >
             {messages.slice(-5).map((message) => (
               <motion.div
@@ -1468,6 +1491,11 @@ function AiConsultantScene() {
             ) : null}
             <div ref={endRef} />
           </div>
+          {hasUnreadContent ? (
+            <button type="button" className="aevix-scroll-latest" onClick={scrollToLatestMessage}>
+              <ChevronDown className="h-4 w-4" /> К новому сообщению
+            </button>
+          ) : null}
           {error ? (
             <motion.p
               initial={{ opacity: 0, y: 8 }}
@@ -1477,7 +1505,7 @@ function AiConsultantScene() {
               {error}
             </motion.p>
           ) : null}
-          <div className="sticky bottom-0 z-10 mt-3 rounded-[1.65rem] border border-ink/8 bg-white/82 p-2 shadow-[0_-16px_48px_rgba(255,250,242,0.74)] backdrop-blur-2xl">
+          <div className="aevix-chat-composer z-10 mt-3 rounded-[1.65rem] border border-ink/8 bg-white/82 p-2 shadow-[0_-16px_48px_rgba(255,250,242,0.74)] backdrop-blur-2xl">
             <div className="flex items-end gap-2 rounded-[1.35rem] border border-ink/8 bg-white/70 p-1.5">
             <textarea
               aria-label="Описание бизнеса для AI-консультанта"

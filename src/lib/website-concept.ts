@@ -103,6 +103,21 @@ export type WebsiteConceptSection = {
   items: string[];
 };
 
+export type WebsiteConceptHero = {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  primaryCta: string;
+  secondaryCta: string;
+};
+
+export type WebsiteConceptPage = {
+  id: string;
+  name: string;
+  hero: WebsiteConceptHero;
+  sections: WebsiteConceptSection[];
+};
+
 export type WebsiteConcept = {
   businessName: string;
   businessType: string;
@@ -114,17 +129,13 @@ export type WebsiteConcept = {
     text: string;
     accent: string;
   };
-  hero: {
-    eyebrow: string;
-    title: string;
-    subtitle: string;
-    primaryCta: string;
-    secondaryCta: string;
-  };
-  sections: WebsiteConceptSection[];
+  navigation: Array<{ label: string; pageId: string }>;
+  pages: WebsiteConceptPage[];
 };
 
 const HEX_COLOR = /^#[0-9A-F]{6}$/i;
+const PAGE_ID = /^[a-z][a-z0-9-]{1,30}$/;
+const UNSAFE_GENERATED_CONTENT = /<\/?(?:script|style|iframe|object|embed|html|body|svg|form)|javascript:|data:text\/html|```|\b(?:eval|Function)\s*\(|=>|\b(?:import|export)\s+(?:default|from|const|function|class)/i;
 
 function isOneOf<T extends readonly string[]>(value: unknown, options: T): value is T[number] {
   return typeof value === "string" && options.includes(value as T[number]);
@@ -133,14 +144,14 @@ function isOneOf<T extends readonly string[]>(value: unknown, options: T): value
 function cleanText(value: unknown, maxLength: number) {
   if (typeof value !== "string") return null;
   const cleaned = value.replace(/\s+/g, " ").trim();
-  if (!cleaned || cleaned.length > maxLength) return null;
+  if (!cleaned || cleaned.length > maxLength || UNSAFE_GENERATED_CONTENT.test(cleaned)) return null;
   return cleaned;
 }
 
 function cleanOptionalText(value: unknown, maxLength: number) {
   if (typeof value !== "string") return null;
   const cleaned = value.replace(/\s+/g, " ").trim();
-  if (cleaned.length > maxLength) return null;
+  if (cleaned.length > maxLength || UNSAFE_GENERATED_CONTENT.test(cleaned)) return null;
   return cleaned;
 }
 
@@ -193,39 +204,68 @@ export function validateWebsiteConcept(value: unknown): WebsiteConcept | null {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Partial<WebsiteConcept>;
   if (!candidate.palette || typeof candidate.palette !== "object") return null;
-  if (!candidate.hero || typeof candidate.hero !== "object") return null;
   if (!isOneOf(candidate.template, conceptTemplates)) return null;
 
   const businessName = cleanText(candidate.businessName, 80);
   const businessType = cleanText(candidate.businessType, 80);
   const style = cleanText(candidate.style, 120);
   const palette = candidate.palette as WebsiteConcept["palette"];
-  const hero = candidate.hero as WebsiteConcept["hero"];
 
   if (!businessName || !businessType || !style) return null;
   if (![palette.background, palette.surface, palette.text, palette.accent].every((color) => HEX_COLOR.test(color))) return null;
 
-  const safeHero = {
-    eyebrow: cleanText(hero.eyebrow, 80),
-    title: cleanText(hero.title, 120),
-    subtitle: cleanText(hero.subtitle, 240),
-    primaryCta: cleanText(hero.primaryCta, 48),
-    secondaryCta: cleanText(hero.secondaryCta, 48),
-  };
-  if (Object.values(safeHero).some((item) => !item)) return null;
-  if (!Array.isArray(candidate.sections) || candidate.sections.length < 4 || candidate.sections.length > 8) return null;
+  if (!Array.isArray(candidate.pages) || candidate.pages.length < 2 || candidate.pages.length > 3) return null;
+  const pages: WebsiteConceptPage[] = [];
+  const pageIds = new Set<string>();
 
-  const sections: WebsiteConceptSection[] = [];
-  for (const section of candidate.sections) {
-    if (!section || typeof section !== "object") return null;
-    const item = section as Partial<WebsiteConceptSection>;
-    if (!isOneOf(item.type, conceptSectionTypes)) return null;
-    const title = cleanText(item.title, 90);
-    const text = cleanOptionalText(item.text, 360);
-    const items = cleanStringArray(item.items, 6, 100);
-    if (!title || text === null || !items) return null;
-    sections.push({ type: item.type, title, text, items });
+  for (const rawPage of candidate.pages) {
+    if (!rawPage || typeof rawPage !== "object") return null;
+    const page = rawPage as Partial<WebsiteConceptPage>;
+    const id = typeof page.id === "string" && PAGE_ID.test(page.id) ? page.id : null;
+    const name = cleanText(page.name, 48);
+    if (!id || !name || pageIds.has(id) || !page.hero || typeof page.hero !== "object") return null;
+    pageIds.add(id);
+
+    const hero = page.hero as Partial<WebsiteConceptHero>;
+    const safeHero = {
+      eyebrow: cleanText(hero.eyebrow, 80),
+      title: cleanText(hero.title, 120),
+      subtitle: cleanText(hero.subtitle, 240),
+      primaryCta: cleanText(hero.primaryCta, 48),
+      secondaryCta: cleanText(hero.secondaryCta, 48),
+    };
+    if (Object.values(safeHero).some((item) => !item)) return null;
+    if (!Array.isArray(page.sections) || page.sections.length < 1 || page.sections.length > 5) return null;
+
+    const sections: WebsiteConceptSection[] = [];
+    for (const rawSection of page.sections) {
+      if (!rawSection || typeof rawSection !== "object") return null;
+      const section = rawSection as Partial<WebsiteConceptSection>;
+      if (!isOneOf(section.type, conceptSectionTypes)) return null;
+      const title = cleanText(section.title, 90);
+      const text = cleanOptionalText(section.text, 360);
+      const items = cleanStringArray(section.items, 6, 100);
+      if (!title || text === null || !items) return null;
+      sections.push({ type: section.type, title, text, items });
+    }
+
+    pages.push({ id, name, hero: safeHero as WebsiteConceptHero, sections });
   }
+
+  if (pages[0]?.id !== "home") return null;
+  if (!Array.isArray(candidate.navigation) || candidate.navigation.length !== pages.length) return null;
+  const navigation: WebsiteConcept["navigation"] = [];
+  const navigationIds = new Set<string>();
+  for (const rawItem of candidate.navigation) {
+    if (!rawItem || typeof rawItem !== "object") return null;
+    const item = rawItem as { label?: unknown; pageId?: unknown };
+    const label = cleanText(item.label, 48);
+    const pageId = typeof item.pageId === "string" ? item.pageId : null;
+    if (!label || !pageId || !pageIds.has(pageId) || navigationIds.has(pageId)) return null;
+    navigationIds.add(pageId);
+    navigation.push({ label, pageId });
+  }
+  if (navigationIds.size !== pageIds.size) return null;
 
   return {
     businessName,
@@ -238,8 +278,8 @@ export function validateWebsiteConcept(value: unknown): WebsiteConcept | null {
       text: palette.text.toUpperCase(),
       accent: palette.accent.toUpperCase(),
     },
-    hero: safeHero as WebsiteConcept["hero"],
-    sections,
+    navigation,
+    pages,
   };
 }
 
@@ -306,14 +346,63 @@ function sectionContent(type: ConceptSectionType, input: WebsiteConceptInput): W
 
 export function buildFallbackWebsiteConcept(input: WebsiteConceptInput): WebsiteConcept {
   const palette = conceptPalettes.find((item) => item.id === input.palettePreset) ?? conceptPalettes[0];
-  const requested = Array.from(new Set<ConceptSectionType>([
-    "services",
-    "about",
-    input.goals.includes("Записывать клиентов") ? "booking" : "pricing",
-    ...input.sections,
-    "contacts",
-  ])).slice(0, 8);
   const primaryGoal = input.goals[0] ?? "Получать заявки";
+  const isBookingBusiness = ["Барбершоп", "Салон красоты", "Ресторан", "Кофейня"].includes(input.businessType);
+  const middlePage = input.businessType === "Ресторан" || input.businessType === "Кофейня"
+    ? { id: "menu", name: "Меню" }
+    : input.businessType === "Парфюмерный магазин" || input.businessType === "Магазин"
+      ? { id: "catalog", name: "Каталог" }
+      : input.businessType === "Барбершоп" || input.businessType === "Салон красоты"
+        ? { id: "services", name: "Услуги и мастера" }
+        : { id: "services", name: "Услуги" };
+  const finalPage = input.businessType === "Ресторан"
+    ? { id: "booking", name: "Бронирование и контакты" }
+    : input.businessType === "Барбершоп"
+      ? { id: "booking", name: "Запись и контакты" }
+      : input.businessType === "Салон красоты"
+        ? { id: "booking", name: "Запись" }
+        : input.businessType === "Парфюмерный магазин"
+          ? { id: "contacts", name: "О бренде и контакты" }
+          : { id: "contacts", name: "Контакты" };
+
+  const pages: WebsiteConceptPage[] = [
+    {
+      id: "home",
+      name: "Главная",
+      hero: {
+        eyebrow: input.businessType,
+        title: `${input.businessName} — место, к которому хочется вернуться`,
+        subtitle: `Понятная подача, характер бренда и быстрый путь к действию: ${primaryGoal.toLowerCase()}.`,
+        primaryCta: isBookingBusiness ? "Записаться" : "Оставить заявку",
+        secondaryCta: middlePage.name,
+      },
+      sections: [sectionContent("services", input), sectionContent("about", input)],
+    },
+    {
+      ...middlePage,
+      hero: {
+        eyebrow: middlePage.name,
+        title: `${middlePage.name} ${input.businessName}`,
+        subtitle: "Основные направления, понятная структура и детали выбора без лишней информации.",
+        primaryCta: isBookingBusiness ? "Выбрать услугу" : "Открыть каталог",
+        secondaryCta: "Узнать больше",
+      },
+      sections: [sectionContent("services", input), sectionContent("pricing", input), sectionContent("gallery", input)],
+    },
+    {
+      ...finalPage,
+      hero: {
+        eyebrow: finalPage.name,
+        title: isBookingBusiness ? "Выберите удобный следующий шаг" : `Свяжитесь с ${input.businessName}`,
+        subtitle: "Контакты, часы работы и демонстрационный сценарий обращения в одном месте.",
+        primaryCta: isBookingBusiness ? "Выбрать время" : "Связаться",
+        secondaryCta: "Посмотреть контакты",
+      },
+      sections: isBookingBusiness
+        ? [sectionContent("booking", input), sectionContent("contacts", input), sectionContent("faq", input)]
+        : [sectionContent("about", input), sectionContent("contacts", input), sectionContent("faq", input)],
+    },
+  ];
 
   return {
     businessName: input.businessName,
@@ -321,21 +410,15 @@ export function buildFallbackWebsiteConcept(input: WebsiteConceptInput): Website
     template: templateForMood(input.visualMood),
     style: input.visualMood,
     palette: { ...palette.colors },
-    hero: {
-      eyebrow: input.businessType,
-      title: `${input.businessName} — место, к которому хочется вернуться`,
-      subtitle: `Понятная подача, характер бренда и быстрый путь к действию: ${primaryGoal.toLowerCase()}.`,
-      primaryCta: input.goals.includes("Записывать клиентов") ? "Записаться" : "Оставить заявку",
-      secondaryCta: "Посмотреть услуги",
-    },
-    sections: requested.map((type) => sectionContent(type, input)),
+    navigation: pages.map((page) => ({ label: page.name, pageId: page.id })),
+    pages,
   };
 }
 
 export const WEBSITE_CONCEPT_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["businessName", "businessType", "template", "style", "palette", "hero", "sections"],
+  required: ["businessName", "businessType", "template", "style", "palette", "navigation", "pages"],
   properties: {
     businessName: { type: "string", maxLength: 80 },
     businessType: { type: "string", maxLength: 80 },
@@ -352,34 +435,62 @@ export const WEBSITE_CONCEPT_SCHEMA = {
         accent: { type: "string", pattern: "^#[0-9A-Fa-f]{6}$" },
       },
     },
-    hero: {
-      type: "object",
-      additionalProperties: false,
-      required: ["eyebrow", "title", "subtitle", "primaryCta", "secondaryCta"],
-      properties: {
-        eyebrow: { type: "string", maxLength: 80 },
-        title: { type: "string", maxLength: 120 },
-        subtitle: { type: "string", maxLength: 240 },
-        primaryCta: { type: "string", maxLength: 48 },
-        secondaryCta: { type: "string", maxLength: 48 },
-      },
-    },
-    sections: {
+    navigation: {
       type: "array",
-      minItems: 4,
-      maxItems: 8,
+      minItems: 2,
+      maxItems: 3,
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["type", "title", "text", "items"],
+        required: ["label", "pageId"],
         properties: {
-          type: { type: "string", enum: conceptSectionTypes },
-          title: { type: "string", maxLength: 90 },
-          text: { type: "string", maxLength: 360 },
-          items: {
+          label: { type: "string", maxLength: 48 },
+          pageId: { type: "string", pattern: "^[a-z][a-z0-9-]{1,30}$" },
+        },
+      },
+    },
+    pages: {
+      type: "array",
+      minItems: 2,
+      maxItems: 3,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "name", "hero", "sections"],
+        properties: {
+          id: { type: "string", pattern: "^[a-z][a-z0-9-]{1,30}$" },
+          name: { type: "string", maxLength: 48 },
+          hero: {
+            type: "object",
+            additionalProperties: false,
+            required: ["eyebrow", "title", "subtitle", "primaryCta", "secondaryCta"],
+            properties: {
+              eyebrow: { type: "string", maxLength: 80 },
+              title: { type: "string", maxLength: 120 },
+              subtitle: { type: "string", maxLength: 240 },
+              primaryCta: { type: "string", maxLength: 48 },
+              secondaryCta: { type: "string", maxLength: 48 },
+            },
+          },
+          sections: {
             type: "array",
-            maxItems: 6,
-            items: { type: "string", maxLength: 100 },
+            minItems: 1,
+            maxItems: 5,
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["type", "title", "text", "items"],
+              properties: {
+                type: { type: "string", enum: conceptSectionTypes },
+                title: { type: "string", maxLength: 90 },
+                text: { type: "string", maxLength: 360 },
+                items: {
+                  type: "array",
+                  maxItems: 6,
+                  items: { type: "string", maxLength: 100 },
+                },
+              },
+            },
           },
         },
       },
