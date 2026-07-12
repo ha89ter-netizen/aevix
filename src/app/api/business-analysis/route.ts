@@ -18,6 +18,24 @@ type BusinessAnalysis = {
   callToAction: string;
 };
 
+type EstimateContext = {
+  businessType: string;
+  selectedServices: string[];
+  branchCount: string;
+  manualWork: string;
+  currentServices: string;
+  localRange: string;
+};
+
+type PersonalEstimate = {
+  summary: string;
+  recommendedModules: string[];
+  estimatedRange: string;
+  implementationSteps: string[];
+  risks: string[];
+  callToAction: string;
+};
+
 const SYSTEM_INSTRUCTIONS = `Ты — AI-консультант digital-студии AEVIX.
 
 Твоя задача — анализировать описание малого бизнеса и простыми словами объяснять, какие процессы можно автоматизировать.
@@ -46,6 +64,19 @@ const SYSTEM_INSTRUCTIONS = `Ты — AI-консультант digital-студ
 - объясни понятный практический эффект;
 - в конце предложи обсудить проект через WhatsApp, Telegram или email;
 - ответ должен быть полезным и занимать примерно 120–250 слов;
+- верни только JSON по схеме, без markdown и без пояснений вне JSON.`;
+
+const ESTIMATE_SYSTEM_INSTRUCTIONS = `Ты — AI-консультант digital-студии AEVIX.
+
+Твоя задача — подготовить предварительный план проекта по бизнес-контексту и выбранным модулям.
+
+Правила:
+- отвечай только на русском;
+- не используй технический жаргон;
+- не выдумывай гарантии, сроки, клиентов, проценты, финансовый результат или рост прибыли;
+- не называй расчет окончательной офертой;
+- используй переданный диапазон стоимости как ориентир и не меняй его произвольно;
+- контактные данные пользователя тебе не передаются и не нужны;
 - верни только JSON по схеме, без markdown и без пояснений вне JSON.`;
 
 const BUSINESS_ANALYSIS_SCHEMA = {
@@ -80,6 +111,35 @@ const BUSINESS_ANALYSIS_SCHEMA = {
       type: "string",
       description: "Мягкое предложение обсудить проект через WhatsApp, Telegram или email.",
     },
+  },
+};
+
+const PERSONAL_ESTIMATE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["summary", "recommendedModules", "estimatedRange", "implementationSteps", "risks", "callToAction"],
+  properties: {
+    summary: { type: "string" },
+    recommendedModules: {
+      type: "array",
+      minItems: 1,
+      maxItems: 7,
+      items: { type: "string" },
+    },
+    estimatedRange: { type: "string" },
+    implementationSteps: {
+      type: "array",
+      minItems: 3,
+      maxItems: 6,
+      items: { type: "string" },
+    },
+    risks: {
+      type: "array",
+      minItems: 1,
+      maxItems: 5,
+      items: { type: "string" },
+    },
+    callToAction: { type: "string" },
   },
 };
 
@@ -156,6 +216,52 @@ function validateAnalysis(value: unknown): BusinessAnalysis | null {
   };
 }
 
+function validateEstimateContext(value: unknown): EstimateContext | null {
+  if (!value || typeof value !== "object") return null;
+
+  const candidate = value as Partial<EstimateContext>;
+
+  if (typeof candidate.businessType !== "string" || !candidate.businessType.trim()) return null;
+  if (!isStringArray(candidate.selectedServices, 1, 7)) return null;
+  if (typeof candidate.branchCount !== "string" || !candidate.branchCount.trim()) return null;
+  if (typeof candidate.manualWork !== "string" || candidate.manualWork.trim().length > 900) return null;
+  if (typeof candidate.currentServices !== "string" || candidate.currentServices.trim().length > 900) return null;
+  if (typeof candidate.localRange !== "string" || !candidate.localRange.trim()) return null;
+
+  const selectedServices = candidate.selectedServices as string[];
+
+  return {
+    businessType: candidate.businessType.trim().slice(0, 80),
+    selectedServices: selectedServices.map((item) => item.trim().slice(0, 80)),
+    branchCount: candidate.branchCount.trim().slice(0, 40),
+    manualWork: candidate.manualWork.trim(),
+    currentServices: candidate.currentServices.trim(),
+    localRange: candidate.localRange.trim().slice(0, 120),
+  };
+}
+
+function validateEstimate(value: unknown): PersonalEstimate | null {
+  if (!value || typeof value !== "object") return null;
+
+  const candidate = value as Partial<PersonalEstimate>;
+
+  if (typeof candidate.summary !== "string" || !candidate.summary.trim()) return null;
+  if (!isStringArray(candidate.recommendedModules, 1, 7)) return null;
+  if (typeof candidate.estimatedRange !== "string" || !candidate.estimatedRange.trim()) return null;
+  if (!isStringArray(candidate.implementationSteps, 3, 6)) return null;
+  if (!isStringArray(candidate.risks, 1, 5)) return null;
+  if (typeof candidate.callToAction !== "string" || !candidate.callToAction.trim()) return null;
+
+  return {
+    summary: candidate.summary.trim(),
+    recommendedModules: (candidate.recommendedModules as string[]).map((item) => item.trim()),
+    estimatedRange: candidate.estimatedRange.trim(),
+    implementationSteps: (candidate.implementationSteps as string[]).map((item) => item.trim()),
+    risks: (candidate.risks as string[]).map((item) => item.trim()),
+    callToAction: candidate.callToAction.trim(),
+  };
+}
+
 function toReadableAnalysis(analysis: BusinessAnalysis) {
   return [
     analysis.summary,
@@ -167,6 +273,83 @@ function toReadableAnalysis(analysis: BusinessAnalysis) {
 
 export async function POST(request: Request) {
   const body = await parseRequestBody(request);
+  const estimateContext = validateEstimateContext(body?.estimateContext);
+
+  if (estimateContext) {
+    if (isRateLimited(getClientId(request))) {
+      return NextResponse.json(
+        { error: "Слишком много запросов подряд. Подождите минуту и попробуйте снова." },
+        { status: 429 },
+      );
+    }
+
+    const apiKey = process.env.OPENAI_API_KEY;
+
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "AI-консультант временно недоступен. Серверный ключ OpenAI еще не настроен." },
+        { status: 503 },
+      );
+    }
+
+    try {
+      const client = new OpenAI({ apiKey });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      const response = await client.responses.create(
+        {
+          model: "gpt-4.1-mini",
+          instructions: ESTIMATE_SYSTEM_INSTRUCTIONS,
+          input: JSON.stringify(estimateContext),
+          max_output_tokens: 850,
+          text: {
+            format: {
+              type: "json_schema",
+              name: "aevix_personal_estimate",
+              strict: true,
+              schema: PERSONAL_ESTIMATE_SCHEMA,
+            },
+            verbosity: "medium",
+          },
+        },
+        { signal: controller.signal },
+      );
+      clearTimeout(timeout);
+
+      const rawEstimate = response.output_text?.trim();
+
+      if (!rawEstimate) {
+        return NextResponse.json(
+          { error: "AI-консультант не смог подготовить персональный расчет." },
+          { status: 502 },
+        );
+      }
+
+      const parsed = validateEstimate(JSON.parse(rawEstimate));
+
+      if (!parsed) {
+        return NextResponse.json(
+          { error: "AI-консультант подготовил расчет в неверном формате. Попробуйте еще раз." },
+          { status: 502 },
+        );
+      }
+
+      return NextResponse.json({
+        estimate: {
+          ...parsed,
+          estimatedRange: estimateContext.localRange,
+        },
+      });
+    } catch {
+      console.error("Personal estimate failed");
+
+      return NextResponse.json(
+        { error: "Не удалось подготовить AI-рекомендацию. Используйте локальный расчет." },
+        { status: 502 },
+      );
+    }
+  }
+
   const message = body?.message;
 
   if (typeof message !== "string") {
