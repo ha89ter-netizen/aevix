@@ -1326,8 +1326,9 @@ function AiConsultantScene() {
                 key={message.id}
                 initial={{ opacity: 0, y: 12, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
                 className={cn(
-                  "max-w-[94%] whitespace-pre-line break-words rounded-3xl px-4 py-3 text-sm leading-relaxed shadow-[0_14px_38px_rgba(9,8,7,0.06)]",
+                  "max-w-[94%] shrink-0 whitespace-pre-line break-words rounded-3xl px-4 py-3 text-sm leading-relaxed shadow-[0_14px_38px_rgba(9,8,7,0.06)]",
                   message.role === "user"
                     ? "ml-auto border border-violet/10 bg-violet/10 text-ink"
                     : "border border-ink/6 bg-white/78 text-ink/72",
@@ -1338,24 +1339,28 @@ function AiConsultantScene() {
             ))}
             {isThinking ? (
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex w-fit items-center gap-2 rounded-full border border-violet/12 bg-violet/8 px-4 py-3 text-xs text-ink/62"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                className="aevix-thinking-pill flex w-fit shrink-0 items-center gap-2 rounded-full border border-violet/14 bg-violet/8 px-4 py-3 text-xs font-medium text-ink/62"
               >
                 <span className="flex items-center gap-1">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet" />
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet/70 [animation-delay:120ms]" />
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet/45 [animation-delay:240ms]" />
+                  <span className="aevix-thinking-dot h-1.5 w-1.5 rounded-full bg-violet" />
+                  <span className="aevix-thinking-dot h-1.5 w-1.5 rounded-full bg-violet/70 [animation-delay:160ms]" />
+                  <span className="aevix-thinking-dot h-1.5 w-1.5 rounded-full bg-violet/45 [animation-delay:320ms]" />
                 </span>
-                {analysisStages[stageIndex]}
+                <span key={stageIndex} className="aevix-thinking-label">
+                  {analysisStages[stageIndex]}
+                </span>
               </motion.div>
             ) : null}
             {analysis ? (
               <motion.article
-                initial={{ opacity: 0, y: 18, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.42, ease: "easeOut" }}
-                className="overflow-hidden rounded-[1.75rem] border border-ink/7 bg-white/86 p-4 text-ink shadow-[0_22px_60px_rgba(76,63,118,0.12)]"
+                initial={{ opacity: 0, y: 18, scale: 0.98, filter: "blur(4px)" }}
+                animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+                transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
+                className="shrink-0 overflow-hidden rounded-[1.75rem] border border-ink/7 bg-white/86 p-4 text-ink shadow-[0_22px_60px_rgba(76,63,118,0.12)]"
               >
                 <div className="flex flex-col gap-3 border-b border-ink/7 pb-4 sm:flex-row sm:items-start sm:justify-between">
                   <div>
@@ -1380,22 +1385,34 @@ function AiConsultantScene() {
                     <div className="rounded-[1.3rem] border border-ink/7 bg-white/72 p-4">
                       <p className="text-xs uppercase tracking-[0.2em] text-ink/38">Найденные проблемы</p>
                       <div className="mt-3 grid gap-2">
-                        {analysis.problems.map((item) => (
-                          <p key={item} className="flex gap-2 text-sm leading-6 text-ink/66">
+                        {analysis.problems.map((item, index) => (
+                          <motion.p
+                            key={item}
+                            initial={{ opacity: 0, x: -8 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1], delay: 0.18 + index * 0.05 }}
+                            className="flex gap-2 text-sm leading-6 text-ink/66"
+                          >
                             <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-violet" />
                             {item}
-                          </p>
+                          </motion.p>
                         ))}
                       </div>
                     </div>
                     <div className="rounded-[1.3rem] border border-ink/7 bg-white/72 p-4">
                       <p className="text-xs uppercase tracking-[0.2em] text-ink/38">Рекомендации</p>
                       <div className="mt-3 grid gap-2">
-                        {analysis.recommendations.map((item) => (
-                          <p key={item} className="flex gap-2 text-sm leading-6 text-ink/66">
+                        {analysis.recommendations.map((item, index) => (
+                          <motion.p
+                            key={item}
+                            initial={{ opacity: 0, x: -8 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1], delay: 0.22 + index * 0.05 }}
+                            className="flex gap-2 text-sm leading-6 text-ink/66"
+                          >
                             <Check className="mt-0.5 h-4 w-4 shrink-0 text-violet" />
                             {item}
-                          </p>
+                          </motion.p>
                         ))}
                       </div>
                     </div>

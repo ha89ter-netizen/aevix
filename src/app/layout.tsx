@@ -65,6 +65,12 @@ export default function RootLayout({
   return (
     <html lang="ru">
       <body className={`${geistSans.variable} ${manrope.variable}`}>
+        <div className="aevix-atmosphere" aria-hidden="true">
+          <span className="aevix-orb aevix-orb-1" />
+          <span className="aevix-orb aevix-orb-2" />
+          <span className="aevix-orb aevix-orb-3" />
+          <span className="aevix-atmosphere-grain" />
+        </div>
         {children}
       </body>
     </html>
