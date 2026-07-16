@@ -21,6 +21,12 @@
   box-sizing: border-box;
 }
 
+/* Component classes set `display`, which outranks the UA `[hidden]` rule and would leave
+   hidden elements visible. Make the attribute authoritative. */
+[hidden] {
+  display: none !important;
+}
+
 html {
   scroll-behavior: auto;
   scroll-padding-top: 6rem;
@@ -1144,6 +1150,80 @@ body::before {
   scrollbar-width: thin;
   scrollbar-color: rgba(122, 92, 255, 0.28) rgba(255, 255, 255, 0.3);
   -webkit-overflow-scrolling: touch;
+}
+
+/* Preview mode: the editor chrome is gone, so the stage owns the full panel height and
+   presents the concept as a real site rather than a device mock in a workspace. */
+.concept-preview-stage.is-preview {
+  padding: 0;
+  background: #fff;
+  scroll-behavior: smooth;
+}
+
+.concept-preview-stage.is-preview .concept-device {
+  /* Overrides the mobile `calc(100svh - 13rem)`, which reserves room for chrome that
+     preview mode does not render. */
+  min-height: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.concept-preview-stage:focus-visible {
+  outline: 2px solid rgba(122, 92, 255, 0.5);
+  outline-offset: -2px;
+}
+
+.concept-preview-exit {
+  position: absolute;
+  z-index: 40;
+  right: 1rem;
+  bottom: 1rem;
+  display: flex;
+  gap: 0.5rem;
+  opacity: 1;
+  transition: opacity 320ms var(--ease-premium), transform 320ms var(--ease-premium);
+}
+
+.concept-preview-exit.is-idle {
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+}
+
+.concept-preview-exit button {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid rgba(17, 20, 24, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0.5rem 0.9rem;
+  color: rgba(9, 8, 7, 0.68);
+  font-size: 0.76rem;
+  font-weight: 650;
+  box-shadow: 0 14px 40px rgba(18, 22, 27, 0.16);
+  backdrop-filter: blur(14px);
+  transition: transform 220ms var(--ease-premium), color 220ms var(--ease-premium), box-shadow 220ms var(--ease-premium);
+}
+
+.concept-preview-exit button:last-child {
+  padding: 0.5rem;
+  aspect-ratio: 1;
+  justify-content: center;
+}
+
+.concept-preview-exit button:hover {
+  transform: translateY(-2px);
+  color: #090807;
+  box-shadow: 0 18px 48px rgba(18, 22, 27, 0.2);
+}
+
+.concept-preview-cta {
+  border-color: rgba(122, 92, 255, 0.28) !important;
+  background: rgba(122, 92, 255, 0.1) !important;
+  color: #5d45cc !important;
 }
 
 .concept-preview-stage::-webkit-scrollbar {

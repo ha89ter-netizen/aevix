@@ -8,6 +8,8 @@ dist/
 .vercel/
 coverage/
 .playwright-mcp/
+test-results/
+playwright-report/
 tsconfig.tsbuildinfo
 
 .env

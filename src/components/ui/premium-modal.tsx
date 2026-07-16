@@ -13,6 +13,10 @@ type PremiumModalProps = {
   children: ReactNode;
   panelClassName?: string;
   expanded?: boolean;
+  /** Hides the built-in close control so a host can render its own minimal affordance (preview mode). */
+  hideClose?: boolean;
+  /** Disables closing when clicking the backdrop (preview mode fills the viewport). */
+  disableBackdropClose?: boolean;
 };
 
 const FOCUSABLE_SELECTOR = [
@@ -31,6 +35,8 @@ export function PremiumModal({
   children,
   panelClassName,
   expanded = false,
+  hideClose = false,
+  disableBackdropClose = false,
 }: PremiumModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -56,7 +62,7 @@ export function PremiumModal({
     document.body.style.top = `-${scrollY}px`;
     document.body.style.width = "100%";
     document.body.style.overflow = "hidden";
-    window.requestAnimationFrame(() => closeRef.current?.focus());
+    window.requestAnimationFrame(() => (closeRef.current ?? panelRef.current)?.focus());
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -104,6 +110,7 @@ export function PremiumModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onMouseDown={(event) => {
+            if (disableBackdropClose) return;
             if (event.target === event.currentTarget) onClose();
           }}
         >
@@ -112,6 +119,7 @@ export function PremiumModal({
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
+            tabIndex={-1}
             initial={{ opacity: 0, y: 26, scale: 0.985 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 18, scale: 0.99 }}
@@ -122,16 +130,18 @@ export function PremiumModal({
               panelClassName,
             )}
           >
-            <button
-              ref={closeRef}
-              type="button"
-              aria-label="Закрыть окно"
-              title="Закрыть"
-              onClick={onClose}
-              className="absolute right-3 top-3 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-ink/10 bg-white/88 text-ink/64 shadow-[0_10px_28px_rgba(18,22,27,0.1)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/40 md:right-4 md:top-4"
-            >
-              <X className="h-5 w-5" />
-            </button>
+            {hideClose ? null : (
+              <button
+                ref={closeRef}
+                type="button"
+                aria-label="Закрыть окно"
+                title="Закрыть"
+                onClick={onClose}
+                className="absolute right-3 top-3 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-ink/10 bg-white/88 text-ink/64 shadow-[0_10px_28px_rgba(18,22,27,0.1)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/40 md:right-4 md:top-4"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            )}
             {children}
           </motion.div>
         </motion.div>

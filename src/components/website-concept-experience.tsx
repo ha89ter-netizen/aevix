@@ -7,6 +7,7 @@ import {
   ArrowRight,
   Check,
   Expand,
+  Eye,
   Info,
   Laptop,
   Maximize2,
@@ -41,6 +42,10 @@ import {
 } from "@/lib/website-concept";
 
 type PreviewMode = "desktop" | "tablet" | "mobile";
+type ViewMode = "edit" | "preview";
+
+/** Idle delay before the floating "back to editor" pill fades out in preview mode. */
+const PREVIEW_CHROME_IDLE_MS = 2600;
 
 const generationStages = [
   "Изучаем бизнес...",
@@ -179,6 +184,7 @@ function ConceptPreview({
   activePageId,
   onPageChange,
   onDemoAction,
+  isPreview = false,
 }: {
   concept: WebsiteConcept;
   mode: PreviewMode;
@@ -186,6 +192,7 @@ function ConceptPreview({
   activePageId: string;
   onPageChange: (pageId: string) => void;
   onDemoAction: () => void;
+  isPreview?: boolean;
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const style = {
@@ -205,8 +212,20 @@ function ConceptPreview({
     });
   }, [activePageId]);
 
+  // Entering preview: move focus to the scroll container so Space / PageUp / PageDown /
+  // arrows / Home / End drive it natively, with no synthetic key handling.
+  useEffect(() => {
+    if (isPreview) stageRef.current?.focus({ preventScroll: true });
+  }, [isPreview]);
+
   return (
-    <div ref={stageRef} className="concept-preview-stage">
+    <div
+      ref={stageRef}
+      tabIndex={0}
+      role="region"
+      aria-label={`Превью сайта: ${concept.businessName}`}
+      className={cn("concept-preview-stage", isPreview && "is-preview")}
+    >
       <motion.div
         layout
         className={cn("concept-device", `concept-device-${mode}`)}
@@ -267,12 +286,77 @@ export function WebsiteConceptExperience() {
   const [notice, setNotice] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("desktop");
   const [fullscreen, setFullscreen] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("edit");
+  const [nativeFullscreen, setNativeFullscreen] = useState(false);
+  const [previewChromeVisible, setPreviewChromeVisible] = useState(true);
   const [editingName, setEditingName] = useState(false);
   const [showExamples, setShowExamples] = useState(false);
   const [activePageId, setActivePageId] = useState("home");
   const [demoMessage, setDemoMessage] = useState<string | null>(null);
   const [previewRevealIndex, setPreviewRevealIndex] = useState(previewRevealStages.length - 1);
   const hasConcept = concept !== null;
+  const isPreview = viewMode === "preview";
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Keep local state in sync with the browser's own fullscreen state, so pressing Escape
+  // (which the browser handles natively) never leaves the UI showing a stale "Свернуть".
+  useEffect(() => {
+    const sync = () => setNativeFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
+
+  const toggleNativeFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await panelRef.current?.requestFullscreen?.();
+    } catch {
+      // Fullscreen can be refused (iOS Safari, permissions). Fall back to the in-modal
+      // expanded layout so the control still does something useful.
+      setFullscreen((current) => !current);
+    }
+  };
+
+  const enterPreview = () => {
+    setViewMode("preview");
+    setPreviewChromeVisible(true);
+  };
+
+  const exitPreview = () => {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+    setViewMode("edit");
+    setPreviewChromeVisible(true);
+  };
+
+  // Closing the workspace must never leave preview mode or a native fullscreen session
+  // latched, otherwise the next open starts in a chrome-less state the user did not ask for.
+  useEffect(() => {
+    if (open) return;
+    setViewMode("edit");
+    setFullscreen(false);
+    setPreviewChromeVisible(true);
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+  }, [open]);
+
+  // Auto-hide the floating pill after inactivity; any pointer/key activity brings it back.
+  useEffect(() => {
+    if (!isPreview) return;
+    let timer = window.setTimeout(() => setPreviewChromeVisible(false), PREVIEW_CHROME_IDLE_MS);
+    const wake = () => {
+      setPreviewChromeVisible(true);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setPreviewChromeVisible(false), PREVIEW_CHROME_IDLE_MS);
+    };
+    window.addEventListener("mousemove", wake);
+    window.addEventListener("keydown", wake);
+    window.addEventListener("touchstart", wake, { passive: true });
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("mousemove", wake);
+      window.removeEventListener("keydown", wake);
+      window.removeEventListener("touchstart", wake);
+    };
+  }, [isPreview]);
 
   useEffect(() => {
     if (!hasConcept) return;
@@ -399,16 +483,27 @@ export function WebsiteConceptExperience() {
       <PremiumModal
         open={open}
         onClose={() => {
-          if (fullscreen) setFullscreen(false);
-          else setOpen(false);
+          // Escape unwinds one layer at a time: fullscreen -> preview -> close.
+          if (document.fullscreenElement) { void document.exitFullscreen(); return; }
+          if (fullscreen) { setFullscreen(false); return; }
+          if (isPreview) { exitPreview(); return; }
+          setOpen(false);
         }}
         titleId="website-concept-title"
-        expanded={fullscreen}
-        panelClassName={concept && !fullscreen ? "md:h-[92svh] md:max-w-[96vw]" : undefined}
+        expanded={fullscreen || isPreview}
+        hideClose={isPreview}
+        disableBackdropClose={isPreview}
+        panelClassName={
+          isPreview
+            ? "md:h-[100svh] md:max-h-[100svh] md:w-screen md:max-w-none md:rounded-none"
+            : concept && !fullscreen
+              ? "md:h-[92svh] md:max-w-[96vw]"
+              : undefined
+        }
       >
         {concept ? (
-          <div className="flex min-h-0 flex-1 flex-col">
-            <div className="concept-workspace-toolbar">
+          <div ref={panelRef} className="flex min-h-0 flex-1 flex-col bg-[#f7f8f9]">
+            <div className="concept-workspace-toolbar" hidden={isPreview}>
               <div className="min-w-0 pr-12">
                 <p>Концепт сайта</p>
                 {editingName ? (
@@ -466,42 +561,61 @@ export function WebsiteConceptExperience() {
                 <button type="button" onClick={() => setEditingName(true)} title="Изменить название">
                   <PencilLine className="h-4 w-4" /><span>Название</span>
                 </button>
-                <button type="button" onClick={() => setFullscreen((current) => !current)} title={fullscreen ? "Свернуть" : "На весь экран"}>
+                <button type="button" onClick={() => setFullscreen((current) => !current)} title={fullscreen ? "Свернуть" : "Развернуть окно"}>
                   {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-                  <span>{fullscreen ? "Свернуть" : "Fullscreen"}</span>
+                  <span>{fullscreen ? "Свернуть" : "Развернуть"}</span>
+                </button>
+                <button type="button" className="concept-preview-cta" onClick={enterPreview} title="Открыть режим просмотра">
+                  <Eye className="h-4 w-4" /><span>Просмотр</span>
                 </button>
               </div>
             </div>
-            {notice ? <p className="concept-notice">{notice}</p> : null}
-            <div className="concept-disclaimer">
+            {notice && !isPreview ? <p className="concept-notice">{notice}</p> : null}
+            <div className="concept-disclaimer" hidden={isPreview}>
               <Info className="h-4 w-4" />
               <p>Этот сайт является предварительным визуальным макетом, а не готовым продуктом. Здесь показаны дизайн, структура и общий пользовательский опыт. Формы, оплата, запись, интеграции и другие бизнес-функции подключаются на этапе полноценной разработки.</p>
             </div>
-            <div className="concept-reveal-rail" aria-label="Сборка preview">
+            <div className="concept-reveal-rail" aria-label="Сборка preview" hidden={isPreview}>
               {previewRevealStages.map((stage, index) => (
                 <span key={stage} className={index <= previewRevealIndex ? "is-complete" : undefined}>
                   {index < previewRevealIndex ? <Check className="h-3.5 w-3.5" /> : index + 1} {stage}
                 </span>
               ))}
             </div>
-            <div className="concept-page-status">
+            <div className="concept-page-status" hidden={isPreview}>
               <button type="button" onClick={() => movePreviewPage(-1)} disabled={activePageIndex === 0} aria-label="Предыдущая страница"><ArrowLeft className="h-4 w-4" /></button>
               <span>{concept.pages[activePageIndex]?.name} · {activePageIndex + 1} из {concept.pages.length}</span>
               <button type="button" onClick={() => movePreviewPage(1)} disabled={activePageIndex === concept.pages.length - 1} aria-label="Следующая страница"><ArrowRight className="h-4 w-4" /></button>
             </div>
-            <div className="min-h-0 flex-1 overflow-hidden">
+            <div className="relative min-h-0 flex-1 overflow-hidden">
               <ConceptPreview
                 concept={concept}
-                mode={previewMode}
+                mode={isPreview ? "desktop" : previewMode}
                 revealIndex={previewRevealIndex}
                 activePageId={activePageId}
                 onPageChange={setActivePageId}
                 onDemoAction={showDemoAction}
+                isPreview={isPreview}
               />
+              {isPreview ? (
+                <div className={cn("concept-preview-exit", !previewChromeVisible && "is-idle")}>
+                  <button type="button" onClick={exitPreview}>
+                    <ArrowLeft className="h-4 w-4" /> Вернуться к редактированию
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void toggleNativeFullscreen()}
+                    aria-label={nativeFullscreen ? "Выйти из полноэкранного режима" : "На весь экран"}
+                    title={nativeFullscreen ? "Выйти из полноэкранного режима" : "На весь экран"}
+                  >
+                    {nativeFullscreen ? <Minimize2 className="h-4 w-4" /> : <Expand className="h-4 w-4" />}
+                  </button>
+                </div>
+              ) : null}
             </div>
             {demoMessage ? <div className="concept-demo-toast" role="status">{demoMessage}</div> : null}
-            <div className="concept-workspace-footer">
-              <Button type="button" variant="glass" onClick={() => { setConcept(null); setFullscreen(false); }}>
+            <div className="concept-workspace-footer" hidden={isPreview}>
+              <Button type="button" variant="glass" onClick={() => { setConcept(null); setFullscreen(false); setViewMode("edit"); }}>
                 <ArrowLeft className="mr-2 h-4 w-4" /> Изменить параметры
               </Button>
               <Button type="button" onClick={contactAevix}>
