@@ -10,7 +10,10 @@ const config: Config = {
         graphite: "#22201e",
         ink: "#090807",
         glass: "rgba(255, 250, 242, 0.68)",
-        violet: "#7a5cff",
+        // Accent resolves to runtime CSS variables so the whole product can re-theme per
+        // business. Defaults to the AEVIX violet; morphed on the app shell when a business
+        // is recognised. See the @property registration in globals.css.
+        violet: "rgb(var(--accent-r) var(--accent-g) var(--accent-b) / <alpha-value>)",
       },
       fontFamily: {
         sans: ["var(--font-geist-sans)", "Inter", "system-ui", "sans-serif"],

@@ -100,22 +100,36 @@ test.describe("concept preview mode", () => {
     const stage = page.locator(STAGE);
     const scrollTop = () => stage.evaluate((el) => Math.round(el.scrollTop));
 
-    expect(await scrollTop()).toBe(0);
-
-    // The stage uses `scroll-behavior: smooth`, so each assertion polls until the
-    // keyboard-driven scroll animation settles rather than reading mid-flight.
-    await page.keyboard.press("PageDown");
-    await expect.poll(scrollTop).toBeGreaterThan(0);
-
-    await page.keyboard.press("End");
+    // Preview focuses the stage in an effect; wait for that before sending keys, otherwise
+    // they land on the body and the stage never scrolls.
     await expect
       .poll(() =>
-        stage.evaluate((el) => Math.abs(el.scrollTop - (el.scrollHeight - el.clientHeight)) < 2),
+        page.evaluate(() => document.activeElement?.classList.contains("concept-preview-stage")),
       )
       .toBe(true);
 
-    await page.keyboard.press("Home");
-    await expect.poll(scrollTop).toBe(0);
+    expect(await scrollTop()).toBe(0);
+
+    // The stage uses `scroll-behavior: smooth`, so each assertion polls until the
+    // keyboard-driven scroll animation settles rather than reading mid-flight. Timeouts are
+    // generous because the shared dev server can animate slowly under full-suite load.
+    await page.keyboard.press("PageDown");
+    await expect.poll(scrollTop, { timeout: 10000 }).toBeGreaterThan(0);
+
+    await page.keyboard.press("End");
+    await expect
+      .poll(
+        () => stage.evaluate((el) => Math.abs(el.scrollTop - (el.scrollHeight - el.clientHeight)) < 2),
+        { timeout: 10000 },
+      )
+      .toBe(true);
+
+    // Retry the keypress: each keydown re-renders the preview chrome, so an individual press
+    // can land between renders and be dropped.
+    await expect(async () => {
+      await page.keyboard.press("Home");
+      await expect.poll(scrollTop, { timeout: 2000 }).toBe(0);
+    }).toPass({ timeout: 15000 });
   });
 
   test("Escape returns to the editor without losing project state", async ({ page }) => {

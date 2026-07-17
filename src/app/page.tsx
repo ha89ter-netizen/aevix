@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
@@ -10,17 +10,23 @@ import {
   Bot,
   BrainCircuit,
   CalendarCheck,
+  Car,
   Check,
   ChevronDown,
   Clock3,
+  Coffee,
   Command,
   CreditCard,
   Globe2,
+  Scissors,
+  ShoppingBag,
+  Sparkle,
+  Stethoscope,
+  Store,
   Layers3,
   Mail,
   Menu,
   MessageCircle,
-  MousePointer2,
   Play,
   Repeat2,
   RotateCcw,
@@ -40,6 +46,14 @@ import { Button } from "@/components/ui/button";
 import { PremiumModal } from "@/components/ui/premium-modal";
 import { WebsiteConceptExperience } from "@/components/website-concept-experience";
 import { cn } from "@/lib/utils";
+import {
+  getBusinessContent,
+  heroPlaceholderExamples,
+  type BusinessContent,
+  type HeroBusinessCategory,
+  type HeroBusinessProfile,
+} from "@/lib/hero-analysis";
+import { ANALYSIS_SEQUENCE, BusinessProvider, useBusiness } from "@/lib/business-context";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -98,14 +112,15 @@ type EstimateResult = {
 };
 
 const navItems = [
-  { label: "Главная", href: "#главная" },
-  { label: "AI-анализ", href: "#ai-анализ" },
-  { label: "Проблемы", href: "#проблемы" },
-  { label: "Возможности", href: "#возможности" },
-  { label: "Стоимость", href: "#стоимость" },
-  { label: "Сценарии", href: "#сценарии" },
-  { label: "Экосистема", href: "#торговый-бот" },
-  { label: "Контакты", href: "#контакты" },
+  { label: "Главная", href: "#главная", desc: "Начало и анализ бизнеса" },
+  { label: "AI-анализ", href: "#ai-анализ", desc: "Разбор процессов вашего бизнеса" },
+  { label: "Проблемы", href: "#проблемы", desc: "Что съедает время команды" },
+  { label: "Возможности", href: "#возможности", desc: "Модули и автоматизации AEVIX" },
+  { label: "Стоимость", href: "#стоимость", desc: "Открытые цены и расчёт" },
+  { label: "Сценарии", href: "#сценарии", desc: "Как это работает в вашей нише" },
+  { label: "Экосистема", href: "#торговый-бот", desc: "Как связаны модули" },
+  { label: "FAQ", href: "#faq", desc: "Частые вопросы по вашему бизнесу" },
+  { label: "Контакты", href: "#контакты", desc: "Обсудить проект" },
 ];
 
 const contacts = {
@@ -492,6 +507,7 @@ const analysisStages = [
   "Формируем план решения",
 ];
 
+
 const fallbackFlow = ["Клиент", "AI-консультант", "Заявка", "CRM", "Напоминание", "Отзыв"];
 
 const flowNodeIcons: IconComponent[] = [
@@ -851,9 +867,37 @@ function LoadingDots({ className }: { className?: string }) {
   );
 }
 
+/** Counts up to `value` on mount so personalised metrics visibly "roll" into place. */
+function AnimatedNumber({ value, className }: { value: number; className?: string }) {
+  const reduced = usePrefersReducedMotion();
+  const [display, setDisplay] = useState(value);
+
+  useEffect(() => {
+    if (reduced) {
+      setDisplay(value);
+      return;
+    }
+    let raf = 0;
+    let startTime = 0;
+    const duration = 850;
+    const tick = (now: number) => {
+      if (!startTime) startTime = now;
+      const t = Math.min((now - startTime) / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+      setDisplay(Math.round(value * eased));
+      if (t < 1) raf = window.requestAnimationFrame(tick);
+    };
+    raf = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(raf);
+  }, [value, reduced]);
+
+  return <span className={className}>{display}</span>;
+}
+
 function TopNav() {
-  const [open, setOpen] = useState(false);
+  const { status, profile, content, reset } = useBusiness();
   const [activeHref, setActiveHref] = useState("#главная");
+  const [centerOpen, setCenterOpen] = useState(false);
 
   useEffect(() => {
     const sections = navItems
@@ -873,87 +917,536 @@ function TopNav() {
     return () => observer.disconnect();
   }, []);
 
+  const activeItem = navItems.find((item) => item.href === activeHref) ?? navItems[0];
+  const personalized = status === "ready" && profile && content;
+  const StatusIcon = personalized ? categoryIcons[profile.category] : Command;
+
+  // Close the Navigation Center, then scroll — the modal unlocks the body scroll on close,
+  // so the programmatic scroll must run just after that.
+  const goTo = (href: string) => {
+    setCenterOpen(false);
+    const id = decodeURIComponent(href.replace("#", ""));
+    window.setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "start",
+      });
+    }, 90);
+  };
+
   return (
-    <motion.header
-      initial={{ opacity: 0, y: -18 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.7, ease: "easeOut" }}
-      className="site-header fixed inset-x-0 top-0 z-40 px-4 pt-4 sm:px-6"
-    >
-      <nav className="site-nav mx-auto flex max-w-[74rem] items-center justify-between rounded-full border border-ink/10 bg-porcelain/72 px-3 py-2 shadow-[0_14px_44px_rgba(9,8,7,0.08)] backdrop-blur-2xl">
-        <a
-          href="#главная"
-          aria-label="AEVIX, перейти к началу страницы"
-          className="group flex items-center gap-3 rounded-full px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/40"
-        >
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ink text-[10px] font-semibold text-porcelain transition group-hover:rotate-6">
-            AX
-          </span>
-          <span className="text-sm font-semibold text-ink">AEVIX</span>
-        </a>
-        <div className="hidden items-center gap-1 lg:flex">
-          {navItems.slice(0, 6).map((item) => (
-            <a
-              key={item.href}
-              href={item.href}
-              aria-current={activeHref === item.href ? "page" : undefined}
-              className={cn(
-                "site-nav-link rounded-full px-3 py-2 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/30",
-                activeHref === item.href ? "is-active text-ink" : "text-ink/56 hover:text-ink",
-              )}
+    <>
+      <motion.header
+        initial={{ opacity: 0, y: -18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, ease: "easeOut" }}
+        className="site-header fixed inset-x-0 top-0 z-40 px-4 pt-4 sm:px-6"
+      >
+        <nav className="site-nav mx-auto flex max-w-[74rem] items-center justify-between rounded-full border border-ink/10 bg-porcelain/72 px-3 py-2 shadow-[0_14px_44px_rgba(9,8,7,0.08)] backdrop-blur-2xl">
+          <a
+            href="#главная"
+            aria-label="AEVIX, перейти к началу страницы"
+            className="group flex items-center gap-3 rounded-full px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/40"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ink text-[10px] font-semibold text-porcelain transition group-hover:rotate-6">
+              AX
+            </span>
+            <span className="text-sm font-semibold text-ink">AEVIX</span>
+          </a>
+          <div className="flex items-center gap-2">
+            {personalized ? (
+              <span className="nav-persona-chip hidden items-center gap-1.5 md:inline-flex" title={content.persona}>
+                <StatusIcon className="h-3.5 w-3.5 text-violet" />
+                {profile.label}
+              </span>
+            ) : null}
+            <Button asChild variant="glass" size="sm" className="hidden sm:inline-flex">
+              <a href={contacts.whatsapp.href} target="_blank" rel="noreferrer">
+                <MessageCircle className="mr-2 h-4 w-4" />
+                Обсудить систему
+              </a>
+            </Button>
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              aria-expanded={centerOpen}
+              aria-label="Открыть центр навигации"
+              onClick={() => setCenterOpen(true)}
+              className="nav-center-trigger flex items-center gap-2 rounded-full border border-ink/10 bg-white/56 px-3 py-2 text-sm font-medium text-ink transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/30"
             >
-              {item.label}
-            </a>
-          ))}
+              <Command className="h-4 w-4 text-violet" />
+              <span className="hidden sm:inline">{activeItem.label}</span>
+              <Menu className="h-4 w-4 sm:hidden" />
+            </button>
+          </div>
+        </nav>
+      </motion.header>
+
+      <PremiumModal
+        open={centerOpen}
+        onClose={() => setCenterOpen(false)}
+        titleId="nav-center-title"
+        panelClassName="md:h-auto md:max-w-2xl"
+      >
+        <div className="nav-center">
+          <div className="nav-center-head">
+            <p className="nav-center-eyebrow">Центр управления</p>
+            <h2 id="nav-center-title">Навигация AEVIX</h2>
+          </div>
+
+          {personalized ? (
+            <div className="nav-center-status is-ready">
+              <span className="nav-center-status-icon">
+                <StatusIcon className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="title">{content.persona}</p>
+                <p className="label">
+                  {profile.label} · автоматизация {content.metrics.automationScore}% · +{content.metrics.revenueUpliftPct}% выручка
+                </p>
+              </div>
+              <button type="button" onClick={reset} className="nav-center-reset">
+                <RotateCcw className="h-3.5 w-3.5" /> Сбросить
+              </button>
+            </div>
+          ) : (
+            <button type="button" onClick={() => goTo("#главная")} className="nav-center-status is-idle">
+              <div className="min-w-0">
+                <p className="title">Сайт ещё не персонализирован</p>
+                <p className="label">Опишите бизнес в начале страницы — интерфейс подстроится под вас</p>
+              </div>
+              <ArrowRight className="h-4 w-4 shrink-0 text-violet" />
+            </button>
+          )}
+
+          <div className="nav-center-grid">
+            {navItems.map((item, index) => (
+              <button
+                key={item.href}
+                type="button"
+                onClick={() => goTo(item.href)}
+                aria-current={activeHref === item.href ? "true" : undefined}
+                className={cn("nav-center-card", activeHref === item.href && "is-active")}
+              >
+                <span className="nav-center-index">{String(index + 1).padStart(2, "0")}</span>
+                <span className="nav-center-card-label">{item.label}</span>
+                <span className="nav-center-card-desc">{item.desc}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="nav-center-actions">
+            <Button asChild className="w-full sm:w-auto" onClick={() => setCenterOpen(false)}>
+              <a href={contacts.whatsapp.href} target="_blank" rel="noreferrer">
+                <MessageCircle className="mr-2 h-4 w-4" />
+                {personalized && content ? content.ctaLabel : "Обсудить систему"}
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </a>
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button asChild variant="glass" size="sm" className="hidden sm:inline-flex">
-            <a href="#контакты">
-              <Sparkles className="mr-2 h-4 w-4" />
-              Обсудить систему
-            </a>
-          </Button>
+      </PremiumModal>
+    </>
+  );
+}
+
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduced(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  return reduced;
+}
+
+/**
+ * Drives the Hero placeholder as a soft cross-fade between whole example phrases. While
+ * `active` (field unfocused and empty) it advances the index on a calm interval; the visible
+ * fade is handled by the ghost overlay via AnimatePresence. When inactive it holds the current
+ * phrase, so focusing or typing stops the motion without ever touching the user's value.
+ * Reduced-motion users see a single static phrase.
+ */
+function useFadePlaceholder(examples: readonly string[], active: boolean) {
+  const [index, setIndex] = useState(0);
+  const reduced = usePrefersReducedMotion();
+
+  useEffect(() => {
+    if (!active || reduced) return;
+    const id = window.setInterval(() => {
+      setIndex((current) => (current + 1) % examples.length);
+    }, 2800);
+    return () => window.clearInterval(id);
+  }, [active, reduced, examples]);
+
+  return { text: examples[index], index };
+}
+
+const categoryIcons: Record<HeroBusinessCategory, IconComponent> = {
+  barbershop: Scissors,
+  beauty: Sparkle,
+  food: Coffee,
+  ecommerce: ShoppingBag,
+  dental: Stethoscope,
+  auto: Car,
+  generic: Store,
+};
+
+function HeroAnalysisResult({
+  profile,
+  content,
+  summary,
+  degraded,
+  onRetry,
+  onReset,
+  onContinue,
+}: {
+  profile: HeroBusinessProfile;
+  content: BusinessContent;
+  summary: string | null;
+  degraded: boolean;
+  onRetry: () => void;
+  onReset: () => void;
+  onContinue: () => void;
+}) {
+  const { metrics } = content;
+  const CategoryIcon = categoryIcons[profile.category];
+  // Nothing specific matched: invite more detail rather than pretending certainty.
+  const lowConfidence = profile.confidence < 70;
+  const metricTiles = [
+    { label: "Автоматизация", value: metrics.automationScore, suffix: "%" },
+    { label: "Часов/нед.", value: metrics.hoursSavedPerWeek, prefix: "~" },
+    { label: "Выручка", value: metrics.revenueUpliftPct, prefix: "+", suffix: "%" },
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 18, filter: "blur(6px)" }}
+      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      className="hero-result glass-panel relative mx-auto w-full max-w-xl overflow-hidden p-5 md:p-6"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="flex items-center justify-between gap-3 border-b border-ink/8 pb-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet/12 text-violet">
+            <CategoryIcon className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs font-medium uppercase tracking-[0.2em] text-violet">Бизнес распознан</p>
+            <p className="truncate text-lg font-semibold leading-tight text-ink">{profile.label}</p>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="hero-confidence" title="Уверенность распознавания">
+            <AnimatedNumber value={profile.confidence} />%
+          </span>
           <button
             type="button"
-            aria-label={open ? "Закрыть меню" : "Открыть меню"}
-            aria-expanded={open}
-            onClick={() => setOpen((current) => !current)}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-ink/10 bg-white/56 text-ink transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/30 lg:hidden"
+            onClick={onReset}
+            className="rounded-full border border-ink/10 bg-white/70 px-3 py-1.5 text-xs font-medium text-ink/60 transition hover:border-violet/24 hover:text-ink"
           >
-            {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            Изменить
           </button>
         </div>
-      </nav>
-      {open ? (
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="site-mobile-menu mx-auto mt-3 grid max-w-[74rem] gap-2 rounded-lg border border-ink/10 bg-porcelain/94 p-3 shadow-object backdrop-blur-2xl lg:hidden"
-        >
-          {navItems.map((item) => (
-            <a
-              key={item.href}
-              href={item.href}
-              onClick={() => setOpen(false)}
-              aria-current={activeHref === item.href ? "page" : undefined}
-              className={cn(
-                "rounded-md px-4 py-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/30",
-                activeHref === item.href ? "bg-ink text-porcelain" : "text-ink/72 hover:bg-ink/5",
-              )}
-            >
-              {item.label}
-            </a>
-          ))}
-          <a
-            href="#контакты"
-            onClick={() => setOpen(false)}
-            className="rounded-md bg-ink px-4 py-3 text-sm font-medium text-porcelain"
-          >
-            Обсудить систему
-          </a>
-        </motion.div>
+      </div>
+
+      <p className="mt-4 text-sm leading-6 text-ink/68">
+        {summary ?? `${profile.descriptor}. Ниже — как AEVIX перестраивает процесс.`}
+      </p>
+
+      {lowConfidence ? (
+        <p className="hero-confidence-hint mt-3">
+          Уточните нишу или задачу — разбор станет точнее.
+        </p>
       ) : null}
-    </motion.header>
+
+      <div className="mt-4 grid grid-cols-3 gap-2">
+        {metricTiles.map((tile, index) => (
+          <motion.div
+            key={tile.label}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1], delay: 0.1 + index * 0.05 }}
+            className="hero-metric rounded-2xl border border-ink/8 bg-white/64 px-3 py-2.5"
+          >
+            <p className="price-display text-xl font-semibold leading-none text-ink">
+              {tile.prefix}
+              <AnimatedNumber value={tile.value} />
+              {tile.suffix}
+            </p>
+            <p className="mt-1 text-[0.66rem] uppercase tracking-[0.12em] text-ink/44">{tile.label}</p>
+          </motion.div>
+        ))}
+      </div>
+      <p className="mt-2 text-[0.68rem] leading-4 text-ink/40">
+        Оценка потенциала (приоритет: {metrics.priority.toLowerCase()}), а не гарантированный результат.
+      </p>
+
+      <p className="mt-4 text-xs font-medium uppercase tracking-[0.2em] text-ink/40">
+        Дорожная карта внедрения
+      </p>
+      <ol className="hero-roadmap mt-3">
+        {content.roadmap.map((phase, index) => (
+          <motion.li
+            key={phase}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1], delay: 0.16 + index * 0.06 }}
+            className="hero-roadmap-step"
+          >
+            <span className="hero-roadmap-dot">{index + 1}</span>
+            {phase}
+          </motion.li>
+        ))}
+      </ol>
+
+      {degraded ? (
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-2xl border border-amber-300/40 bg-amber-50/70 px-3 py-2.5 text-xs text-amber-700">
+          <span className="flex-1 min-w-[12rem]">AI-сервис временно недоступен — показан базовый разбор AEVIX.</span>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="inline-flex items-center gap-1.5 font-semibold text-amber-800 underline-offset-2 hover:underline"
+          >
+            <RotateCcw className="h-3.5 w-3.5" /> Повторить с AI
+          </button>
+        </div>
+      ) : null}
+
+      <div className="mt-5 flex flex-col gap-2.5 sm:flex-row">
+        <Button type="button" onClick={onContinue} className="w-full sm:w-auto">
+          Продолжить полный разбор
+          <ArrowRight className="ml-2 h-4 w-4 transition group-hover:translate-x-1" />
+        </Button>
+      </div>
+    </motion.div>
+  );
+}
+
+function HeroAnalysisSequence({ stage }: { stage: number }) {
+  return (
+    <div
+      className="hero-result glass-panel relative mx-auto flex w-full max-w-xl flex-col justify-center gap-5 p-7 md:p-8"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="flex items-center gap-3">
+        <span className="hero-loading-mark flex h-12 w-12 items-center justify-center rounded-2xl bg-violet/12 text-violet">
+          <BrainCircuit className="h-6 w-6" />
+        </span>
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-violet">AEVIX анализ</p>
+          <p className="text-base font-semibold text-ink">{ANALYSIS_SEQUENCE[stage]}…</p>
+        </div>
+      </div>
+      <ol className="grid gap-2.5">
+        {ANALYSIS_SEQUENCE.map((label, index) => {
+          const state = index < stage ? "done" : index === stage ? "active" : "todo";
+          return (
+            <li key={label} className={cn("hero-sequence-step", `is-${state}`)}>
+              <span className="hero-sequence-dot">
+                {state === "done" ? <Check className="h-3.5 w-3.5" /> : index + 1}
+              </span>
+              {label}
+            </li>
+          );
+        })}
+      </ol>
+      <span className="sr-only">Идёт анализ, пожалуйста подождите.</span>
+    </div>
+  );
+}
+
+function HeroAnalyzer() {
+  const { status, stage, profile, content, summary, degraded, analyze, retry, reset } = useBusiness();
+  const [input, setInput] = useState("");
+  const [focused, setFocused] = useState(false);
+  const [emptyHint, setEmptyHint] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const trimmed = input.trim();
+  const isAnalyzing = status === "analyzing";
+  const showGhost = trimmed.length === 0;
+  const cyclingActive = !focused && showGhost && status === "idle";
+  const { text: placeholderText, index: placeholderIndex } = useFadePlaceholder(
+    heroPlaceholderExamples,
+    cyclingActive,
+  );
+  const canSubmit = trimmed.length > 0 && !isAnalyzing;
+
+  // Auto-grow the textarea up to a sensible ceiling so long descriptions stay readable.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 168)}px`;
+  }, [input]);
+
+  const submit = () => {
+    if (isAnalyzing) return; // guard against double submit
+    if (!trimmed) {
+      setEmptyHint(true);
+      textareaRef.current?.focus();
+      return;
+    }
+    setEmptyHint(false);
+    void analyze(input);
+  };
+
+  const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      submit();
+    }
+  };
+
+  const handleReset = () => {
+    reset();
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  };
+
+  const continueToFullAnalysis = () => {
+    // The consultant reads the described business straight from context, so this only needs
+    // to bring it into view.
+    document.getElementById("ai-анализ")?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "start",
+    });
+  };
+
+  const personalized = status === "ready" && profile && content;
+  const BadgeIcon = personalized ? categoryIcons[profile.category] : BrainCircuit;
+
+  return (
+    <div className="grid w-full items-center gap-8 lg:grid-cols-[1.02fr_0.98fr]">
+      <div data-reveal className="relative z-10">
+        <div className="hero-badge mb-7 inline-flex items-center gap-2 rounded-full border border-ink/10 bg-white/46 px-3 py-2 text-sm text-ink/62 backdrop-blur-xl">
+          <BadgeIcon className="h-4 w-4 text-violet" />
+          {personalized ? content.persona : "AEVIX · AI-платформа для малого бизнеса"}
+        </div>
+        <h1 className="hero-title text-balance font-semibold text-ink">
+          <span data-heading-line className="heading-line">Опишите бизнес —</span>{" "}
+          <span data-heading-line className="heading-line">AEVIX подберёт</span>{" "}
+          <span data-heading-line className="heading-line">автоматизацию.</span>
+        </h1>
+        <p className="mt-5 max-w-xl text-balance text-lg leading-8 text-ink/64 md:text-xl md:leading-9">
+          Не вы изучаете сайт — сайт изучает ваш бизнес и предлагает решения под него.
+        </p>
+
+        <form
+          className="hero-analyzer-form mt-7 md:mt-8"
+          onSubmit={(event) => {
+            event.preventDefault();
+            submit();
+          }}
+        >
+          <label htmlFor="hero-business-input" className="sr-only">
+            Опишите ваш бизнес для анализа AEVIX
+          </label>
+          <div className={cn("hero-field", focused && "is-focused")}>
+            <div className="hero-field-input-wrap">
+              <textarea
+                id="hero-business-input"
+                ref={textareaRef}
+                value={input}
+                onChange={(event) => {
+                  setInput(event.target.value);
+                  if (event.target.value.trim()) setEmptyHint(false);
+                }}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                onKeyDown={onKeyDown}
+                rows={1}
+                aria-label="Опишите ваш бизнес для анализа AEVIX"
+                aria-describedby="hero-input-hint"
+                className="hero-field-input"
+                spellCheck={false}
+              />
+              {showGhost ? (
+                <div className="hero-placeholder-ghost" aria-hidden="true">
+                  <AnimatePresence mode="wait">
+                    <motion.span
+                      key={placeholderIndex}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                    >
+                      {placeholderText}
+                    </motion.span>
+                  </AnimatePresence>
+                </div>
+              ) : null}
+            </div>
+            <Button
+              type="submit"
+              disabled={!canSubmit}
+              aria-label="Проанализировать бизнес"
+              className="hero-field-submit shrink-0"
+            >
+              {isAnalyzing ? (
+                <>
+                  <LoadingDots className="mr-2" />
+                  Анализ
+                </>
+              ) : (
+                <>
+                  Анализировать
+                  <ArrowRight className="ml-2 h-4 w-4 transition group-hover:translate-x-1" />
+                </>
+              )}
+            </Button>
+          </div>
+          <p
+            id="hero-input-hint"
+            aria-live="polite"
+            className={cn("hero-input-hint", emptyHint && "is-error")}
+          >
+            {emptyHint
+              ? "Введите описание бизнеса — хотя бы одно предложение."
+              : "Enter — анализ, Shift+Enter — новая строка."}
+          </p>
+        </form>
+
+        <ul className="hero-trust mt-6">
+          {[
+            [ShieldCheck, "Без обязательств"],
+            [Zap, "Первый разбор за секунды"],
+            [Bot, "AI под ваш бизнес"],
+          ].map(([Icon, label]) => (
+            <li key={label as string}>
+              <Icon className="h-4 w-4 text-violet" />
+              {label as string}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* Not a [data-reveal] target: this column swaps content (dashboard → sequence →
+          result), and a scroll-reveal's ResizeObserver refresh would reset it to hidden on
+          each height change. The dashboard and result carry their own entrance animations. */}
+      <div data-parallax="-4" className="relative">
+        {status === "idle" ? (
+          <HeroDashboard />
+        ) : isAnalyzing ? (
+          <HeroAnalysisSequence stage={stage} />
+        ) : profile && content ? (
+          <HeroAnalysisResult
+            profile={profile}
+            content={content}
+            summary={summary}
+            degraded={degraded}
+            onRetry={() => void retry()}
+            onReset={handleReset}
+            onContinue={continueToFullAnalysis}
+          />
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -1025,38 +1518,8 @@ function HeroScene() {
   return (
     <section id="главная" className="scene hero-scene relative flex items-center overflow-hidden pt-28">
       <div className="absolute inset-x-0 top-24 mx-auto h-px max-w-7xl bg-gradient-to-r from-transparent via-ink/18 to-transparent" />
-      <div className="mx-auto grid w-full max-w-7xl items-center gap-5 md:gap-10 lg:grid-cols-[1.05fr_0.95fr]">
-        <div data-reveal className="relative z-10">
-          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-ink/10 bg-white/46 px-3 py-2 text-sm text-ink/62 backdrop-blur-xl">
-            <MousePointer2 className="h-4 w-4 text-violet" />
-            Цифровые системы для малого бизнеса
-          </div>
-          <h1 className="hero-title text-balance font-semibold text-ink">
-            <span data-heading-line className="heading-line">Пока вы ведете</span>{" "}
-            <span data-heading-line className="heading-line">бизнес, система</span>{" "}
-            <span data-heading-line className="heading-line">выполняет рутину.</span>
-          </h1>
-          <p className="mt-5 max-w-xl text-balance text-xl leading-8 text-ink/66 md:mt-7 md:text-2xl md:leading-9">
-            AEVIX объединяет заявки, запись, напоминания и CRM-сценарии в один рабочий контур.
-          </p>
-          <div className="mt-7 flex flex-col gap-3 md:mt-9 sm:flex-row">
-            <Button asChild>
-              <a href="#ai-анализ">
-                Подобрать решение
-                <ArrowRight className="ml-2 h-4 w-4 transition group-hover:translate-x-1" />
-              </a>
-            </Button>
-            <Button asChild variant="glass">
-              <a href="#возможности">
-                <Play className="mr-2 h-4 w-4" />
-                Посмотреть возможности
-              </a>
-            </Button>
-          </div>
-        </div>
-        <div data-reveal data-parallax="-4">
-          <HeroDashboard />
-        </div>
+      <div className="mx-auto w-full max-w-7xl">
+        <HeroAnalyzer />
       </div>
       <div className="hero-scroll-cue absolute bottom-6 left-1/2 hidden -translate-x-1/2 flex-col items-center gap-2 text-ink/42 md:flex">
         <span className="h-8 w-px bg-gradient-to-b from-ink/5 to-ink/35" />
@@ -1079,7 +1542,9 @@ function getSafeFlow(result: AnalysisResult | null, input: string) {
 }
 
 function AiConsultantScene() {
-  const [input, setInput] = useState("У меня барбершоп, запись клиентов ведется вручную");
+  const { input: businessInput } = useBusiness();
+  const [input, setInput] = useState("");
+  const lastSyncedRef = useRef("");
   const [messages, setMessages] = useState<AiMessage[]>([
     {
       id: "intro",
@@ -1122,6 +1587,16 @@ function AiConsultantScene() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  // Prefill from the business the visitor described in the Hero (single source of truth:
+  // the context). Syncs only when that description changes, so manual edits here are kept
+  // and nothing auto-submits — the visitor decides when to run the deeper analysis.
+  useEffect(() => {
+    if (businessInput && businessInput !== lastSyncedRef.current) {
+      lastSyncedRef.current = businessInput;
+      setInput(businessInput);
+    }
+  }, [businessInput]);
 
   useEffect(() => {
     if (userScrolledAway) {
@@ -1870,6 +2345,10 @@ function FeatureModules() {
 }
 
 function ServicePricingScene() {
+  const { status, profile, content } = useBusiness();
+  const personalized = status === "ready" && profile && content;
+  const focusModules = content?.focusModules ?? [];
+
   return (
     <section id="стоимость" className="scene pricing-scene relative flex items-center overflow-hidden">
       <div className="mx-auto w-full max-w-7xl">
@@ -1882,15 +2361,27 @@ function ServicePricingScene() {
             <span data-heading-line className="heading-line">без скрытых коэффициентов.</span>
           </h2>
           <p className="mt-6 max-w-2xl text-lg leading-8 text-ink/62">
-            Изучите базовые модули. Персональный расчёт доступен перед финальным обращением.
+            {personalized
+              ? `Отмечены модули, с которых стоит начать для «${profile.label}». Персональный расчёт — ниже.`
+              : "Изучите базовые модули. Персональный расчёт доступен перед финальным обращением."}
           </p>
         </div>
 
         <div data-reveal className="card-field grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {serviceCatalog.map((service) => {
             const Icon = service.icon;
+            const recommended = personalized && focusModules.includes(service.title);
             return (
-              <article key={service.id} className="interactive-surface glass-panel rounded-[1.75rem] p-5">
+              <article
+                key={service.id}
+                className={cn(
+                  "interactive-surface glass-panel relative rounded-[1.75rem] p-5",
+                  recommended && "is-recommended",
+                )}
+              >
+                {recommended ? (
+                  <span className="hero-recommend-badge absolute right-4 top-4">Рекомендуем</span>
+                ) : null}
                 <Icon className="h-6 w-6 text-violet" />
                 <h3 className="mt-8 text-2xl font-semibold">{service.title}</h3>
                 <p className="mt-3 text-base leading-7 text-ink/58">{service.description}</p>
@@ -2396,8 +2887,10 @@ function StoryScene() {
 }
 
 function CasesScene() {
+  const { status, profile, content } = useBusiness();
   const [active, setActive] = useState(0);
   const scenario = applicationScenarios[active];
+  const personalized = status === "ready" && profile && content;
 
   return (
     <section id="сценарии" className="scene cases-scene flex items-center text-ink">
@@ -2416,6 +2909,34 @@ function CasesScene() {
             Возможные сценарии применения, а не результаты реальных клиентов.
           </p>
         </div>
+
+        {personalized ? (
+          <motion.div
+            key={profile.category}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.44, ease: [0.22, 1, 0.36, 1] }}
+            className="hero-personal-case mb-6 rounded-[2rem] border border-violet/18 bg-gradient-to-br from-white via-[#f8f4ff] to-[#eef1f7] p-6"
+          >
+            <div className="mb-4 flex items-center gap-2 text-sm font-medium uppercase tracking-[0.18em] text-violet">
+              <Sparkles className="h-4 w-4" /> Ваш сценарий · {profile.label}
+            </div>
+            <div className="grid gap-4 lg:grid-cols-3">
+              {[
+                ["01", "Как было", content.caseBefore],
+                ["02", "Что автоматизировали", content.caseAutomated],
+                ["03", "Что получилось", content.caseResult],
+              ].map(([index, title, text]) => (
+                <div key={title} className="relative rounded-2xl border border-ink/8 bg-white/70 p-5">
+                  <span className="price-display text-sm font-semibold text-violet/70">{index}</span>
+                  <p className="mt-2 text-xs uppercase tracking-[0.2em] text-violet">{title}</p>
+                  <p className="mt-3 text-base leading-7 text-ink/74">{text}</p>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        ) : null}
+
         <div data-reveal className="flex gap-2 overflow-x-auto pb-3">
           {applicationScenarios.map((item, index) => (
             <button
@@ -2618,7 +3139,55 @@ function FounderScene() {
   );
 }
 
+function FaqScene() {
+  const { status, profile, content } = useBusiness();
+  const personalized = status === "ready" && profile && content;
+  const faq = personalized ? content.faq : getBusinessContent("generic").faq;
+  const [open, setOpen] = useState(0);
+
+  return (
+    <section id="faq" className="scene faq-scene flex items-center">
+      <div className="mx-auto w-full max-w-4xl">
+        <div data-reveal className="mb-10 max-w-3xl">
+          <p className="mb-4 text-sm font-medium uppercase tracking-[0.28em] text-violet">
+            {personalized ? `FAQ · ${profile.label}` : "Частые вопросы"}
+          </p>
+          <h2 className="section-title text-balance font-semibold">
+            <span data-heading-line className="heading-line">
+              {personalized ? "Ответы под ваш бизнес." : "Короткие ответы на частые вопросы."}
+            </span>
+          </h2>
+        </div>
+        <div data-reveal className="grid gap-2.5">
+          {faq.map((item, index) => {
+            const isOpen = open === index;
+            return (
+              <div key={item.q} className={cn("faq-item", isOpen && "is-open")}>
+                <button
+                  type="button"
+                  aria-expanded={isOpen}
+                  onClick={() => setOpen(isOpen ? -1 : index)}
+                  className="faq-question"
+                >
+                  <span>{item.q}</span>
+                  <ChevronDown className={cn("faq-chevron h-4 w-4 shrink-0", isOpen && "rotate-180")} />
+                </button>
+                <div className="faq-answer" aria-hidden={!isOpen}>
+                  <p>{item.a}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ContactScene() {
+  const { status, profile, content } = useBusiness();
+  const personalized = status === "ready" && profile && content;
+
   return (
     <section id="контакты" className="scene contact-scene flex items-center">
       <div className="mx-auto w-full max-w-6xl">
@@ -2632,13 +3201,15 @@ function ContactScene() {
             <span data-heading-line className="heading-line">повторяющуюся работу.</span>
           </h2>
           <p className="mt-7 max-w-xl text-xl leading-8 text-porcelain/58">
-            Расскажите, где команда работает вручную. AEVIX предложит первый сценарий.
+            {personalized
+              ? `Соберём систему под «${profile.label}»: ${profile.automations[0]?.toLowerCase()}, CRM и напоминания в одном контуре.`
+              : "Расскажите, где команда работает вручную. AEVIX предложит первый сценарий."}
           </p>
           <div className="mt-10 flex flex-col items-start gap-4">
             <Button asChild className="bg-porcelain text-ink hover:bg-white">
               <a href={contacts.whatsapp.href} target="_blank" rel="noreferrer">
                 <MessageCircle className="mr-2 h-4 w-4" />
-                Обсудить проект <ArrowRight className="ml-2 h-4 w-4" />
+                {personalized && content ? content.ctaLabel : "Обсудить проект"} <ArrowRight className="ml-2 h-4 w-4" />
               </a>
             </Button>
             <p className="text-sm text-porcelain/48">Telegram и email доступны ниже — выберите удобный канал.</p>
@@ -2748,27 +3319,60 @@ function StructuredData() {
   );
 }
 
+/**
+ * Owns the live accent. When a business is recognised, its accent RGB is written to the
+ * shell's registered `--accent-*` channels and the whole product re-themes with a smooth,
+ * inherited transition (see globals.css). Idle falls back to the AEVIX violet.
+ */
+function AppShell({ children }: { children: ReactNode }) {
+  const { status, content } = useBusiness();
+  const accent = status === "ready" && content ? content.accent : null;
+  const style = accent
+    ? ({ "--accent-r": accent.r, "--accent-g": accent.g, "--accent-b": accent.b } as CSSProperties)
+    : undefined;
+
+  // One-shot accent sweep at the moment the interface re-themes, tying the rebuild together.
+  const [rebuildKey, setRebuildKey] = useState(0);
+  const wasReady = useRef(false);
+  useEffect(() => {
+    if (status === "ready" && !wasReady.current) setRebuildKey((key) => key + 1);
+    wasReady.current = status === "ready";
+  }, [status]);
+
+  return (
+    <div className="app-shell" style={style}>
+      {rebuildKey > 0 ? <span key={rebuildKey} className="app-rebuild-flash" aria-hidden="true" /> : null}
+      {children}
+    </div>
+  );
+}
+
 export default function Home() {
   usePremiumMotion();
 
   return (
-    <main>
-      <StructuredData />
-      <TopNav />
-      <HeroScene />
-      <AiConsultantScene />
-      <ProblemsScene />
-      <FeatureModules />
-      <ServicePricingScene />
-      <StoryScene />
-      <CasesScene />
-      <TradingBotScene />
-      <ProcessScene />
-      <PrinciplesScene />
-      <FounderScene />
-      <PricingCalculatorScene />
-      <ContactScene />
-      <FooterScene />
-    </main>
+    <BusinessProvider>
+      <AppShell>
+      <main>
+        <StructuredData />
+        <TopNav />
+        <HeroScene />
+        <AiConsultantScene />
+        <ProblemsScene />
+        <FeatureModules />
+        <ServicePricingScene />
+        <StoryScene />
+        <CasesScene />
+        <TradingBotScene />
+        <ProcessScene />
+        <PrinciplesScene />
+        <FounderScene />
+        <PricingCalculatorScene />
+        <FaqScene />
+        <ContactScene />
+        <FooterScene />
+      </main>
+      </AppShell>
+    </BusinessProvider>
   );
 }
