@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
@@ -118,7 +118,6 @@ const navItems = [
   { label: "Возможности", href: "#возможности", desc: "Модули и автоматизации AEVIX" },
   { label: "Стоимость", href: "#стоимость", desc: "Открытые цены и расчёт" },
   { label: "Сценарии", href: "#сценарии", desc: "Как это работает в вашей нише" },
-  { label: "Экосистема", href: "#торговый-бот", desc: "Как связаны модули" },
   { label: "FAQ", href: "#faq", desc: "Частые вопросы по вашему бизнесу" },
   { label: "Контакты", href: "#контакты", desc: "Обсудить проект" },
 ];
@@ -400,50 +399,10 @@ const modules: Module[] = [
   },
 ];
 
-const automationScenarios = [
-  {
-    label: "Салон",
-    customer: "Здравствуйте. Хочу записаться завтра после 17:00.",
-    steps: ["AI понял запрос", "Проверил расписание", "Нашёл свободное окно", "Создал запись", "Обновил CRM", "Запланировал напоминание", "Отправил подтверждение"],
-  },
-  {
-    label: "Ресторан",
-    customer: "Добрый вечер. Нужен столик на четверых сегодня.",
-    steps: ["AI уточнил время", "Проверил доступные столы", "Зафиксировал бронь", "Передал детали залу", "Обновил список гостей", "Подготовил напоминание", "Подтвердил бронь"],
-  },
-  {
-    label: "Магазин",
-    customer: "Есть ли этот аромат в наличии и можно ли забрать сегодня?",
-    steps: ["AI распознал товар", "Проверил наличие", "Уточнил точку выдачи", "Создал заявку", "Обновил статус", "Передал заказ сотруднику", "Отправил подтверждение"],
-  },
-  {
-    label: "Стоматология",
-    customer: "Нужна консультация врача на этой неделе.",
-    steps: ["AI уточнил задачу", "Подобрал специалиста", "Проверил расписание", "Предложил время", "Создал запись", "Обновил CRM", "Отправил памятку"],
-  },
-  {
-    label: "Автосервис",
-    customer: "Нужно проверить тормоза и записаться на диагностику.",
-    steps: ["AI определил услугу", "Собрал данные автомобиля", "Проверил загрузку", "Предложил слот", "Создал заказ", "Назначил мастера", "Отправил подтверждение"],
-  },
-] as const;
-
 const beforeAfterItems = {
   before: ["Ручные ответы", "Excel и таблицы", "Записи в блокноте", "Пропущенные сообщения", "Звонки без контекста"],
   after: ["AI-консультант", "Единая CRM", "Автоматические сценарии", "Понятные статусы", "Онлайн-запись"],
 } as const;
-
-const ecosystemModules = [
-  { label: "Сайт", icon: Globe2, related: ["CRM", "Аналитика", "Платежи"] },
-  { label: "Telegram", icon: Send, related: ["CRM", "Календарь", "AI"] },
-  { label: "WhatsApp", icon: MessageCircle, related: ["CRM", "Календарь", "AI"] },
-  { label: "Instagram", icon: Star, related: ["CRM", "AI", "Аналитика"] },
-  { label: "CRM", icon: Layers3, related: ["Сайт", "Telegram", "WhatsApp", "Email", "Аналитика"] },
-  { label: "Календарь", icon: CalendarCheck, related: ["Telegram", "WhatsApp", "CRM"] },
-  { label: "Email", icon: Mail, related: ["CRM", "Аналитика"] },
-  { label: "Аналитика", icon: TrendingUp, related: ["Сайт", "CRM", "Email", "Платежи"] },
-  { label: "Платежи", icon: CreditCard, related: ["Сайт", "CRM", "Аналитика"] },
-] as const;
 
 const applicationScenarios = [
   {
@@ -472,16 +431,6 @@ const applicationScenarios = [
   },
 ];
 
-const roadmapStages = [
-  ["Исследование", "Разбираем задачи, роли и текущий путь клиента."],
-  ["Планирование", "Фиксируем модули, интеграции и границы первой версии."],
-  ["Дизайн", "Проектируем интерфейс и понятные пользовательские сценарии."],
-  ["Разработка", "Собираем рабочие модули и соединяем их с бизнес-процессом."],
-  ["Тестирование", "Проверяем реальные обращения, роли и крайние ситуации."],
-  ["Запуск", "Подключаем систему к рабочим каналам и данным."],
-  ["Поддержка", "Наблюдаем за процессом и уточняем сценарии по реальной работе."],
-] as const;
-
 const aiQuickPrompts = [
   "Сколько это стоит?",
   "Сколько занимает разработка?",
@@ -492,13 +441,6 @@ const aiQuickPrompts = [
   "У меня барбершоп",
   "Что если у меня несколько филиалов?",
 ] as const;
-
-const principles = [
-  "Сначала понятный процесс, потом AI.",
-  "Никаких выдуманных результатов и фальшивых историй.",
-  "Клиент должен понимать следующий шаг без технического словаря.",
-  "Система должна помогать команде, а не создавать новую ручную работу.",
-];
 
 const analysisStages = [
   "Изучаем описание бизнеса",
@@ -870,7 +812,8 @@ function LoadingDots({ className }: { className?: string }) {
 /** Counts up to `value` on mount so personalised metrics visibly "roll" into place. */
 function AnimatedNumber({ value, className }: { value: number; className?: string }) {
   const reduced = usePrefersReducedMotion();
-  const [display, setDisplay] = useState(value);
+  // Start at 0 and roll up; starting at `value` would flash the final number for one frame.
+  const [display, setDisplay] = useState(0);
 
   useEffect(() => {
     if (reduced) {
@@ -895,7 +838,7 @@ function AnimatedNumber({ value, className }: { value: number; className?: strin
 }
 
 function TopNav() {
-  const { status, profile, content, reset } = useBusiness();
+  const { status, profile, content, reset, openConsultation } = useBusiness();
   const [activeHref, setActiveHref] = useState("#главная");
   const [centerOpen, setCenterOpen] = useState(false);
 
@@ -960,11 +903,9 @@ function TopNav() {
                 {profile.label}
               </span>
             ) : null}
-            <Button asChild variant="glass" size="sm" className="hidden sm:inline-flex">
-              <a href={contacts.whatsapp.href} target="_blank" rel="noreferrer">
-                <MessageCircle className="mr-2 h-4 w-4" />
-                Обсудить систему
-              </a>
+            <Button type="button" size="sm" className="hidden sm:inline-flex" onClick={openConsultation}>
+              <Sparkles className="mr-2 h-4 w-4" />
+              Консультация
             </Button>
             <button
               type="button"
@@ -1036,12 +977,17 @@ function TopNav() {
           </div>
 
           <div className="nav-center-actions">
-            <Button asChild className="w-full sm:w-auto" onClick={() => setCenterOpen(false)}>
-              <a href={contacts.whatsapp.href} target="_blank" rel="noreferrer">
-                <MessageCircle className="mr-2 h-4 w-4" />
-                {personalized && content ? content.ctaLabel : "Обсудить систему"}
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </a>
+            <Button
+              type="button"
+              className="w-full sm:w-auto"
+              onClick={() => {
+                setCenterOpen(false);
+                openConsultation();
+              }}
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              Бесплатная консультация
+              <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -1542,7 +1488,7 @@ function getSafeFlow(result: AnalysisResult | null, input: string) {
 }
 
 function AiConsultantScene() {
-  const { input: businessInput } = useBusiness();
+  const { input: businessInput, openConsultation } = useBusiness();
   const [input, setInput] = useState("");
   const lastSyncedRef = useRef("");
   const [messages, setMessages] = useState<AiMessage[]>([
@@ -1794,6 +1740,7 @@ function AiConsultantScene() {
             onScroll={onMessagesScroll}
             tabIndex={0}
             aria-label="История диалога с AI-консультантом"
+            data-lenis-prevent
             className="aevix-ai-scroll aevix-chat-conversation relative flex min-h-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto overscroll-contain scroll-smooth rounded-[1.65rem] border border-ink/6 bg-gradient-to-b from-white/78 to-white/42 p-3 pr-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]"
           >
             {messages.slice(-5).map((message) => (
@@ -1843,7 +1790,7 @@ function AiConsultantScene() {
                     <h3 className="mt-2 text-2xl font-semibold tracking-[-0.03em]">План решения</h3>
                   </div>
                   <Button
-                    onClick={() => scrollToSection("контакты")}
+                    onClick={openConsultation}
                     size="sm"
                     className="aevix-ai-action bg-ink text-porcelain hover:bg-ink"
                   >
@@ -2809,83 +2756,6 @@ function PricingCalculatorScene() {
   );
 }
 
-function StoryScene() {
-  const [scenarioIndex, setScenarioIndex] = useState(0);
-  const [activeStep, setActiveStep] = useState(0);
-  const [playing, setPlaying] = useState(true);
-  const scenario = automationScenarios[scenarioIndex];
-
-  useEffect(() => {
-    if (!playing) return;
-    const timer = window.setInterval(() => {
-      setActiveStep((current) => {
-        if (current >= scenario.steps.length - 1) {
-          setPlaying(false);
-          return current;
-        }
-        return current + 1;
-      });
-    }, 760);
-    return () => window.clearInterval(timer);
-  }, [playing, scenario.steps.length]);
-
-  const selectScenario = (index: number) => {
-    setScenarioIndex(index);
-    setActiveStep(0);
-    setPlaying(!window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-  };
-
-  const replay = () => {
-    setActiveStep(0);
-    setPlaying(!window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-  };
-
-  return (
-    <section id="автоматизация-демо" className="scene story-scene flex items-center">
-      <div className="mx-auto w-full max-w-7xl">
-        <div data-reveal className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
-          <div>
-          <p className="mb-4 text-sm font-medium uppercase text-violet">Живая автоматизация</p>
-          <h2 className="section-title text-balance font-semibold">
-            <span data-heading-line className="heading-line">Посмотрите, как работает</span>{" "}
-            <span data-heading-line className="heading-line">ваш будущий AI.</span>
-          </h2>
-          </div>
-          <Button type="button" variant="glass" onClick={replay}>
-            <RotateCcw className="mr-2 h-4 w-4" /> Повторить
-          </Button>
-        </div>
-        <div data-reveal className="automation-demo mt-9">
-          <div className="automation-tabs" aria-label="Сценарии автоматизации">
-            {automationScenarios.map((item, index) => (
-              <button key={item.label} type="button" aria-pressed={scenarioIndex === index} onClick={() => selectScenario(index)}>{item.label}</button>
-            ))}
-          </div>
-          <div className="automation-customer">
-            <span>Клиент</span>
-            <p>{scenario.customer}</p>
-          </div>
-          <div className="automation-flow" aria-live="polite">
-            {scenario.steps.map((step, index) => {
-              const complete = index <= activeStep;
-              return (
-                <div key={step} className={cn("automation-step", complete && "is-complete", index === activeStep && playing && "is-active")}>
-                  <span>{complete ? <Check className="h-4 w-4" /> : index + 1}</span>
-                  <strong>{step}</strong>
-                  {index < scenario.steps.length - 1 ? <i aria-hidden="true" /> : null}
-                </div>
-              );
-            })}
-          </div>
-          <div className={cn("automation-success", activeStep === scenario.steps.length - 1 && "is-visible")}>
-            <Check className="h-5 w-5" /> Сценарий завершён. Клиент и команда получили следующий шаг.
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function CasesScene() {
   const { status, profile, content } = useBusiness();
   const [active, setActive] = useState(0);
@@ -2983,130 +2853,6 @@ function CasesScene() {
   );
 }
 
-function TradingBotScene() {
-  const [active, setActive] = useState<string | null>("CRM");
-  const selected = ecosystemModules.find((module) => module.label === active);
-  const relatedModules: readonly string[] = selected?.related ?? [];
-
-  return (
-    <section id="торговый-бот" className="scene technical-scene relative flex items-center overflow-hidden">
-      <div className="mx-auto w-full max-w-7xl">
-        <div data-reveal className="max-w-3xl">
-          <p className="mb-4 text-sm font-medium uppercase text-violet">Экосистема AEVIX</p>
-          <h2 className="section-title text-balance font-semibold">
-            <span data-heading-line className="heading-line">Один центр.</span>{" "}
-            <span data-heading-line className="heading-line">Все каналы работают вместе.</span>
-          </h2>
-          <p className="mt-6 max-w-xl text-lg leading-8 text-ink/62">
-            Наведите или нажмите на модуль, чтобы увидеть связанные потоки данных.
-          </p>
-        </div>
-        <div data-reveal className="ecosystem-stage mt-10">
-          <div className="ecosystem-center">
-            <span>AX</span>
-            <strong>AEVIX</strong>
-            <small>единый контур</small>
-          </div>
-          <div className="ecosystem-nodes">
-            {ecosystemModules.map((module, index) => {
-              const Icon = module.icon;
-              const highlighted = !active || module.label === active || relatedModules.includes(module.label);
-              return (
-              <button
-                key={module.label}
-                type="button"
-                style={{ "--node-index": index } as React.CSSProperties}
-                onPointerEnter={() => setActive(module.label)}
-                onFocus={() => setActive(module.label)}
-                onClick={() => setActive(module.label)}
-                aria-pressed={active === module.label}
-                className={cn("ecosystem-node interactive-surface", highlighted ? "is-related" : "is-muted", active === module.label && "is-active")}
-              >
-                <Icon className="h-5 w-5" />
-                <span>{module.label}</span>
-                <i aria-hidden="true" />
-              </button>
-              );
-            })}
-          </div>
-          <div className="ecosystem-status" aria-live="polite">
-            <span>{selected?.label ?? "AEVIX"}</span>
-            <p>{selected ? `Связанные модули: ${selected.related.join(", ")}.` : "Выберите модуль, чтобы увидеть поток."}</p>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function ProcessScene() {
-  const [active, setActive] = useState(0);
-  const progress = (active / (roadmapStages.length - 1)) * 100;
-
-  return (
-    <section id="процесс" className="scene process-scene relative flex items-center overflow-hidden">
-      <div className="mx-auto w-full max-w-7xl">
-        <div data-reveal className="max-w-3xl">
-          <p className="mb-4 text-sm font-medium uppercase text-violet">Интерактивный roadmap</p>
-          <h2 className="section-title text-balance font-semibold">
-            <span data-heading-line className="heading-line">От разбора задачи</span>{" "}
-            <span data-heading-line className="heading-line">до работающей системы.</span>
-          </h2>
-        </div>
-        <div data-reveal className="roadmap mt-10">
-          <div className="roadmap-track" aria-hidden="true"><motion.span animate={{ width: `${progress}%` }} /></div>
-          <div className="roadmap-stages">
-            {roadmapStages.map(([title], index) => (
-              <button key={title} type="button" aria-pressed={active === index} onClick={() => setActive(index)} className={cn(index <= active && "is-complete", active === index && "is-active")}>
-                <span>{index < active ? <Check className="h-4 w-4" /> : index + 1}</span>
-                <strong>{title}</strong>
-              </button>
-            ))}
-          </div>
-          <motion.div key={active} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="roadmap-detail">
-            <span>Этап {active + 1} из {roadmapStages.length}</span>
-            <h3>{roadmapStages[active][0]}</h3>
-            <p>{roadmapStages[active][1]}</p>
-            {active < roadmapStages.length - 1 ? (
-              <Button type="button" variant="glass" onClick={() => setActive((current) => Math.min(current + 1, roadmapStages.length - 1))}>
-                Следующий этап <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            ) : (
-              <Button type="button" onClick={() => scrollToSection("контакты")}>Обсудить запуск</Button>
-            )}
-          </motion.div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function PrinciplesScene() {
-  return (
-    <section className="scene principles-scene flex items-center">
-      <div className="mx-auto w-full max-w-7xl">
-        <div data-reveal className="mb-10 max-w-3xl">
-          <p className="mb-4 text-sm font-medium uppercase tracking-[0.28em] text-violet">
-            Принципы
-          </p>
-          <h2 className="section-title text-balance font-semibold">
-            <span data-heading-line className="heading-line">Мы не продаем бота.</span>{" "}
-            <span data-heading-line className="heading-line">Мы убираем повторяющуюся работу.</span>
-          </h2>
-        </div>
-        <div className="card-field grid gap-4 md:grid-cols-2">
-          {principles.map((principle, index) => (
-            <div key={principle} data-reveal className="glass-panel rounded-[1.75rem] p-6">
-              <p className="text-sm uppercase tracking-[0.24em] text-ink/36">0{index + 1}</p>
-              <p className="mt-8 text-2xl font-semibold leading-9 tracking-[-0.03em]">{principle}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function FounderScene() {
   return (
     <section className="scene founder-scene flex items-center">
@@ -3185,48 +2931,146 @@ function FaqScene() {
 }
 
 function ContactScene() {
-  const { status, profile, content } = useBusiness();
+  const { status, profile, content, input } = useBusiness();
   const personalized = status === "ready" && profile && content;
+
+  const [name, setName] = useState("");
+  const [contact, setContact] = useState("");
+  const [business, setBusiness] = useState("");
+  const [task, setTask] = useState("");
+  const [sent, setSent] = useState(false);
+  const syncedRef = useRef("");
+
+  // Prefill the business field with what the visitor already described in the Hero.
+  useEffect(() => {
+    if (input && input !== syncedRef.current) {
+      syncedRef.current = input;
+      setBusiness(input);
+    }
+  }, [input]);
+
+  const canSend = name.trim().length > 0 && contact.trim().length > 0;
+
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!canSend) return;
+    const lines = [
+      "Заявка с сайта AEVIX",
+      `Имя: ${name.trim()}`,
+      `Контакт: ${contact.trim()}`,
+      business.trim() ? `Бизнес: ${business.trim()}` : null,
+      task.trim() ? `Задача: ${task.trim()}` : null,
+      personalized ? `Ниша: ${profile.label}` : null,
+    ].filter(Boolean);
+    const url = `${contacts.whatsapp.href}?text=${encodeURIComponent(lines.join("\n"))}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+    setSent(true);
+  };
 
   return (
     <section id="контакты" className="scene contact-scene flex items-center">
       <div className="mx-auto w-full max-w-6xl">
         <div data-reveal className="dark-glass overflow-hidden rounded-[2.2rem] p-7 text-porcelain md:p-10">
-          <div className="mb-16 flex items-center justify-between">
+          <div className="mb-10 flex items-center justify-between">
             <span className="text-sm uppercase tracking-[0.32em] text-porcelain/42">AEVIX</span>
             <ShieldCheck className="h-6 w-6 text-violet" />
           </div>
-          <h2 className="contact-title max-w-3xl text-balance font-semibold">
-            <span data-heading-line className="heading-line">Обсудим, где AI может снять</span>{" "}
-            <span data-heading-line className="heading-line">повторяющуюся работу.</span>
-          </h2>
-          <p className="mt-7 max-w-xl text-xl leading-8 text-porcelain/58">
-            {personalized
-              ? `Соберём систему под «${profile.label}»: ${profile.automations[0]?.toLowerCase()}, CRM и напоминания в одном контуре.`
-              : "Расскажите, где команда работает вручную. AEVIX предложит первый сценарий."}
-          </p>
-          <div className="mt-10 flex flex-col items-start gap-4">
-            <Button asChild className="bg-porcelain text-ink hover:bg-white">
-              <a href={contacts.whatsapp.href} target="_blank" rel="noreferrer">
-                <MessageCircle className="mr-2 h-4 w-4" />
-                {personalized && content ? content.ctaLabel : "Обсудить проект"} <ArrowRight className="ml-2 h-4 w-4" />
-              </a>
-            </Button>
-            <p className="text-sm text-porcelain/48">Telegram и email доступны ниже — выберите удобный канал.</p>
-          </div>
-          <div className="mt-7 grid gap-3 text-sm text-porcelain/58 md:grid-cols-3">
-            <a href={contacts.whatsapp.href} target="_blank" rel="noreferrer" className="interactive-surface rounded-2xl border border-white/10 bg-white/[0.055] p-4 transition hover:bg-white/[0.09] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/40">
-              <span className="block text-porcelain/36">{contacts.whatsapp.label}</span>
-              <span className="mt-1 block text-porcelain">{contacts.whatsapp.value}</span>
-            </a>
-            <a href={contacts.telegram.href} target="_blank" rel="noreferrer" className="interactive-surface rounded-2xl border border-white/10 bg-white/[0.055] p-4 transition hover:bg-white/[0.09] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/40">
-              <span className="block text-porcelain/36">{contacts.telegram.label}</span>
-              <span className="mt-1 block text-porcelain">{contacts.telegram.value}</span>
-            </a>
-            <a href={contacts.email.href} className="interactive-surface rounded-2xl border border-white/10 bg-white/[0.055] p-4 transition hover:bg-white/[0.09] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/40">
-              <span className="block text-porcelain/36">{contacts.email.label}</span>
-              <span className="mt-1 block text-porcelain">{contacts.email.value}</span>
-            </a>
+
+          <div className="grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+            <div>
+              <h2 className="contact-title text-balance font-semibold">
+                <span data-heading-line className="heading-line">Оставьте заявку —</span>{" "}
+                <span data-heading-line className="heading-line">вернёмся с планом.</span>
+              </h2>
+              <p className="mt-6 max-w-md text-lg leading-8 text-porcelain/58">
+                {personalized
+                  ? `Соберём систему под «${profile.label}»: ${profile.automations[0]?.toLowerCase()}, CRM и напоминания в одном контуре.`
+                  : "Опишите бизнес — вернёмся с первым сценарием автоматизации, ориентиром по цене и срокам."}
+              </p>
+              <ul className="contact-assurances mt-7">
+                {[
+                  [Clock3, "Отвечаем в течение рабочего дня"],
+                  [ShieldCheck, "Без обязательств и предоплаты за разбор"],
+                  [Workflow, "Этапы и цена — до старта работ"],
+                ].map(([Icon, label]) => (
+                  <li key={label as string}>
+                    <Icon className="h-4 w-4 text-violet" />
+                    {label as string}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="contact-form-card">
+              {sent ? (
+                <div className="contact-sent" role="status">
+                  <span className="contact-sent-mark">
+                    <Check className="h-6 w-6" />
+                  </span>
+                  <p className="text-lg font-semibold text-porcelain">Заявка открыта в WhatsApp</p>
+                  <p className="mt-2 text-sm text-porcelain/58">
+                    Отправьте подготовленное сообщение — мы ответим в течение рабочего дня.
+                  </p>
+                  <button type="button" className="contact-sent-again" onClick={() => setSent(false)}>
+                    Отправить ещё одну заявку
+                  </button>
+                </div>
+              ) : (
+                <form className="lead-form" onSubmit={submit}>
+                  <label className="lead-field">
+                    <span>Имя</span>
+                    <input
+                      className="lead-input"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      placeholder="Как к вам обращаться"
+                      autoComplete="name"
+                      required
+                    />
+                  </label>
+                  <label className="lead-field">
+                    <span>Телефон, Telegram или WhatsApp</span>
+                    <input
+                      className="lead-input"
+                      value={contact}
+                      onChange={(event) => setContact(event.target.value)}
+                      placeholder="+7… или @username"
+                      required
+                    />
+                  </label>
+                  <label className="lead-field">
+                    <span>Ваш бизнес</span>
+                    <textarea
+                      className="lead-input lead-textarea"
+                      value={business}
+                      onChange={(event) => setBusiness(event.target.value)}
+                      placeholder="Например: барбершоп на 3 мастера, запись вручную"
+                      rows={2}
+                    />
+                  </label>
+                  <label className="lead-field">
+                    <span>Что хотите автоматизировать <span className="lead-optional">(необязательно)</span></span>
+                    <input
+                      className="lead-input"
+                      value={task}
+                      onChange={(event) => setTask(event.target.value)}
+                      placeholder="Запись, ответы клиентам, напоминания…"
+                    />
+                  </label>
+                  <Button type="submit" disabled={!canSend} className="lead-submit w-full">
+                    <MessageCircle className="mr-2 h-4 w-4" />
+                    {personalized && content ? content.ctaLabel : "Отправить заявку"}
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                  <p className="lead-note">
+                    Заявка уйдёт в WhatsApp AEVIX. Или напишите напрямую:{" "}
+                    <a href={contacts.telegram.href} target="_blank" rel="noreferrer">Telegram</a>
+                    {" · "}
+                    <a href={contacts.email.href}>почта</a>.
+                  </p>
+                </form>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -3256,7 +3100,7 @@ function FooterScene() {
           </nav>
           <nav aria-label="Ресурсы AEVIX">
             <p>Ресурсы</p>
-            <a href="#ai-анализ">FAQ через AI</a>
+            <a href="#faq">FAQ</a>
             <button type="button" onClick={() => setLegal((current) => current === "privacy" ? null : "privacy")}>Privacy Policy</button>
             <button type="button" onClick={() => setLegal((current) => current === "terms" ? null : "terms")}>Terms</button>
           </nav>
@@ -3343,7 +3187,72 @@ function AppShell({ children }: { children: ReactNode }) {
     <div className="app-shell" style={style}>
       {rebuildKey > 0 ? <span key={rebuildKey} className="app-rebuild-flash" aria-hidden="true" /> : null}
       {children}
+      <ConsultationModal />
     </div>
+  );
+}
+
+/**
+ * Free-consultation popup. Opened by every generic "get in touch" CTA (header, Navigation
+ * Center, analysis result) so those never scroll or jump — they surface a channel picker.
+ * The direct WhatsApp/Telegram/email links at the end of the page stay direct.
+ */
+function ConsultationModal() {
+  const { consultationOpen, closeConsultation, input, status, profile } = useBusiness();
+  const personalized = status === "ready" && profile;
+  const intro = "Здравствуйте! Хочу записаться на бесплатную консультацию AEVIX.";
+  const message = input.trim() ? `${intro}\nМой бизнес: ${input.trim()}` : intro;
+  const whatsappHref = `${contacts.whatsapp.href}?text=${encodeURIComponent(message)}`;
+
+  return (
+    <PremiumModal
+      open={consultationOpen}
+      onClose={closeConsultation}
+      titleId="consultation-title"
+      panelClassName="md:h-auto md:max-w-md"
+    >
+      <div className="consult">
+        <span className="consult-mark">
+          <Sparkles className="h-6 w-6" />
+        </span>
+        <h2 id="consultation-title" className="consult-title">Бесплатная консультация</h2>
+        <p className="consult-sub">
+          Разберём {personalized ? `«${profile.label}»` : "ваш бизнес"} и предложим первый сценарий
+          автоматизации. Без обязательств и предоплаты.
+        </p>
+        <div className="consult-options">
+          <a
+            href={whatsappHref}
+            target="_blank"
+            rel="noreferrer"
+            onClick={closeConsultation}
+            className="consult-option consult-wa"
+          >
+            <span className="consult-option-icon"><MessageCircle className="h-5 w-5" /></span>
+            <span className="consult-option-body">
+              <strong>WhatsApp</strong>
+              <span>Ответим в рабочее время</span>
+            </span>
+            <ArrowRight className="h-4 w-4 shrink-0 opacity-60" />
+          </a>
+          <a
+            href={contacts.telegram.href}
+            target="_blank"
+            rel="noreferrer"
+            onClick={closeConsultation}
+            className="consult-option consult-tg"
+          >
+            <span className="consult-option-icon"><Send className="h-5 w-5" /></span>
+            <span className="consult-option-body">
+              <strong>Telegram</strong>
+              <span>{contacts.telegram.value}</span>
+            </span>
+            <ArrowRight className="h-4 w-4 shrink-0 opacity-60" />
+          </a>
+        </div>
+        <p className="consult-note">Сообщение уже готово — просто отправьте его в чат.</p>
+      </div>
+    </PremiumModal>
   );
 }
 
@@ -3352,27 +3261,27 @@ export default function Home() {
 
   return (
     <BusinessProvider>
-      <AppShell>
-      <main>
-        <StructuredData />
-        <TopNav />
-        <HeroScene />
-        <AiConsultantScene />
-        <ProblemsScene />
-        <FeatureModules />
-        <ServicePricingScene />
-        <StoryScene />
-        <CasesScene />
-        <TradingBotScene />
-        <ProcessScene />
-        <PrinciplesScene />
-        <FounderScene />
-        <PricingCalculatorScene />
-        <FaqScene />
-        <ContactScene />
-        <FooterScene />
-      </main>
-      </AppShell>
+      {/* All framer-motion animations respect the OS "reduce motion" setting (CSS-only
+          reduced-motion cannot reach framer's JS-driven animations). */}
+      <MotionConfig reducedMotion="user">
+        <AppShell>
+          <main>
+            <StructuredData />
+            <TopNav />
+            <HeroScene />
+            <AiConsultantScene />
+            <ProblemsScene />
+            <FeatureModules />
+            <ServicePricingScene />
+            <CasesScene />
+            <FounderScene />
+            <PricingCalculatorScene />
+            <FaqScene />
+            <ContactScene />
+            <FooterScene />
+          </main>
+        </AppShell>
+      </MotionConfig>
     </BusinessProvider>
   );
 }

@@ -91,6 +91,22 @@ test.describe("concept preview mode", () => {
     expect(metrics.contentH).toBeGreaterThan(metrics.stageH);
   });
 
+  test("mouse wheel scrolls the preview — Lenis must not hijack it", async ({ page }, testInfo) => {
+    // The wheel is a desktop/trackpad concern (touch scrolls natively on mobile). This is the
+    // regression guard for the Lenis smooth-scroll hijack that broke wheel scrolling.
+    test.skip(testInfo.project.name !== "desktop", "desktop-only wheel scenario");
+    await openConceptExample(page);
+    await enterPreview(page);
+
+    const stage = page.locator(STAGE);
+    const box = await stage.boundingBox();
+    if (box) await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.wheel(0, 600);
+    await expect
+      .poll(() => stage.evaluate((el) => Math.round(el.scrollTop)), { timeout: 5000 })
+      .toBeGreaterThan(0);
+  });
+
   test("keyboard drives the preview scroll (PageDown / End / Home)", async ({ page }, testInfo) => {
     // Physical page keys are a desktop concern; touch devices have no equivalent.
     test.skip(testInfo.project.name !== "desktop", "desktop-only scenario");

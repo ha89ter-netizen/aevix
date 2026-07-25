@@ -122,6 +122,29 @@ test.describe("site personalisation", () => {
     await expect(firstItem.getByText(/Как клиенты будут записываться/)).toBeVisible();
   });
 
+  test("contact form prefills the described business and captures a lead", async ({ page }) => {
+    await analyzeBarber(page);
+    const contact = page.locator("#контакты");
+    await contact.scrollIntoViewIfNeeded();
+
+    // Business field is prefilled with what was described in the Hero.
+    await expect(contact.locator(".lead-textarea")).toHaveValue(BARBER_TEXT);
+
+    // Submit is gated on name + contact.
+    const submit = contact.locator(".lead-submit");
+    await expect(submit).toBeDisabled();
+    await contact.locator(".lead-field", { hasText: "Имя" }).locator(".lead-input").fill("Иван");
+    await contact.locator(".lead-field", { hasText: "Telegram" }).locator(".lead-input").first().fill("@ivan");
+    await expect(submit).toBeEnabled();
+
+    // Submitting hands off to WhatsApp (stubbed) and shows the confirmation state.
+    await page.evaluate(() => {
+      window.open = () => null;
+    });
+    await submit.click();
+    await expect(contact.locator(".contact-sent")).toBeVisible();
+  });
+
   test("reset returns the site to its neutral state", async ({ page }) => {
     await analyzeBarber(page);
     await expect(page.locator(".hero-personal-case")).toBeVisible();
@@ -139,12 +162,88 @@ test.describe("site personalisation", () => {
   });
 });
 
+test.describe("ai consultant chat", () => {
+  test("chat history scrolls with the mouse wheel (Lenis must not hijack it)", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop", "desktop-only wheel scenario");
+    await page.route("**/api/business-analysis", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          result: {
+            summary: "В кофейне с доставкой заказы принимаются вручную в мессенджерах — часть теряется в пик.",
+            problems: ["Заказы теряются между чатами", "Нет единого статуса доставки", "Повторяющиеся вопросы о меню", "Ручной сбор адресов"],
+            recommendations: ["AI-консультант в WhatsApp и Telegram", "CRM с заказами и статусами", "Автоподтверждения и напоминания", "Меню и доставка в одном сценарии", "Сбор отзывов после заказа"],
+            flow: ["Гость", "AI-консультант", "Заказ", "CRM", "Доставка", "Отзыв"],
+            callToAction: "Обсудим автоматизацию приёма заказов под вашу кофейню.",
+          },
+        }),
+      }),
+    );
+    await gotoHydrated(page);
+    // Reveal the section (its blocks are scroll-reveal-hidden) so the field is interactable.
+    await page.addStyleTag({
+      content: "[data-reveal]{opacity:1!important;visibility:visible!important;transform:none!important;filter:none!important}",
+    });
+
+    const scene = page.locator("#ai-анализ");
+    await scene.getByLabel("Описание бизнеса для AI-консультанта").fill("у меня кофейня с доставкой, заказы в директе");
+    await scene.getByRole("button", { name: "Проанализировать бизнес" }).click();
+    await expect(scene.locator("article")).toBeVisible({ timeout: 15000 });
+
+    const chat = page.locator(".aevix-ai-scroll");
+    await expect
+      .poll(() => chat.evaluate((el) => el.scrollHeight > el.clientHeight + 1))
+      .toBe(true);
+
+    const box = await chat.boundingBox();
+    if (box) await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    const before = await chat.evaluate((el) => Math.round(el.scrollTop));
+    await page.mouse.wheel(0, -600); // scroll up from the auto-scrolled bottom
+    await expect
+      .poll(() => chat.evaluate((el) => Math.round(el.scrollTop)))
+      .not.toBe(before);
+  });
+});
+
+test.describe("consultation popup", () => {
+  test("header CTA opens the channel picker without scrolling", async ({ page }, testInfo) => {
+    // The header button is desktop-only; on mobile the entry point is the Navigation Center.
+    test.skip(testInfo.project.name !== "desktop", "desktop-only header CTA");
+    await gotoHydrated(page);
+    const y0 = await page.evaluate(() => window.scrollY);
+    await page.getByRole("button", { name: "Консультация" }).click();
+
+    const popup = page.locator(".consult");
+    await expect(popup).toBeVisible();
+    await expect(popup.locator(".consult-option")).toHaveCount(2);
+    await expect(popup.locator(".consult-wa")).toHaveAttribute("href", /wa\.me/);
+    await expect(popup.locator(".consult-tg")).toHaveAttribute("href", /t\.me/);
+    // Opening the popup must not scroll the page.
+    expect(await page.evaluate(() => window.scrollY)).toBe(y0);
+
+    // Closing leaves no scroll lock.
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".consult")).toHaveCount(0);
+    const state = await page.evaluate(() => {
+      const before = window.scrollY;
+      window.scrollBy(0, 200);
+      const moved = window.scrollY !== before;
+      window.scrollTo(0, before);
+      return { moved, position: document.body.style.position, overflow: document.body.style.overflow };
+    });
+    expect(state.moved).toBe(true);
+    expect(state.position).toBe("");
+    expect(state.overflow).toBe("");
+  });
+});
+
 test.describe("navigation center", () => {
   test("opens as a dialog with grouped destinations", async ({ page }) => {
     await gotoHydrated(page);
     await openNavCenter(page);
     await expect(page.getByRole("heading", { name: "Навигация AEVIX" })).toBeVisible();
-    await expect(page.locator(".nav-center-card")).toHaveCount(9);
+    await expect(page.locator(".nav-center-card")).toHaveCount(8);
     // Idle: prompts the visitor to personalise.
     await expect(page.locator(".nav-center-status.is-idle")).toBeVisible();
   });

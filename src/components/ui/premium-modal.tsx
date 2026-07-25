@@ -120,6 +120,9 @@ export function PremiumModal({
             aria-modal="true"
             aria-labelledby={titleId}
             tabIndex={-1}
+            /* Let native wheel/trackpad scroll work inside the modal — Lenis smooth-scroll
+               otherwise hijacks the wheel to the (locked) page and inner content won't move. */
+            data-lenis-prevent
             initial={{ opacity: 0, y: 26, scale: 0.985 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 18, scale: 0.99 }}

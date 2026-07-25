@@ -42,6 +42,10 @@ type BusinessContextValue = {
   analyze: (message: string) => Promise<void>;
   retry: () => Promise<void>;
   reset: () => void;
+  /** Free-consultation popup (channel picker), shared by every "get in touch" CTA. */
+  consultationOpen: boolean;
+  openConsultation: () => void;
+  closeConsultation: () => void;
 };
 
 const BusinessContext = createContext<BusinessContextValue | null>(null);
@@ -53,7 +57,11 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
   const [summary, setSummary] = useState<string | null>(null);
   const [degraded, setDegraded] = useState(false);
   const [input, setInput] = useState("");
+  const [consultationOpen, setConsultationOpen] = useState(false);
   const runningRef = useRef(false);
+
+  const openConsultation = useCallback(() => setConsultationOpen(true), []);
+  const closeConsultation = useCallback(() => setConsultationOpen(false), []);
 
   const analyze = useCallback(async (message: string) => {
     const text = message.trim();
@@ -136,8 +144,11 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       analyze,
       retry,
       reset,
+      consultationOpen,
+      openConsultation,
+      closeConsultation,
     }),
-    [status, stage, profile, summary, degraded, input, analyze, retry, reset],
+    [status, stage, profile, summary, degraded, input, analyze, retry, reset, consultationOpen, openConsultation, closeConsultation],
   );
 
   return <BusinessContext.Provider value={value}>{children}</BusinessContext.Provider>;
