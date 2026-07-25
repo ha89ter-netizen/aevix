@@ -33,6 +33,8 @@ import {
   conceptPalettes,
   conceptSectionOptions,
   conceptTemplates,
+  estimateConceptPrice,
+  formatConceptPrice,
   type ConceptGoal,
   type ConceptSectionType,
   type ConceptTemplate,
@@ -523,6 +525,9 @@ export function WebsiteConceptExperience() {
               </div>
               <div className="concept-toolbar-actions">
                 <span className="concept-draft-badge"><Info className="h-3.5 w-3.5" /> Предварительный макет</span>
+                <span className="concept-price-badge" title="Примерная стоимость такого лендинга при разработке в AEVIX">
+                  ≈ от {formatConceptPrice(estimateConceptPrice(concept).min)}
+                </span>
                 <div
                   className="concept-page-switch"
                   role="tablist"

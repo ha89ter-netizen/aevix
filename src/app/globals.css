@@ -754,6 +754,86 @@ body::before {
   font-size: 0.78rem;
 }
 
+/* ---- Minimalist AI analysis (headed text + services) ---- */
+.ai-block-title {
+  font-size: 0.72rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+}
+
+.ai-analysis section + section {
+  border-top: 1px solid rgba(17, 20, 24, 0.06);
+  padding-top: 1.15rem;
+}
+
+.ai-dot {
+  margin-top: 0.55rem;
+  height: 0.35rem;
+  width: 0.35rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+}
+
+.ai-calc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.26);
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.09);
+  padding: 0.3rem 0.7rem;
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+  font-size: 0.74rem;
+  font-weight: 600;
+  transition: background 200ms var(--ease-premium), transform 200ms var(--ease-premium);
+}
+
+.ai-calc-link:hover {
+  transform: translateY(-1px);
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.16);
+}
+
+.ai-service-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(17, 20, 24, 0.07);
+  background: rgba(255, 255, 255, 0.6);
+  padding: 0.65rem 0.85rem;
+  transition: border-color 200ms var(--ease-premium), background 200ms var(--ease-premium);
+}
+
+.ai-service-row:hover {
+  border-color: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.24);
+  background: #fff;
+}
+
+.ai-service-icon {
+  display: inline-flex;
+  height: 2.1rem;
+  width: 2.1rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.7rem;
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.1);
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+}
+
+.ai-service-price {
+  flex-shrink: 0;
+  font-family: var(--font-manrope), sans-serif;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: #090807;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .site-nav {
   border-color: rgba(17, 20, 24, 0.08);
   background: rgba(250, 250, 248, 0.86);
@@ -1838,6 +1918,23 @@ body::before {
   font-weight: 650;
 }
 
+.concept-price-badge {
+  display: inline-flex;
+  min-height: 2.35rem;
+  flex: 0 0 auto;
+  align-items: center;
+  border: 1px solid rgba(17, 20, 24, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 0 0.75rem;
+  color: #090807;
+  font-family: var(--font-manrope), sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .concept-page-switch {
   display: flex;
   flex: 0 0 auto;
@@ -2688,12 +2785,83 @@ body::before {
   box-shadow: 0 6px 18px rgba(17, 20, 24, 0.1);
 }
 
+/* "После": cards light up green one-by-one (train / opening-scene effect), each with a
+   checkmark that flashes for ~1s. Stagger comes from --i set per item. */
 .before-after-stage.is-after .before-after-item {
-  background: linear-gradient(180deg, rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.025), rgba(89, 147, 193, 0.045));
+  animation: ba-greenify 520ms var(--ease-premium) both;
+  animation-delay: calc(var(--i, 0) * 0.16s);
 }
 
-.before-after-stage.is-after .before-after-item svg {
-  color: #7257e8;
+@keyframes ba-greenify {
+  from {
+    background: transparent;
+    box-shadow: inset 0 0 0 rgba(22, 163, 74, 0);
+  }
+  to {
+    background: linear-gradient(180deg, rgba(22, 163, 74, 0.1), rgba(22, 163, 74, 0.04));
+    box-shadow: inset 3px 0 0 rgba(22, 163, 74, 0.55);
+  }
+}
+
+.before-after-stage.is-after .before-after-item > svg {
+  color: #16a34a;
+}
+
+.ba-check {
+  position: absolute;
+  top: 0.9rem;
+  right: 0.9rem;
+  z-index: 3;
+  display: inline-flex;
+  height: 1.5rem;
+  width: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #16a34a;
+  color: #fff;
+  opacity: 0;
+  transform: scale(0.3);
+  pointer-events: none;
+}
+
+/* Reset the generic `.before-after-item svg` positioning for the checkmark glyph. */
+.ba-check svg {
+  position: static;
+  height: 0.85rem;
+  width: 0.85rem;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: #fff;
+  box-shadow: none;
+}
+
+.before-after-stage.is-after .ba-check {
+  animation: ba-check-flash 1s var(--ease-spring) both;
+  animation-delay: calc(var(--i, 0) * 0.16s + 0.12s);
+}
+
+@keyframes ba-check-flash {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  45% {
+    transform: scale(1);
+  }
+  75% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
 }
 
 .before-after-result {

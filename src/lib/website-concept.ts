@@ -344,6 +344,31 @@ function sectionContent(type: ConceptSectionType, input: WebsiteConceptInput): W
   return content[type];
 }
 
+/**
+ * Rough landing-cost estimate for a generated concept, tied to current AEVIX prices.
+ * Base = "Сайт компании" (от 200 000 ₸); grows with pages, sections, and booking
+ * (which implies online booking / a bot). More selected options → higher price.
+ */
+export function estimateConceptPrice(concept: WebsiteConcept): { min: number; max: number } {
+  const BASE = 200_000; // Сайт компании
+  const PER_EXTRA_PAGE = 40_000;
+  const PER_SECTION = 12_000;
+  const BOOKING = 60_000; // онлайн-запись / бот
+
+  const totalSections = concept.pages.reduce((sum, page) => sum + page.sections.length, 0);
+  const extraPages = Math.max(0, concept.pages.length - 1);
+  const hasBooking = concept.pages.some((page) => page.sections.some((section) => section.type === "booking"));
+
+  const raw = BASE + extraPages * PER_EXTRA_PAGE + totalSections * PER_SECTION + (hasBooking ? BOOKING : 0);
+  const min = Math.round(raw / 10_000) * 10_000;
+  const max = Math.round((raw * 1.4) / 10_000) * 10_000;
+  return { min, max };
+}
+
+export function formatConceptPrice(value: number): string {
+  return `${value.toLocaleString("ru-RU").replace(/ /g, " ")} ₸`;
+}
+
 export function buildFallbackWebsiteConcept(input: WebsiteConceptInput): WebsiteConcept {
   const palette = conceptPalettes.find((item) => item.id === input.palettePreset) ?? conceptPalettes[0];
   const primaryGoal = input.goals[0] ?? "Получать заявки";

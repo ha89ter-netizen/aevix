@@ -1509,6 +1509,8 @@ function AiConsultantScene() {
   const endRef = useRef<HTMLDivElement>(null);
   const canSend = input.trim().length > 0 && input.trim().length <= 1500 && !isThinking;
   const flow = getSafeFlow(analysis, input);
+  // Услуги от дорогих к дешёвым (по запросу — сначала более дорогие).
+  const servicesByPrice = [...serviceCatalog].sort((a, b) => (b.price || 0) - (a.price || 0));
   const progress =
     analysis || isThinking
       ? ((analysis ? analysisStages.length - 1 : stageIndex) / (analysisStages.length - 1)) * 100
@@ -1798,51 +1800,88 @@ function AiConsultantScene() {
                     Обсудить это решение
                   </Button>
                 </div>
-                <div className="mt-4 grid gap-3">
-                  <div className="rounded-[1.3rem] border border-violet/10 bg-violet/[0.055] p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-ink/38">Краткий вывод</p>
-                    <p className="mt-2 text-base leading-7 text-ink/72">{analysis.summary}</p>
-                  </div>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <div className="rounded-[1.3rem] border border-ink/7 bg-white/72 p-4">
-                      <p className="text-xs uppercase tracking-[0.2em] text-ink/38">Найденные проблемы</p>
-                      <div className="mt-3 grid gap-2">
+                <div className="ai-analysis mt-4 grid gap-5">
+                  <section>
+                    <p className="ai-block-title">Краткий вывод</p>
+                    <p className="mt-2 text-base leading-7 text-ink/74">{analysis.summary}</p>
+                  </section>
+
+                  {analysis.problems.length ? (
+                    <section>
+                      <p className="ai-block-title">Что мешает</p>
+                      <ul className="mt-2 grid gap-1.5">
                         {analysis.problems.map((item, index) => (
-                          <motion.p
+                          <motion.li
                             key={item}
                             initial={{ opacity: 0, x: -8 }}
                             animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1], delay: 0.18 + index * 0.05 }}
-                            className="flex gap-2 text-sm leading-6 text-ink/66"
+                            transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1], delay: 0.16 + index * 0.05 }}
+                            className="flex gap-2.5 text-sm leading-6 text-ink/68"
                           >
-                            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-violet" />
+                            <span className="ai-dot" />
                             {item}
-                          </motion.p>
+                          </motion.li>
                         ))}
-                      </div>
-                    </div>
-                    <div className="rounded-[1.3rem] border border-ink/7 bg-white/72 p-4">
-                      <p className="text-xs uppercase tracking-[0.2em] text-ink/38">Рекомендации</p>
-                      <div className="mt-3 grid gap-2">
+                      </ul>
+                    </section>
+                  ) : null}
+
+                  {analysis.recommendations.length ? (
+                    <section>
+                      <p className="ai-block-title">Что поможет</p>
+                      <ul className="mt-2 grid gap-1.5">
                         {analysis.recommendations.map((item, index) => (
-                          <motion.p
+                          <motion.li
                             key={item}
                             initial={{ opacity: 0, x: -8 }}
                             animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1], delay: 0.22 + index * 0.05 }}
-                            className="flex gap-2 text-sm leading-6 text-ink/66"
+                            transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1], delay: 0.2 + index * 0.05 }}
+                            className="flex gap-2.5 text-sm leading-6 text-ink/68"
                           >
                             <Check className="mt-0.5 h-4 w-4 shrink-0 text-violet" />
                             {item}
-                          </motion.p>
+                          </motion.li>
                         ))}
-                      </div>
+                      </ul>
+                    </section>
+                  ) : null}
+
+                  <section>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="ai-block-title">Услуги и цены</p>
+                      <button type="button" onClick={() => scrollToSection("стоимость")} className="ai-calc-link">
+                        <SlidersHorizontal className="h-3.5 w-3.5" />
+                        Калькулятор
+                      </button>
                     </div>
-                  </div>
-                  <div className="rounded-[1.3rem] border border-ink/7 bg-white/72 p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-ink/38">Практический эффект</p>
+                    <ul className="mt-3 grid gap-2">
+                      {servicesByPrice.map((service) => {
+                        const ServiceIcon = service.icon;
+                        return (
+                          <li key={service.id} className="ai-service-row">
+                            <span className="ai-service-icon">
+                              <ServiceIcon className="h-4 w-4" />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <strong className="block text-sm font-semibold text-ink">{service.title}</strong>
+                              <span className="block text-xs leading-5 text-ink/52">{service.description}</span>
+                            </span>
+                            <span className="ai-service-price">
+                              {service.price ? `от ${formatKzt(service.price)}` : service.id === "nfc" ? "бонус" : "по составу"}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <p className="mt-2 text-[0.72rem] leading-4 text-ink/40">
+                      Стартовые цены. Персональный расчёт — в калькуляторе.
+                    </p>
+                  </section>
+
+                  <section>
+                    <p className="ai-block-title">Практический эффект</p>
                     <p className="mt-2 text-base leading-7 text-ink/68">{analysis.callToAction}</p>
-                  </div>
+                  </section>
                   <div className="rounded-[1.5rem] border border-violet/10 bg-gradient-to-br from-white via-[#f8f4ff] to-[#eef1f7] p-4">
                     <div className="mb-4 flex items-center justify-between gap-3">
                       <div>
@@ -2043,9 +2082,16 @@ function ProblemsScene() {
         <motion.div key={mode} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className={cn("before-after-stage mt-10", mode === "after" && "is-after")}>
           <div className="before-after-flow">
             {items.map((item, index) => (
-              <div key={item} className="before-after-item">
+              <div
+                key={item}
+                className="before-after-item"
+                style={{ "--i": index } as CSSProperties}
+              >
                 <span>{String(index + 1).padStart(2, "0")}</span>
                 <strong>{item}</strong>
+                <span className="ba-check" aria-hidden="true">
+                  <Check />
+                </span>
                 {index < items.length - 1 ? <ArrowRight aria-hidden="true" /> : null}
               </div>
             ))}
