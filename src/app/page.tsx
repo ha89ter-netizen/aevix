@@ -181,9 +181,9 @@ const serviceCatalog: Array<{
   },
   {
     id: "site",
-    title: "Сайт компании",
-    price: 200_000,
-    description: "Сайт, который объясняет услуги и собирает заявки.",
+    title: "Сайт / лендинг",
+    price: 100_000,
+    description: "Цена зависит от объёма, дизайна и информации.",
     icon: Globe2,
   },
   {
@@ -441,6 +441,23 @@ const aiQuickPrompts = [
   "У меня барбершоп",
   "Что если у меня несколько филиалов?",
 ] as const;
+
+/**
+ * Short, concrete answers for factual quick questions — no long "report" for a simple
+ * question. Prompts not listed here fall through to the full AI analysis.
+ */
+const quickReplies: Record<string, string> = {
+  "Сколько это стоит?":
+    "Коротко: лендинг — от 100–200К ₸, боты и автоматизация — от 120К ₸. Точная цена зависит от задач. Хотите конкретику — откройте калькулятор или получите бесплатную консультацию.",
+  "Сколько занимает разработка?":
+    "Обычно первая версия — 1–3 недели, зависит от объёма и интеграций. Точный срок назовём после короткого разбора.",
+  "Как работает AI?":
+    "AI отвечает клиенту в WhatsApp и Telegram, уточняет задачу, собирает данные и передаёт сотруднику готовое обращение. Сложное сразу уходит человеку.",
+  "Можно улучшить существующий сайт?":
+    "Да. Разбираем текущую структуру и путь клиента, затем предлагаем точечные улучшения или новую версию — без переделки ради переделки.",
+  "Что если у меня несколько филиалов?":
+    "Каждый филиал ведём отдельно: своё расписание, заявки и статусы. Владелец видит все точки в одном месте.",
+};
 
 const analysisStages = [
   "Изучаем описание бизнеса",
@@ -905,7 +922,7 @@ function TopNav() {
             ) : null}
             <Button type="button" size="sm" className="hidden sm:inline-flex" onClick={openConsultation}>
               <Sparkles className="mr-2 h-4 w-4" />
-              Консультация
+              Бесплатная консультация
             </Button>
             <button
               type="button"
@@ -1503,8 +1520,6 @@ function AiConsultantScene() {
   const [stageIndex, setStageIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [expandedNode, setExpandedNode] = useState<number | null>(null);
-  const [userScrolledAway, setUserScrolledAway] = useState(false);
-  const [hasUnreadContent, setHasUnreadContent] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const canSend = input.trim().length > 0 && input.trim().length <= 1500 && !isThinking;
@@ -1546,41 +1561,17 @@ function AiConsultantScene() {
     }
   }, [businessInput]);
 
-  useEffect(() => {
-    if (userScrolledAway) {
-      setHasUnreadContent(true);
-      return;
-    }
-    const element = scrollRef.current;
-    if (!element) return;
-    const frame = window.requestAnimationFrame(() => {
+  // Pin a just-sent message to the top of the chat so its answer reads top-down —
+  // instead of slamming the view to the very bottom of a long reply.
+  const scrollMessageToTop = (id: string) => {
+    window.requestAnimationFrame(() => {
+      const element = scrollRef.current;
+      const target = element?.querySelector<HTMLElement>(`[data-mid="${id}"]`);
+      if (!element || !target) return;
       element.scrollTo({
-        top: element.scrollHeight,
+        top: Math.max(0, target.offsetTop - 8),
         behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
       });
-      setHasUnreadContent(false);
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [analysis, isThinking, messages, stageIndex, userScrolledAway]);
-
-  const onMessagesScroll = () => {
-    const element = scrollRef.current;
-    if (!element) return;
-
-    const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
-    const scrolledAway = distanceFromBottom > 96;
-    setUserScrolledAway(scrolledAway);
-    if (!scrolledAway) setHasUnreadContent(false);
-  };
-
-  const scrollToLatestMessage = () => {
-    const element = scrollRef.current;
-    if (!element) return;
-    setUserScrolledAway(false);
-    setHasUnreadContent(false);
-    element.scrollTo({
-      top: element.scrollHeight,
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
     });
   };
 
@@ -1597,15 +1588,16 @@ function AiConsultantScene() {
     }
 
     setError(null);
-    if (messageOverride) setInput(messageOverride);
+    setInput(""); // clear the composer after sending
     setAnalysis(null);
     setExpandedNode(null);
-    setUserScrolledAway(false);
     setThinking(true);
+    const userMessageId = `user-${Date.now()}`;
     setMessages((current) => [
       ...current,
-      { id: `user-${Date.now()}`, role: "user", text: message },
+      { id: userMessageId, role: "user", text: message },
     ]);
+    scrollMessageToTop(userMessageId);
 
     try {
       const response = await fetch("/api/business-analysis", {
@@ -1661,6 +1653,26 @@ function AiConsultantScene() {
     } finally {
       setThinking(false);
     }
+  };
+
+  // Factual quick questions get a short canned reply (no long report); the rest run the
+  // full analysis.
+  const handleQuickPrompt = (prompt: string) => {
+    const reply = quickReplies[prompt];
+    if (!reply) {
+      void sendAnalysis(prompt);
+      return;
+    }
+    if (isThinking) return;
+    setError(null);
+    setAnalysis(null);
+    const userMessageId = `user-${Date.now()}`;
+    setMessages((current) => [
+      ...current,
+      { id: userMessageId, role: "user", text: prompt },
+      { id: `reply-${Date.now()}`, role: "ai", text: reply },
+    ]);
+    scrollMessageToTop(userMessageId);
   };
 
   return (
@@ -1739,7 +1751,6 @@ function AiConsultantScene() {
           </div>
           <div
             ref={scrollRef}
-            onScroll={onMessagesScroll}
             tabIndex={0}
             aria-label="История диалога с AI-консультантом"
             data-lenis-prevent
@@ -1748,6 +1759,7 @@ function AiConsultantScene() {
             {messages.slice(-5).map((message) => (
               <motion.div
                 key={message.id}
+                data-mid={message.id}
                 initial={{ opacity: 0, y: 12, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
@@ -1969,11 +1981,6 @@ function AiConsultantScene() {
             ) : null}
             <div ref={endRef} />
           </div>
-          {hasUnreadContent ? (
-            <button type="button" className="aevix-scroll-latest" onClick={scrollToLatestMessage}>
-              <ChevronDown className="h-4 w-4" /> К новому сообщению
-            </button>
-          ) : null}
           {error ? (
             <motion.p
               initial={{ opacity: 0, y: 8 }}
@@ -2046,7 +2053,7 @@ function AiConsultantScene() {
                   key={prompt}
                   type="button"
                   disabled={isThinking}
-                  onClick={() => void sendAnalysis(prompt)}
+                  onClick={() => handleQuickPrompt(prompt)}
                 >
                   {prompt}
                 </button>
@@ -2240,15 +2247,14 @@ function ScenarioModal({
 }
 
 function FeatureModules() {
-  const [active, setActive] = useState(modules[0].id);
-  const [scenarioOpen, setScenarioOpen] = useState(false);
-  const selected = modules.find((module) => module.id === active) ?? modules[0];
-  const SelectedIcon = selected.icon;
+  // Optional demo only — all module value is visible without clicking.
+  const [scenarioId, setScenarioId] = useState<string | null>(null);
+  const scenarioModule = modules.find((module) => module.id === scenarioId) ?? null;
 
   return (
     <section id="возможности" className="scene capabilities-scene relative flex items-center">
-      <div className="mx-auto grid w-full max-w-7xl gap-8 lg:grid-cols-[0.68fr_1fr]">
-        <div data-reveal>
+      <div className="mx-auto w-full max-w-7xl">
+        <div data-reveal className="mb-10 max-w-3xl">
           <p className="mb-4 text-sm font-medium uppercase tracking-[0.28em] text-violet">
             Возможности
           </p>
@@ -2256,82 +2262,40 @@ function FeatureModules() {
             <span data-heading-line className="heading-line">Не набор функций.</span>{" "}
             <span data-heading-line className="heading-line">Модули, которые закрывают конкретные участки работы.</span>
           </h2>
-          <p className="mt-6 max-w-lg text-lg leading-8 text-ink/62">
-            Выберите модуль и посмотрите, как он работает в реальном процессе.
+          <p className="mt-6 max-w-xl text-lg leading-8 text-ink/62">
+            Каждый модуль — понятный участок автоматизации. Сценарий можно посмотреть по желанию.
           </p>
         </div>
-        <div className="grid gap-4">
-          <div className="card-field grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {modules.map((module) => {
-              const Icon = module.icon;
-              const isActive = module.id === active;
-              return (
-                <button
-                  key={module.id}
-                  onClick={() => setActive(module.id)}
-                  aria-pressed={isActive}
-                  className={cn(
-                    "interactive-surface group rounded-[1.5rem] border p-4 text-left transition duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/30",
-                    isActive
-                      ? "border-ink/14 bg-ink text-porcelain shadow-object"
-                      : "border-ink/10 bg-white/42 text-ink hover:-translate-y-1 hover:border-violet/20 hover:bg-white/76 hover:shadow-object",
-                  )}
-                >
-                  <Icon className={cn("h-5 w-5", isActive ? "text-violet" : "text-ink/52 group-hover:text-violet")} />
-                  <p className="mt-7 text-base font-medium">{module.title}</p>
-                  <p className={cn("mt-2 text-sm leading-6", isActive ? "text-porcelain/56" : "text-ink/52")}>
-                    {module.metric}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-          <motion.div
-            key={selected.id}
-            initial={{ opacity: 0, y: 22, filter: "blur(8px)" }}
-            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            transition={{ duration: 0.42, ease: "easeOut" }}
-            className="glass-panel overflow-hidden rounded-[2rem] p-5 md:p-7"
-          >
-            <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-              <div>
-                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-ink text-porcelain shadow-glow">
-                  <SelectedIcon className="h-6 w-6" />
+        <div data-reveal className="card-field grid gap-4 md:grid-cols-2">
+          {modules.map((module) => {
+            const Icon = module.icon;
+            return (
+              <article key={module.id} className="capability-card interactive-surface glass-panel rounded-[1.75rem] p-6">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="capability-icon">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <button type="button" className="capability-demo" onClick={() => setScenarioId(module.id)}>
+                    <Zap className="h-3.5 w-3.5" /> Сценарий
+                  </button>
                 </div>
-                <h3 className="text-3xl font-semibold tracking-[-0.03em]">{selected.title}</h3>
-                <p className="mt-3 max-w-xl text-lg leading-7 text-ink/62">{selected.intro}</p>
-              </div>
-              <Button variant="glass" size="sm" onClick={() => setScenarioOpen(true)}>
-                <Zap className="mr-2 h-4 w-4" />
-                Запустить сценарий
-              </Button>
-            </div>
-            <div className="module-output-chain" aria-label={`Результаты модуля ${selected.title}`}>
-              {selected.what.slice(0, 5).map((item, index) => (
-                <div key={item}>
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                  <strong>{item.replace(/\.$/, "")}</strong>
-                  {index < Math.min(selected.what.length, 5) - 1 ? <ArrowRight aria-hidden="true" /> : null}
-                </div>
-              ))}
-            </div>
-            <div className="mt-8 grid gap-3 md:grid-cols-2">
-              <div className="rounded-[1.5rem] border border-ink/8 bg-white/45 p-5">
-                <p className="mb-4 text-xs uppercase tracking-[0.22em] text-ink/42">Сигнал</p>
-                <p className="text-lg leading-7 text-ink/76">{selected.prompt}</p>
-              </div>
-              <div className="rounded-[1.5rem] bg-ink p-5 text-porcelain">
-                <p className="mb-4 text-xs uppercase tracking-[0.22em] text-porcelain/36">
-                  Действие AEVIX
-                </p>
-                <p className="text-lg leading-7 text-porcelain/82">{selected.answer}</p>
-              </div>
-            </div>
-          </motion.div>
+                <h3 className="mt-5 text-2xl font-semibold tracking-[-0.02em]">{module.title}</h3>
+                <p className="mt-2 text-base leading-7 text-ink/62">{module.intro}</p>
+                <ul className="mt-4 grid gap-1.5">
+                  {module.what.slice(0, 3).map((item) => (
+                    <li key={item} className="flex gap-2.5 text-sm leading-6 text-ink/70">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-violet" />
+                      {item.replace(/\.$/, "")}
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            );
+          })}
         </div>
       </div>
-      {scenarioOpen ? (
-        <ScenarioModal module={selected} onClose={() => setScenarioOpen(false)} />
+      {scenarioModule ? (
+        <ScenarioModal module={scenarioModule} onClose={() => setScenarioId(null)} />
       ) : null}
     </section>
   );

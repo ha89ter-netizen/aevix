@@ -199,10 +199,10 @@ test.describe("ai consultant chat", () => {
     const box = await chat.boundingBox();
     if (box) await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     const before = await chat.evaluate((el) => Math.round(el.scrollTop));
-    await page.mouse.wheel(0, -600); // scroll up from the auto-scrolled bottom
+    await page.mouse.wheel(0, 600); // the new message is pinned near the top, so scroll down
     await expect
       .poll(() => chat.evaluate((el) => Math.round(el.scrollTop)))
-      .not.toBe(before);
+      .toBeGreaterThan(before);
   });
 });
 

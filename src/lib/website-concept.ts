@@ -350,10 +350,10 @@ function sectionContent(type: ConceptSectionType, input: WebsiteConceptInput): W
  * (which implies online booking / a bot). More selected options → higher price.
  */
 export function estimateConceptPrice(concept: WebsiteConcept): { min: number; max: number } {
-  const BASE = 200_000; // Сайт компании
-  const PER_EXTRA_PAGE = 40_000;
-  const PER_SECTION = 12_000;
-  const BOOKING = 60_000; // онлайн-запись / бот
+  const BASE = 100_000; // лендинг / сайт — стартовая цена
+  const PER_EXTRA_PAGE = 25_000;
+  const PER_SECTION = 8_000;
+  const BOOKING = 40_000; // онлайн-запись / бот
 
   const totalSections = concept.pages.reduce((sum, page) => sum + page.sections.length, 0);
   const extraPages = Math.max(0, concept.pages.length - 1);

@@ -25,6 +25,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { PremiumModal } from "@/components/ui/premium-modal";
 import { cn } from "@/lib/utils";
+import { conceptImagesFor, type ConceptImagery } from "@/lib/concept-images";
 import {
   buildFallbackWebsiteConcept,
   conceptBusinessTypes,
@@ -103,8 +104,17 @@ function toggleKnown<T extends string>(items: T[], item: T) {
   return items.includes(item) ? items.filter((current) => current !== item) : [...items, item];
 }
 
-function ConceptSection({ section, onDemoAction }: { section: WebsiteConceptSection; onDemoAction: () => void }) {
+function ConceptSection({
+  section,
+  onDemoAction,
+  imagery,
+}: {
+  section: WebsiteConceptSection;
+  onDemoAction: () => void;
+  imagery: ConceptImagery;
+}) {
   if (section.type === "gallery") {
+    const labels = section.items.length ? section.items : ["Пространство", "Детали", "Результат"];
     return (
       <section className="concept-section concept-gallery">
         <div className="concept-section-heading">
@@ -112,9 +122,16 @@ function ConceptSection({ section, onDemoAction }: { section: WebsiteConceptSect
           <h3>{section.title}</h3>
         </div>
         <div className="concept-gallery-grid">
-          {(section.items.length ? section.items : ["Пространство", "Детали", "Результат"]).slice(0, 3).map((item, index) => (
-            <div key={item} className={`concept-gallery-frame concept-gallery-frame-${index + 1}`}>
-              <span>{item}</span>
+          {[0, 1, 2].map((index) => (
+            <div
+              key={index}
+              className={`concept-gallery-frame concept-gallery-frame-${index + 1}`}
+              style={{ background: imagery.gradient }}
+            >
+              {/* Decorative external mock imagery with a gradient fallback — plain img by design. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="concept-photo" src={imagery.gallery[index]} alt="" loading="lazy" />
+              <span>{labels[index] ?? labels[0]}</span>
             </div>
           ))}
         </div>
@@ -197,6 +214,7 @@ function ConceptPreview({
   isPreview?: boolean;
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
+  const imagery = conceptImagesFor(concept.businessType);
   const style = {
     "--concept-bg": concept.palette.background,
     "--concept-surface": concept.palette.surface,
@@ -256,15 +274,19 @@ function ConceptPreview({
                   <button type="button" onClick={() => nextPage.id === activePage.id ? onDemoAction() : onPageChange(nextPage.id)}>{activePage.hero.secondaryCta}</button>
                 </div>
               </div>
-              <div className="concept-hero-visual" aria-hidden="true">
-                <div><span>{concept.businessType}</span><strong>{concept.businessName}</strong></div>
-                <div><small>01</small><span>Внимание к деталям</span></div>
-                <div><small>02</small><span>Понятный сервис</span></div>
+              <div className="concept-hero-visual" style={{ background: imagery.gradient }}>
+                {/* Decorative external mock imagery with a gradient fallback — plain img by design. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="concept-photo concept-hero-photo" src={imagery.hero} alt="" loading="lazy" />
+                <div className="concept-hero-visual-caption">
+                  <span>{concept.businessType}</span>
+                  <strong>{concept.businessName}</strong>
+                </div>
               </div>
             </section>
             <div className={cn("concept-preview-piece", revealIndex >= 4 && "is-visible")}>
               {activePage.sections.map((section, index) => (
-                <ConceptSection key={`${section.type}-${index}`} section={section} onDemoAction={onDemoAction} />
+                <ConceptSection key={`${section.type}-${index}`} section={section} onDemoAction={onDemoAction} imagery={imagery} />
               ))}
             </div>
           </motion.main>
@@ -685,6 +707,10 @@ export function WebsiteConceptExperience() {
                   <p>Создаём концепт</p>
                   <h3>{generationStages[stageIndex]}</h3>
                   <div><motion.span animate={{ width: `${((stageIndex + 1) / generationStages.length) * 100}%` }} /></div>
+                  <p className="concept-generating-note">
+                    Это первоначальный макет — для понимания структуры и стиля. Итоговый продукт
+                    будет в разы качественнее и точнее заточен под ваш бизнес.
+                  </p>
                 </div>
               ) : null}
 

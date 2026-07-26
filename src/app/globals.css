@@ -754,6 +754,39 @@ body::before {
   font-size: 0.78rem;
 }
 
+/* ---- Capability cards (flat, no click-to-reveal) ---- */
+.capability-icon {
+  display: inline-flex;
+  height: 2.6rem;
+  width: 2.6rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.85rem;
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.1);
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+}
+
+.capability-demo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid rgba(17, 20, 24, 0.1);
+  background: rgba(255, 255, 255, 0.7);
+  padding: 0.35rem 0.7rem;
+  color: rgba(9, 8, 7, 0.62);
+  font-size: 0.74rem;
+  font-weight: 600;
+  transition: color 200ms var(--ease-premium), border-color 200ms var(--ease-premium),
+    background 200ms var(--ease-premium);
+}
+
+.capability-demo:hover {
+  border-color: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.32);
+  background: #fff;
+  color: #090807;
+}
+
 /* ---- Minimalist AI analysis (headed text + services) ---- */
 .ai-block-title {
   font-size: 0.72rem;
@@ -1768,6 +1801,19 @@ body::before {
   text-align: center;
 }
 
+.concept-generating-note {
+  max-width: 26rem;
+  margin-top: 1.4rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.16);
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.06);
+  padding: 0.75rem 1rem;
+  color: rgba(9, 8, 7, 0.62);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  animation: aevix-thinking-label-in 0.4s var(--ease-soft);
+}
+
 .concept-generation-mark {
   position: relative;
   display: flex;
@@ -2341,39 +2387,70 @@ body::before {
 }
 
 .concept-hero-visual {
-  display: grid;
+  position: relative;
   min-height: 25rem;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr auto;
-  gap: 0.65rem;
+  overflow: hidden;
+  border-radius: 10px;
+  box-shadow: 0 24px 60px color-mix(in srgb, var(--concept-text) 16%, transparent);
 }
 
-.concept-hero-visual > div {
+/* Category photo fills its frame over a themed gradient (the graceful fallback). */
+.concept-photo {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  opacity: 0;
+  animation: concept-photo-in 900ms var(--ease-premium) forwards;
+}
+
+.concept-hero-photo {
+  animation: concept-photo-in 900ms var(--ease-premium) forwards, concept-kenburns 14s ease-in-out 900ms infinite alternate;
+}
+
+@keyframes concept-photo-in {
+  from {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes concept-kenburns {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.07);
+  }
+}
+
+.concept-hero-visual-caption {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: 2;
   display: flex;
-  min-width: 0;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1.25rem;
-  border: 1px solid color-mix(in srgb, var(--concept-text) 11%, transparent);
-  border-radius: 8px;
-  background: var(--concept-surface);
-  box-shadow: 0 20px 50px color-mix(in srgb, var(--concept-text) 10%, transparent);
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 1.4rem;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.55), transparent);
+  color: #fff;
 }
 
-.concept-hero-visual > div:first-child {
-  align-items: flex-end;
-  grid-column: 1 / -1;
-  background: var(--concept-accent);
-  color: var(--concept-surface);
+.concept-hero-visual-caption span {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  opacity: 0.8;
 }
 
-.concept-hero-visual strong {
-  align-self: flex-end;
-  font-size: 2.6rem;
-}
-
-.concept-hero-visual small {
-  color: var(--concept-accent);
+.concept-hero-visual-caption strong {
+  font-size: 2rem;
+  line-height: 1.05;
 }
 
 .concept-section {
@@ -2462,19 +2539,32 @@ body::before {
 }
 
 .concept-gallery-frame {
+  position: relative;
   display: flex;
   align-items: flex-end;
+  overflow: hidden;
   padding: 1rem;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--concept-accent) 22%, var(--concept-surface));
-  color: var(--concept-text);
+  color: #fff;
   font-weight: 650;
+}
+
+.concept-gallery-frame > span {
+  position: relative;
+  z-index: 2;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+
+.concept-gallery-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.45), transparent 60%);
 }
 
 .concept-gallery-frame:first-child {
   grid-row: 1 / 3;
-  background: color-mix(in srgb, var(--concept-accent) 72%, var(--concept-surface));
-  color: var(--concept-surface);
 }
 
 .concept-action-section {
