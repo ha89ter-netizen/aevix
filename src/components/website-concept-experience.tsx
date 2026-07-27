@@ -404,11 +404,18 @@ export function WebsiteConceptExperience() {
     window.addEventListener("mousemove", wake);
     window.addEventListener("keydown", wake);
     window.addEventListener("touchstart", wake, { passive: true });
+    // "wheel" fires once per physical scroll tick, so it's cheap. Deliberately not "scroll" —
+    // that fires on every frame of the keyboard-driven smooth-scroll animation below and would
+    // flood this with re-renders; pointer-events stays enabled while idle regardless (see
+    // .concept-preview-exit.is-idle in globals.css), so skipping it costs nothing but a
+    // slightly earlier fade while reading.
+    window.addEventListener("wheel", wake, { passive: true });
     return () => {
       window.clearTimeout(timer);
       window.removeEventListener("mousemove", wake);
       window.removeEventListener("keydown", wake);
       window.removeEventListener("touchstart", wake);
+      window.removeEventListener("wheel", wake);
     };
   }, [isPreview]);
 

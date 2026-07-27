@@ -188,6 +188,28 @@ test.describe("concept preview mode", () => {
     expect(state.inlineTop).toBe("");
   });
 
+  test("exit control stays clickable after the idle auto-hide fires", async ({ page }) => {
+    // Regression guard: the floating "Вернуться к редактированию" / fullscreen pill fades
+    // out after PREVIEW_CHROME_IDLE_MS of inactivity. It used to also flip to
+    // `pointer-events: none` while idle, which traps the visitor — a click is itself the
+    // "wake up" signal, and the browser hit-tests that very click before React can re-render
+    // to remove the idle class, so the click fell through to the page underneath and the
+    // control never recovered. Worst on mobile, where a tap has no preceding hover to wake
+    // it early. There must be no way to get stuck in fullscreen preview with no way out.
+    await openConceptExample(page);
+    await enterPreview(page);
+
+    // Let the idle auto-hide fire without any further pointer/keyboard activity.
+    await page.waitForTimeout(3200);
+    await expect(page.locator(".concept-preview-exit")).toHaveClass(/is-idle/);
+
+    const exitButton = page.getByRole("button", { name: "Вернуться к редактированию" });
+    await exitButton.click({ timeout: 5000 });
+
+    await expect(page.locator(".concept-workspace-toolbar")).toBeVisible();
+    await expect(page.locator(".concept-preview-exit")).toHaveCount(0);
+  });
+
   test("no editor panel overlaps the end of the previewed page", async ({ page }) => {
     await openConceptExample(page);
     await enterPreview(page);

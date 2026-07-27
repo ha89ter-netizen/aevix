@@ -2207,9 +2207,12 @@ body::before {
 }
 
 .concept-preview-exit.is-idle {
+  /* Stays visually out of the way but must remain clickable: a tap/click is itself
+     the "wake" signal, and its own hit-test happens before React can re-render to
+     remove this class — pointer-events: none here would swallow that first click and
+     trap the visitor in fullscreen preview with no way back to the editor. */
   opacity: 0;
   transform: translateY(6px);
-  pointer-events: none;
 }
 
 .concept-preview-exit button {
