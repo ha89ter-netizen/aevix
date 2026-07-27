@@ -8,6 +8,10 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 5;
 const REQUEST_TIMEOUT_MS = 22_000;
 
+// In-memory, per-instance rate limiting: a cheap, honest deterrent against casual abuse, but
+// not a real ceiling — Vercel can run multiple instances of this function concurrently, each
+// with its own empty Map, and a cold start resets it too. Fine at current traffic; if usage
+// grows, replace with a shared store (Vercel KV / Upstash Redis) so limits hold across instances.
 const requestBuckets = new Map<string, { count: number; resetAt: number }>();
 
 type BusinessAnalysis = {

@@ -8,6 +8,7 @@ const RATE_LIMIT_MAX_REQUESTS = 5;
 const LEAD_NOTIFICATION_EMAIL = "ha89ter@gmail.com";
 const DEFAULT_FROM = "AEVIX <onboarding@resend.dev>";
 
+// See the identical note in api/business-analysis/route.ts: per-instance only, not a hard cap.
 const requestBuckets = new Map<string, { count: number; resetAt: number }>();
 
 type LeadPayload = {

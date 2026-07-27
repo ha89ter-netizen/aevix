@@ -15,6 +15,7 @@ const RATE_LIMIT_MAX_REQUESTS = 4;
 const REQUEST_TIMEOUT_MS = 24_000;
 const MAX_REQUEST_BYTES = 10_000;
 
+// See the identical note in api/business-analysis/route.ts: per-instance only, not a hard cap.
 const requestBuckets = new Map<string, { count: number; resetAt: number }>();
 
 const SYSTEM_INSTRUCTIONS = `Ты — арт-директор digital-студии AEVIX.
