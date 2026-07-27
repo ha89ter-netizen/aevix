@@ -2977,6 +2977,20 @@ function FaqScene() {
   );
 }
 
+// Best-effort backup record of the lead: the visible action is opening WhatsApp with a
+// prefilled message, but that's lost entirely if the visitor never presses send there or
+// closes the tab. This fires in the background and never blocks or surfaces errors to the
+// visitor — WhatsApp stays the primary, visible path.
+function sendLeadEmail(lead: { name: string; contact: string; business: string; task: string; niche: string }) {
+  fetch("/api/lead", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(lead),
+  }).catch(() => {
+    // Silently degrade — the visitor already has the WhatsApp draft open.
+  });
+}
+
 function ContactScene() {
   const { status, profile, content, input } = useBusiness();
   const personalized = status === "ready" && profile && content;
@@ -3001,17 +3015,25 @@ function ContactScene() {
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!canSend) return;
+    const trimmedName = name.trim();
+    const trimmedContact = contact.trim();
+    const trimmedBusiness = business.trim();
+    const trimmedTask = task.trim();
+    const niche = personalized ? profile.label : "";
     const lines = [
       "Заявка с сайта AEVIX",
-      `Имя: ${name.trim()}`,
-      `Контакт: ${contact.trim()}`,
-      business.trim() ? `Бизнес: ${business.trim()}` : null,
-      task.trim() ? `Задача: ${task.trim()}` : null,
-      personalized ? `Ниша: ${profile.label}` : null,
+      `Имя: ${trimmedName}`,
+      `Контакт: ${trimmedContact}`,
+      trimmedBusiness ? `Бизнес: ${trimmedBusiness}` : null,
+      trimmedTask ? `Задача: ${trimmedTask}` : null,
+      niche ? `Ниша: ${niche}` : null,
     ].filter(Boolean);
     const url = `${contacts.whatsapp.href}?text=${encodeURIComponent(lines.join("\n"))}`;
+    // window.open must run synchronously in the click handler — anything awaited before it
+    // (like the email call below) would lose the user-gesture context and get popup-blocked.
     window.open(url, "_blank", "noopener,noreferrer");
     setSent(true);
+    sendLeadEmail({ name: trimmedName, contact: trimmedContact, business: trimmedBusiness, task: trimmedTask, niche });
   };
 
   return (

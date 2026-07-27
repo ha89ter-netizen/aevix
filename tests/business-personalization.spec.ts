@@ -124,6 +124,12 @@ test.describe("site personalisation", () => {
 
   test("contact form prefills the described business and captures a lead", async ({ page }) => {
     await analyzeBarber(page);
+    // analyzeBarber only waits for .hero-result to appear, which happens as soon as status
+    // leaves "idle" — business-context.tsx holds a deliberate ~2.1s minimum "analyzing" state
+    // regardless of API speed, so the niche isn't attached to the lead until status flips to
+    // "ready". Wait for that before touching the form, or the email below is submitted mid-race
+    // with an empty niche.
+    await expect(page.locator(".hero-personal-case")).toBeVisible();
     const contact = page.locator("#контакты");
     await contact.scrollIntoViewIfNeeded();
 
@@ -137,12 +143,27 @@ test.describe("site personalisation", () => {
     await contact.locator(".lead-field", { hasText: "Telegram" }).locator(".lead-input").first().fill("@ivan");
     await expect(submit).toBeEnabled();
 
-    // Submitting hands off to WhatsApp (stubbed) and shows the confirmation state.
+    // Submitting hands off to WhatsApp (stubbed), shows the confirmation state, and — as a
+    // backup so the lead isn't lost if WhatsApp is never sent — fires a background email.
     await page.evaluate(() => {
       window.open = () => null;
     });
+    await page.route("**/api/lead", (route: Route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ sent: true }) }),
+    );
+    const leadRequest = page.waitForRequest(
+      (request) => request.url().includes("/api/lead") && request.method() === "POST",
+    );
     await submit.click();
     await expect(contact.locator(".contact-sent")).toBeVisible();
+
+    const request = await leadRequest;
+    expect(request.postDataJSON()).toMatchObject({
+      name: "Иван",
+      contact: "@ivan",
+      business: BARBER_TEXT,
+      niche: "Барбершоп",
+    });
   });
 
   test("reset returns the site to its neutral state", async ({ page }) => {
