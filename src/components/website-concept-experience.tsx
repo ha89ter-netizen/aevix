@@ -243,7 +243,7 @@ function ConceptPreview({
   isPreview?: boolean;
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
-  const imagery = conceptImagesFor(concept.businessType);
+  const imagery = conceptImagesFor(concept.businessType, concept.businessName);
   const services = conceptServicesFor(concept.businessType);
   const style = {
     "--concept-bg": concept.palette.background,
@@ -282,6 +282,10 @@ function ConceptPreview({
         transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
       >
         <div className={cn("concept-site", `concept-template-${concept.template}`)} style={style}>
+          <div className="concept-atmosphere" aria-hidden="true">
+            <span className="concept-orb concept-orb-1" />
+            <span className="concept-orb concept-orb-2" />
+          </div>
           <header className={cn("concept-nav concept-preview-piece", revealIndex >= 0 && "is-visible")}>
             <strong>{concept.businessName}</strong>
             <nav aria-label="Навигация демонстрационного сайта">

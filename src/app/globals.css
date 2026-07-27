@@ -2288,10 +2288,67 @@ body::before {
 }
 
 .concept-site {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   min-height: 100%;
   background: var(--concept-bg);
   color: var(--concept-text);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* A quiet living backdrop behind the generated mockup — the same drifting-orb language as the
+   real site's own .aevix-atmosphere, scoped to the concept and tinted with its own palette
+   accent instead of the visitor's, so it reads as "this mockup is alive" rather than a static
+   screenshot. isolate + z-index: -1 keeps it strictly behind this mockup's own content without
+   reaching into anything outside it. */
+.concept-atmosphere {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.concept-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(10px);
+  will-change: transform;
+}
+
+.concept-orb-1 {
+  top: -20%;
+  left: -12%;
+  width: 26rem;
+  height: 26rem;
+  background: radial-gradient(circle, color-mix(in srgb, var(--concept-accent) 22%, transparent), transparent 70%);
+  animation: concept-orb-float-a 30s var(--ease-soft) infinite;
+}
+
+.concept-orb-2 {
+  bottom: -18%;
+  right: -10%;
+  width: 22rem;
+  height: 22rem;
+  background: radial-gradient(circle, color-mix(in srgb, var(--concept-accent) 16%, transparent), transparent 72%);
+  animation: concept-orb-float-b 34s var(--ease-soft) infinite;
+}
+
+@keyframes concept-orb-float-a {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(4%, 5%, 0) scale(1.08); }
+}
+
+@keyframes concept-orb-float-b {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(-4%, -5%, 0) scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .concept-orb {
+    animation: none;
+  }
 }
 
 .concept-nav {
@@ -2866,166 +2923,292 @@ body::before {
   box-shadow: 0 12px 30px rgba(25, 24, 31, 0.16);
 }
 
-.before-after-stage {
-  overflow: hidden;
+/* --- Ecosystem visualisation: a core orb ("Сейчас" / "После AEVIX") wired by web-like
+   spokes to five satellite orbs, one per pain point / solution. Idle ("before") state reads
+   as dim, slowly twinkling dead stars; "after" wakes the whole network with colour and a
+   steady glow. Clicking a satellite orb hands off to .ecosystem-detail via a shared layoutId,
+   so framer-motion animates it growing into place rather than just appearing. */
+.ecosystem-wrap {
+  display: grid;
+  gap: 2rem;
+  align-items: center;
+}
+
+@media (min-width: 1024px) {
+  .ecosystem-wrap {
+    grid-template-columns: 1.1fr 0.9fr;
+  }
+}
+
+.ecosystem-stage {
+  position: relative;
+  width: 100%;
+  max-width: 30rem;
+  aspect-ratio: 1;
+  margin: 0 auto;
+}
+
+.ecosystem-spoke {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 38%;
+  height: 2px;
+  transform-origin: 0 50%;
+  transform: rotate(var(--angle));
+  background: linear-gradient(90deg, rgba(9, 8, 7, 0.22), rgba(9, 8, 7, 0.03));
+  transition: background 700ms var(--ease-premium), opacity 700ms var(--ease-premium);
+}
+
+.ecosystem-wrap.is-after .ecosystem-spoke {
+  background: linear-gradient(90deg, rgb(var(--accent-r, 114) var(--accent-g, 87) var(--accent-b, 232) / 0.55), rgb(var(--accent-r, 114) var(--accent-g, 87) var(--accent-b, 232) / 0.05));
+}
+
+.ecosystem-core {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  display: grid;
+  width: 8.5rem;
+  height: 8.5rem;
+  transform: translate(-50%, -50%);
+  place-content: center;
+  border-radius: 50%;
+  border: 1px solid rgba(9, 8, 7, 0.14);
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.9), rgba(203, 206, 212, 0.55));
+  box-shadow: 0 20px 45px rgba(17, 20, 24, 0.14);
+  text-align: center;
+  animation: ecosystem-core-breathe 5s ease-in-out infinite;
+  transition: background 800ms var(--ease-premium), box-shadow 800ms var(--ease-premium), border-color 800ms var(--ease-premium);
+  /* Purely decorative — its square hit-box corners reach close enough to the satellite orbs
+     at some angles to steal their clicks otherwise, since it sits at a higher z-index. */
+  pointer-events: none;
+}
+
+.ecosystem-core span {
+  padding: 0 0.5rem;
+  font-family: var(--font-manrope), sans-serif;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: rgba(9, 8, 7, 0.68);
+}
+
+.ecosystem-wrap.is-after .ecosystem-core {
+  border-color: rgb(var(--accent-r, 114) var(--accent-g, 87) var(--accent-b, 232) / 0.4);
+  background: radial-gradient(circle at 35% 30%, #fff, rgb(var(--accent-r, 114) var(--accent-g, 87) var(--accent-b, 232) / 0.3));
+  box-shadow: 0 22px 55px rgb(var(--accent-r, 114) var(--accent-g, 87) var(--accent-b, 232) / 0.32);
+}
+
+.ecosystem-wrap.is-after .ecosystem-core span {
+  color: #1a1420;
+}
+
+@keyframes ecosystem-core-breathe {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.04); }
+}
+
+.ecosystem-node {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  width: 6.5rem;
+  transform: translate(-50%, -50%) rotate(var(--angle)) translateX(9.5rem) rotate(calc(-1 * var(--angle)));
+  text-align: center;
+  animation: ecosystem-twinkle 4.5s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 0.45s);
+}
+
+.ecosystem-wrap.is-after .ecosystem-node {
+  animation: none;
+  opacity: 1;
+}
+
+/* The satellite/core idle animations run forever and are purely decorative — pause them
+   while a detail panel covers the stage instead of leaving them ticking underneath. */
+.ecosystem-wrap.is-detail-open .ecosystem-node,
+.ecosystem-wrap.is-detail-open .ecosystem-core {
+  animation-play-state: paused;
+}
+
+.ecosystem-node-dot {
+  display: grid;
+  height: 2.75rem;
+  width: 2.75rem;
+  place-content: center;
+  border-radius: 50%;
+  border: 1px solid rgba(9, 8, 7, 0.14);
+  background: radial-gradient(circle at 35% 30%, #fff, rgba(198, 202, 210, 0.6));
+  color: rgba(9, 8, 7, 0.5);
+  box-shadow: 0 12px 26px rgba(17, 20, 24, 0.12);
+  transition: background 700ms var(--ease-premium), color 700ms var(--ease-premium), box-shadow 700ms var(--ease-premium), border-color 700ms var(--ease-premium), transform 240ms var(--ease-premium);
+}
+
+.ecosystem-node:hover .ecosystem-node-dot,
+.ecosystem-node:focus-visible .ecosystem-node-dot {
+  transform: scale(1.08);
+}
+
+.ecosystem-wrap.is-after .ecosystem-node-dot {
+  border-color: rgb(var(--accent-r, 114) var(--accent-g, 87) var(--accent-b, 232) / 0.4);
+  background: radial-gradient(circle at 35% 30%, #fff, rgb(var(--accent-r, 114) var(--accent-g, 87) var(--accent-b, 232) / 0.42));
+  color: #4a2fbf;
+  box-shadow: 0 16px 34px rgb(var(--accent-r, 114) var(--accent-g, 87) var(--accent-b, 232) / 0.28);
+}
+
+.ecosystem-node-label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: rgba(9, 8, 7, 0.56);
+}
+
+.ecosystem-wrap.is-after .ecosystem-node-label {
+  color: rgba(9, 8, 7, 0.78);
+}
+
+@keyframes ecosystem-twinkle {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.95; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ecosystem-core,
+  .ecosystem-node {
+    animation: none;
+  }
+}
+
+.ecosystem-result {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1.5rem;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.68);
   box-shadow: var(--shadow-soft);
 }
 
-.before-after-flow {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0;
-  padding: 1.25rem;
-}
-
-.before-after-item {
-  position: relative;
-  display: grid;
-  min-height: 8.5rem;
-  align-content: space-between;
-  gap: 1rem;
-  padding: 1.15rem;
-  border-right: 1px solid var(--line);
-}
-
-.before-after-item:last-child {
-  border-right: 0;
-}
-
-.before-after-item > span {
-  color: rgba(9, 8, 7, 0.34);
-  font-size: 0.7rem;
-}
-
-.before-after-item strong {
-  max-width: 11rem;
-  font-family: var(--font-manrope), sans-serif;
-  font-size: 1.05rem;
-  line-height: 1.35;
-}
-
-.before-after-item svg {
-  position: absolute;
-  z-index: 2;
-  right: -0.7rem;
-  top: 50%;
-  width: 1.35rem;
-  height: 1.35rem;
-  border-radius: 999px;
-  background: #fff;
-  padding: 0.25rem;
-  color: rgba(9, 8, 7, 0.32);
-  box-shadow: 0 6px 18px rgba(17, 20, 24, 0.1);
-}
-
-/* "После": cards light up green one-by-one (train / opening-scene effect), each with a
-   checkmark that flashes for ~1s. Stagger comes from --i set per item. */
-.before-after-stage.is-after .before-after-item {
-  animation: ba-greenify 520ms var(--ease-premium) both;
-  animation-delay: calc(var(--i, 0) * 0.16s);
-}
-
-@keyframes ba-greenify {
-  from {
-    background: transparent;
-    box-shadow: inset 0 0 0 rgba(22, 163, 74, 0);
-  }
-  to {
-    background: linear-gradient(180deg, rgba(22, 163, 74, 0.1), rgba(22, 163, 74, 0.04));
-    box-shadow: inset 3px 0 0 rgba(22, 163, 74, 0.55);
-  }
-}
-
-.before-after-stage.is-after .before-after-item > svg {
-  color: #16a34a;
-}
-
-.ba-check {
-  position: absolute;
-  top: 0.9rem;
-  right: 0.9rem;
-  z-index: 3;
-  display: inline-flex;
-  height: 1.5rem;
-  width: 1.5rem;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  background: #16a34a;
-  color: #fff;
-  opacity: 0;
-  transform: scale(0.3);
-  pointer-events: none;
-}
-
-/* Reset the generic `.before-after-item svg` positioning for the checkmark glyph. */
-.ba-check svg {
-  position: static;
-  height: 0.85rem;
-  width: 0.85rem;
-  padding: 0;
-  border-radius: 0;
-  background: none;
-  color: #fff;
-  box-shadow: none;
-}
-
-.before-after-stage.is-after .ba-check {
-  animation: ba-check-flash 1s var(--ease-spring) both;
-  animation-delay: calc(var(--i, 0) * 0.16s + 0.12s);
-}
-
-@keyframes ba-check-flash {
-  0% {
-    opacity: 0;
-    transform: scale(0.3);
-  }
-  25% {
-    opacity: 1;
-    transform: scale(1.15);
-  }
-  45% {
-    transform: scale(1);
-  }
-  75% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(0.85);
-  }
-}
-
-.before-after-result {
-  display: grid;
-  grid-template-columns: 0.6fr 1.2fr 1fr;
-  align-items: center;
-  gap: 1.5rem;
-  padding: 1.35rem 1.5rem;
-  border-top: 1px solid var(--line);
-  background: #f4f6f8;
-}
-
-.before-after-result span {
+.ecosystem-result span {
   color: #7257e8;
   font-size: 0.72rem;
   font-weight: 650;
   text-transform: uppercase;
 }
 
-.before-after-result strong {
+.ecosystem-result strong {
   font-family: var(--font-manrope), sans-serif;
   font-size: 1.25rem;
 }
 
-.before-after-result p {
+.ecosystem-result p {
   color: rgba(9, 8, 7, 0.54);
   font-size: 0.85rem;
   line-height: 1.55;
+}
+
+.ecosystem-detail {
+  /* Fixed, not absolute: .problems-scene centers tall content with `flex items-center`, so at
+     rest the section's own top edge sits scrolled above the viewport. An absolutely-positioned
+     overlay inherits that and covers the whole (taller-than-viewport) section, which pushed the
+     close button here above the visible viewport — reachable by keyboard (Escape) but not by a
+     real click, and this cascaded into ~2s of Playwright's actionability retries as it kept
+     trying to scroll an element that was never actually clickable at that position. */
+  position: fixed;
+  inset: 0;
+  /* Above .site-header (z-40) and in line with the other full-screen overlays (PremiumModal
+     uses z-[70]) — otherwise the fixed header sits on top of this and swallows clicks meant
+     for the close button underneath it. */
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(244, 245, 247, 0.92);
+  backdrop-filter: blur(10px);
+}
+
+.ecosystem-detail-close {
+  position: absolute;
+  right: 1.25rem;
+  top: 1.25rem;
+  display: grid;
+  height: 2.5rem;
+  width: 2.5rem;
+  place-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: rgba(9, 8, 7, 0.6);
+  box-shadow: var(--shadow-soft);
+}
+
+.ecosystem-detail-body {
+  display: grid;
+  width: 100%;
+  max-width: 46rem;
+  align-items: center;
+  gap: 2.5rem;
+}
+
+@media (min-width: 768px) {
+  .ecosystem-detail-body {
+    grid-template-columns: 0.8fr 1.2fr;
+  }
+}
+
+.ecosystem-detail-orb {
+  display: grid;
+  justify-items: center;
+  gap: 0.9rem;
+  justify-self: center;
+}
+
+.ecosystem-detail-orb .ecosystem-node-dot {
+  height: 6rem;
+  width: 6rem;
+  color: rgba(9, 8, 7, 0.5);
+}
+
+.ecosystem-detail-orb.is-after .ecosystem-node-dot {
+  border-color: rgb(var(--accent-r, 114) var(--accent-g, 87) var(--accent-b, 232) / 0.4);
+  background: radial-gradient(circle at 35% 30%, #fff, rgb(var(--accent-r, 114) var(--accent-g, 87) var(--accent-b, 232) / 0.42));
+  color: #4a2fbf;
+  box-shadow: 0 16px 34px rgb(var(--accent-r, 114) var(--accent-g, 87) var(--accent-b, 232) / 0.28);
+}
+
+.ecosystem-detail-orb .ecosystem-node-label {
+  max-width: 12rem;
+  font-size: 1rem;
+  color: rgba(9, 8, 7, 0.78);
+}
+
+.ecosystem-detail-eyebrow {
+  color: #7257e8;
+  font-size: 0.72rem;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.ecosystem-detail-copy h3 {
+  margin-top: 0.5rem;
+  font-family: var(--font-manrope), sans-serif;
+  font-size: 1.7rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.ecosystem-detail-text {
+  margin-top: 0.75rem;
+  max-width: 30rem;
+  color: rgba(9, 8, 7, 0.62);
+  font-size: 1rem;
+  line-height: 1.65;
 }
 
 .module-output-chain {
@@ -3206,139 +3389,6 @@ body::before {
   padding: 1rem 1.4rem;
   border-color: rgba(38, 115, 74, 0.12);
   opacity: 1;
-}
-
-.ecosystem-stage {
-  position: relative;
-  min-height: 42rem;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: radial-gradient(circle at center, rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.09), transparent 36%), rgba(255, 255, 255, 0.66);
-  box-shadow: var(--shadow-soft);
-}
-
-.ecosystem-center {
-  position: absolute;
-  z-index: 5;
-  left: 50%;
-  top: 48%;
-  display: grid;
-  width: 10rem;
-  height: 10rem;
-  place-content: center;
-  justify-items: center;
-  border-radius: 50%;
-  background: #17181b;
-  color: #fff;
-  box-shadow: 0 26px 70px rgba(44, 39, 61, 0.24), 0 0 0 1rem rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.05);
-  transform: translate(-50%, -50%);
-}
-
-.ecosystem-center span {
-  display: grid;
-  width: 2.2rem;
-  height: 2.2rem;
-  place-content: center;
-  border-radius: 50%;
-  background: #fff;
-  color: #17181b;
-  font-size: 0.62rem;
-}
-
-.ecosystem-center strong {
-  margin-top: 0.55rem;
-  font-family: var(--font-manrope), sans-serif;
-  font-size: 1.2rem;
-}
-
-.ecosystem-center small {
-  margin-top: 0.25rem;
-  color: rgba(255, 255, 255, 0.48);
-  font-size: 0.65rem;
-}
-
-.ecosystem-node {
-  position: absolute;
-  z-index: 3;
-  left: calc(50% + cos(calc(var(--node-index) * 40deg)) * 18rem);
-  top: calc(48% + sin(calc(var(--node-index) * 40deg)) * 15rem);
-  display: flex;
-  min-width: 8.5rem;
-  min-height: 3.4rem;
-  align-items: center;
-  gap: 0.65rem;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.9);
-  padding: 0.75rem 0.9rem;
-  box-shadow: 0 16px 42px rgba(41, 48, 61, 0.09);
-  color: rgba(9, 8, 7, 0.7);
-  transform: translate(-50%, -50%);
-  transition: opacity 280ms var(--ease-premium), border-color 280ms var(--ease-premium), box-shadow 280ms var(--ease-premium), transform 280ms var(--ease-premium);
-}
-
-.ecosystem-node::before {
-  position: absolute;
-  z-index: -1;
-  right: 50%;
-  top: 50%;
-  width: 18rem;
-  height: 1px;
-  background: linear-gradient(90deg, rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.32), transparent);
-  content: "";
-  transform: rotate(calc(var(--node-index) * 40deg + 180deg));
-  transform-origin: right center;
-}
-
-.ecosystem-node i {
-  position: absolute;
-  right: 0.45rem;
-  top: 0.45rem;
-  width: 0.35rem;
-  height: 0.35rem;
-  border-radius: 50%;
-  background: #7257e8;
-  animation: status-breathe 1.8s ease-in-out infinite;
-}
-
-.ecosystem-node.is-active {
-  border-color: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.42);
-  box-shadow: 0 24px 60px rgba(92, 73, 155, 0.18);
-  color: #090807;
-  transform: translate(-50%, -50%) scale(1.07);
-}
-
-.ecosystem-node.is-muted {
-  opacity: 0.32;
-}
-
-.ecosystem-status {
-  position: absolute;
-  z-index: 6;
-  right: 1.25rem;
-  bottom: 1.25rem;
-  width: min(22rem, calc(100% - 2.5rem));
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.88);
-  padding: 1rem;
-  box-shadow: var(--shadow-soft);
-  backdrop-filter: blur(16px);
-}
-
-.ecosystem-status span {
-  color: #7257e8;
-  font-size: 0.7rem;
-  font-weight: 650;
-  text-transform: uppercase;
-}
-
-.ecosystem-status p {
-  margin-top: 0.35rem;
-  color: rgba(9, 8, 7, 0.58);
-  font-size: 0.82rem;
-  line-height: 1.5;
 }
 
 .roadmap {
@@ -3603,36 +3653,52 @@ body::before {
   transform: translateX(2px);
 }
 
-.footer-legal {
-  position: relative;
-  margin-top: 2rem;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.66);
-  padding: 1rem 3.5rem 1rem 1rem;
+.legal-modal {
+  overflow-y: auto;
+  padding: 2rem;
 }
 
-.footer-legal strong {
+.legal-modal h2 {
   font-family: var(--font-manrope), sans-serif;
+  font-size: 1.6rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
 }
 
-.footer-legal p {
-  margin-top: 0.4rem;
-  color: rgba(9, 8, 7, 0.55);
-  font-size: 0.8rem;
-  line-height: 1.55;
-}
-
-.footer-legal button {
-  position: absolute;
-  right: 1rem;
-  top: 1rem;
+.legal-modal-body {
   display: grid;
-  width: 2rem;
-  height: 2rem;
-  place-content: center;
-  border-radius: 50%;
-  background: #fff;
+  gap: 1.4rem;
+  margin-top: 1.5rem;
+}
+
+.legal-modal-body h3 {
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: #111;
+}
+
+.legal-modal-body p,
+.legal-modal-body li {
+  margin-top: 0.35rem;
+  color: rgba(9, 8, 7, 0.62);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.legal-modal-body ul {
+  margin-top: 0.35rem;
+  padding-left: 1.1rem;
+  list-style: disc;
+}
+
+.legal-modal-body li {
+  margin-top: 0.3rem;
+}
+
+.legal-modal-body a {
+  color: #7257e8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .premium-footer-bottom {
@@ -4169,29 +4235,37 @@ textarea {
     flex: 1;
   }
 
-  .before-after-flow {
-    grid-template-columns: 1fr;
-    padding: 0.75rem;
+  .ecosystem-stage {
+    max-width: 20rem;
   }
 
-  .before-after-item {
-    min-height: 5.5rem;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
+  .ecosystem-node {
+    width: 4.6rem;
+    transform: translate(-50%, -50%) rotate(var(--angle)) translateX(6.6rem) rotate(calc(-1 * var(--angle)));
   }
 
-  .before-after-item:last-child {
-    border-bottom: 0;
+  .ecosystem-node-dot {
+    height: 2.2rem;
+    width: 2.2rem;
   }
 
-  .before-after-item svg {
-    right: 1rem;
-    top: auto;
-    bottom: -0.7rem;
-    transform: rotate(90deg);
+  .ecosystem-node-label {
+    font-size: 0.68rem;
   }
 
-  .before-after-result,
+  .ecosystem-core {
+    width: 6.4rem;
+    height: 6.4rem;
+  }
+
+  .ecosystem-core span {
+    font-size: 0.8rem;
+  }
+
+  .ecosystem-detail-body {
+    gap: 1.5rem;
+  }
+
   .roadmap-detail {
     grid-template-columns: 1fr;
     gap: 0.65rem;
@@ -4237,48 +4311,6 @@ textarea {
     width: 100%;
     height: 45%;
     animation-name: data-flow-vertical;
-  }
-
-  .ecosystem-stage {
-    display: grid;
-    min-height: auto;
-    gap: 1rem;
-    padding: 1rem;
-  }
-
-  .ecosystem-center {
-    position: static;
-    width: 8rem;
-    height: 8rem;
-    justify-self: center;
-    transform: none;
-  }
-
-  .ecosystem-nodes {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.6rem;
-  }
-
-  .ecosystem-node {
-    position: relative;
-    left: auto;
-    top: auto;
-    min-width: 0;
-    transform: none;
-  }
-
-  .ecosystem-node::before {
-    display: none;
-  }
-
-  .ecosystem-node.is-active {
-    transform: scale(1.025);
-  }
-
-  .ecosystem-status {
-    position: static;
-    width: 100%;
   }
 
   .roadmap-track {

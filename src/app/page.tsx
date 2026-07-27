@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -399,10 +400,57 @@ const modules: Module[] = [
   },
 ];
 
-const beforeAfterItems = {
-  before: ["Ручные ответы", "Excel и таблицы", "Записи в блокноте", "Пропущенные сообщения", "Звонки без контекста"],
-  after: ["AI-консультант", "Единая CRM", "Автоматические сценарии", "Понятные статусы", "Онлайн-запись"],
-} as const;
+type EcosystemNode = {
+  id: string;
+  icon: IconComponent;
+  before: string;
+  after: string;
+  beforeText: string;
+  afterText: string;
+};
+
+const ecosystemNodes: EcosystemNode[] = [
+  {
+    id: "replies",
+    icon: Bot,
+    before: "Ручные ответы",
+    after: "AI-консультант",
+    beforeText: "Сотрудник вручную отвечает на одни и те же вопросы в WhatsApp, Telegram и на сайте — время уходит на повторение, а не на дело.",
+    afterText: "AI-консультант отвечает клиенту мгновенно в любом канале, уточняет задачу и передаёт сотруднику уже готовое, понятное обращение.",
+  },
+  {
+    id: "sheets",
+    icon: Layers3,
+    before: "Excel и таблицы",
+    after: "Единая CRM",
+    beforeText: "Заявки и статусы клиентов живут в разных таблицах и чатах — сложно понять, что происходит прямо сейчас.",
+    afterText: "Каждое обращение, статус и история клиента — в одном рабочем контуре, видном всей команде.",
+  },
+  {
+    id: "notebook",
+    icon: Workflow,
+    before: "Записи в блокноте",
+    after: "Автоматические сценарии",
+    beforeText: "Запись клиентов и повторяющиеся шаги ведутся вручную на бумаге — легко забыть, перепутать или потерять.",
+    afterText: "AEVIX сам продвигает заявку по нужным шагам: назначает статус, напоминание и следующее действие.",
+  },
+  {
+    id: "missed",
+    icon: Repeat2,
+    before: "Пропущенные сообщения",
+    after: "Понятные статусы",
+    beforeText: "Сообщения теряются между каналами — сложно понять, кому уже ответили, а кто до сих пор ждёт.",
+    afterText: "Каждое обращение получает понятный статус, и видно, что уже сделано, а что требует внимания.",
+  },
+  {
+    id: "calls",
+    icon: CalendarCheck,
+    before: "Звонки без контекста",
+    after: "Онлайн-запись",
+    beforeText: "Клиент звонит, а сотрудник вручную уточняет свободное время и данные — долго и без единой картины расписания.",
+    afterText: "Клиент сам выбирает удобное время в боте или на сайте, а запись сразу попадает в общее расписание.",
+  },
+];
 
 const applicationScenarios = [
   {
@@ -2133,9 +2181,23 @@ function AiConsultantScene() {
   );
 }
 
+// Nodes sit on a circle around the core, evenly spaced starting from straight up.
+const ECOSYSTEM_ANGLE_STEP = 360 / ecosystemNodes.length;
+const ECOSYSTEM_START_ANGLE = -90;
+
 function ProblemsScene() {
   const [mode, setMode] = useState<"before" | "after">("before");
-  const items = beforeAfterItems[mode];
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const activeNode = ecosystemNodes.find((node) => node.id === activeId) ?? null;
+
+  useEffect(() => {
+    if (!activeId) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setActiveId(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [activeId]);
 
   return (
     <section id="проблемы" className="scene problems-scene relative flex items-center overflow-hidden">
@@ -2153,31 +2215,132 @@ function ProblemsScene() {
             <button type="button" aria-pressed={mode === "after"} onClick={() => setMode("after")}>После AEVIX</button>
           </div>
         </div>
-        <motion.div key={mode} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className={cn("before-after-stage mt-10", mode === "after" && "is-after")}>
-          <div className="before-after-flow">
-            {items.map((item, index) => (
-              <div
-                key={item}
-                className="before-after-item"
-                style={{ "--i": index } as CSSProperties}
-              >
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <strong>{item}</strong>
-                <span className="ba-check" aria-hidden="true">
-                  <Check />
-                </span>
-                {index < items.length - 1 ? <ArrowRight aria-hidden="true" /> : null}
-              </div>
-            ))}
+
+        <div data-reveal className={cn("ecosystem-wrap mt-10", mode === "after" && "is-after", activeId && "is-detail-open")}>
+          <div className="ecosystem-stage" role="list" aria-label="Процессы бизнеса до и после AEVIX">
+            {ecosystemNodes.map((node, index) => {
+              const angle = ECOSYSTEM_START_ANGLE + index * ECOSYSTEM_ANGLE_STEP;
+              return (
+                <span
+                  key={`spoke-${node.id}`}
+                  className="ecosystem-spoke"
+                  style={{ "--angle": `${angle}deg` } as CSSProperties}
+                  aria-hidden="true"
+                />
+              );
+            })}
+
+            <div className="ecosystem-core">
+              <span>{mode === "before" ? "Сейчас" : "После AEVIX"}</span>
+            </div>
+
+            {ecosystemNodes.map((node, index) => {
+              const angle = ECOSYSTEM_START_ANGLE + index * ECOSYSTEM_ANGLE_STEP;
+              const Icon = node.icon;
+              return (
+                <motion.button
+                  key={node.id}
+                  type="button"
+                  role="listitem"
+                  className="ecosystem-node"
+                  style={{ "--angle": `${angle}deg`, "--i": index } as CSSProperties}
+                  onClick={() => setActiveId(node.id)}
+                  aria-label={`Подробнее: ${mode === "before" ? node.before : node.after}`}
+                >
+                  <span className="ecosystem-node-dot">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span className="ecosystem-node-label">{mode === "before" ? node.before : node.after}</span>
+                </motion.button>
+              );
+            })}
           </div>
-          <div className="before-after-result">
+
+          <div className="ecosystem-result">
             <span>{mode === "before" ? "Разрозненный процесс" : "Единый рабочий контур"}</span>
             <strong>{mode === "before" ? "Команда держит систему в голове" : "AEVIX ведёт следующий шаг автоматически"}</strong>
-            <p>{mode === "before" ? "Переключитесь на «После AEVIX», чтобы собрать процесс." : "AI, CRM, запись и статусы работают как одна последовательность."}</p>
+            <p>
+              {mode === "before"
+                ? "Переключитесь на «После AEVIX», чтобы собрать процесс, или нажмите на узел сети — подробности справа."
+                : "AI, CRM, запись и статусы работают как одна последовательность. Нажмите на узел, чтобы увидеть детали."}
+            </p>
           </div>
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {activeNode ? (
+          <EcosystemDetail node={activeNode} mode={mode} onClose={() => setActiveId(null)} />
+        ) : null}
+      </AnimatePresence>
+    </section>
+  );
+}
+
+function EcosystemDetail({
+  node,
+  mode,
+  onClose,
+}: {
+  node: EcosystemNode;
+  mode: "before" | "after";
+  onClose: () => void;
+}) {
+  const Icon = node.icon;
+  const label = mode === "before" ? node.before : node.after;
+  const text = mode === "before" ? node.beforeText : node.afterText;
+
+  if (typeof document === "undefined") return null;
+
+  // Portaled to <body>, matching PremiumModal's own pattern: nested this deep inside <main>,
+  // no z-index could ever out-stack the fixed site header (a sibling of <main>, not an
+  // ancestor) — a child's stacking level is capped by its own ancestor's, not just its own value.
+  return createPortal(
+    <motion.div
+      className="ecosystem-detail"
+      role="dialog"
+      aria-modal="true"
+      aria-label={label}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.28 }}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <button type="button" className="ecosystem-detail-close" onClick={onClose} aria-label="Закрыть">
+        <X className="h-4 w-4" />
+      </button>
+      <div className="ecosystem-detail-body">
+        {/* Entrance-only animation (no `exit`): AnimatePresence waits for every nested
+            motion element's own exit transition before it will unmount the wrapper, and
+            two independent staggered exits here previously stacked into a ~1.7s hang before
+            the panel actually closed. The wrapper's own fade below is enough for a clean close. */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.55, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
+          className={cn("ecosystem-detail-orb", mode === "after" && "is-after")}
+        >
+          <span className="ecosystem-node-dot">
+            <Icon className="h-7 w-7" />
+          </span>
+          <span className="ecosystem-node-label">{label}</span>
+        </motion.div>
+        <motion.div
+          className="ecosystem-detail-copy"
+          initial={{ opacity: 0, x: 24 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.12, duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <p className="ecosystem-detail-eyebrow">{mode === "before" ? "Что мешает" : "Что меняет AEVIX"}</p>
+          <h3>{label}</h3>
+          <p className="ecosystem-detail-text">{text}</p>
         </motion.div>
       </div>
-    </section>
+    </motion.div>,
+    document.body,
   );
 }
 
@@ -3170,8 +3333,8 @@ function FooterScene() {
           <nav aria-label="Ресурсы AEVIX">
             <p>Ресурсы</p>
             <a href="#faq">FAQ</a>
-            <button type="button" onClick={() => setLegal((current) => current === "privacy" ? null : "privacy")}>Privacy Policy</button>
-            <button type="button" onClick={() => setLegal((current) => current === "terms" ? null : "terms")}>Terms</button>
+            <button type="button" onClick={() => setLegal("privacy")}>Privacy Policy</button>
+            <button type="button" onClick={() => setLegal("terms")}>Terms</button>
           </nav>
           <nav aria-label="Контакты AEVIX">
             <p>Контакты</p>
@@ -3180,19 +3343,121 @@ function FooterScene() {
             <a href={contacts.email.href}>Email</a>
           </nav>
         </div>
-        {legal ? (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="footer-legal" role="status">
-            <strong>{legal === "privacy" ? "Privacy Policy" : "Terms"}</strong>
-            <p>{legal === "privacy" ? "Контактные данные используются только для ответа на обращение. Бизнес-контекст передаётся AI без персональных контактов." : "Расчёты на сайте являются предварительными. Финальный состав, стоимость и условия определяются после разбора задачи."}</p>
-            <button type="button" onClick={() => setLegal(null)} aria-label="Закрыть информацию"><X className="h-4 w-4" /></button>
-          </motion.div>
-        ) : null}
         <div className="premium-footer-bottom">
           <span>© 2026 AEVIX</span>
           <span>Built by Alan Kossybayev</span>
         </div>
       </div>
+      <LegalModal document={legal} onClose={() => setLegal(null)} />
     </footer>
+  );
+}
+
+const PRIVACY_SECTIONS: Array<{ title: string; body: ReactNode }> = [
+  {
+    title: "Какие данные собираются",
+    body: (
+      <p>
+        Через форму заявки и AI-консультанта мы получаем то, что вы сами вводите: имя, контакт
+        (телефон, Telegram или WhatsApp), необязательные email, описание бизнеса и задачи.
+        Никакие данные не собираются автоматически и без вашего ввода.
+      </p>
+    ),
+  },
+  {
+    title: "Для чего используются",
+    body: (
+      <p>
+        Только чтобы ответить на обращение, подготовить предварительный расчёт и обсудить проект.
+        Мы не продаём и не передаём данные третьим лицам для маркетинга.
+      </p>
+    ),
+  },
+  {
+    title: "Какие внешние сервисы участвуют",
+    body: (
+      <ul>
+        <li>
+          <strong>OpenAI</strong> — получает только описание бизнеса и задачи (для AI-анализа и
+          генерации концепта сайта). Имя, телефон, Telegram, WhatsApp и email в OpenAI не
+          передаются.
+        </li>
+        <li>
+          <strong>Resend</strong> — используется только чтобы продублировать заявку с формы на
+          рабочую почту студии; данные обрабатывает исключительно для этой доставки.
+        </li>
+      </ul>
+    ),
+  },
+  {
+    title: "Cookies и аналитика",
+    body: <p>Сайт не использует рекламные cookies и системы отслеживания посетителей.</p>,
+  },
+  {
+    title: "Хранение и удаление",
+    body: (
+      <p>
+        Данные заявки хранятся ровно столько, сколько нужно, чтобы обсудить и завершить проект.
+        Чтобы запросить удаление или уточнить, какие данные о вас есть, напишите на{" "}
+        <a href={contacts.email.href}>{contacts.email.value}</a>.
+      </p>
+    ),
+  },
+];
+
+const TERMS_SECTIONS: Array<{ title: string; body: ReactNode }> = [
+  {
+    title: "Предварительный характер расчётов",
+    body: (
+      <p>
+        Стоимость, сроки и состав работ на сайте — ориентировочные и основаны на введённых вами
+        данных. Это не окончательная оферта: финальные условия фиксируются после разбора задачи.
+      </p>
+    ),
+  },
+  {
+    title: "AI-анализ и концепты сайтов",
+    body: (
+      <p>
+        Ответы AI-консультанта и сгенерированные концепты сайтов — иллюстративные сценарии
+        автоматизации и предварительные визуальные макеты, а не готовый продукт и не гарантия
+        конкретного результата, роста выручки или сроков.
+      </p>
+    ),
+  },
+  {
+    title: "Связь и обращения",
+    body: (
+      <p>
+        Отправляя заявку через сайт, WhatsApp, Telegram или email, вы соглашаетесь, что мы можем
+        связаться с вами по указанному контакту, чтобы обсудить проект.
+      </p>
+    ),
+  },
+];
+
+function LegalModal({ document: activeDocument, onClose }: { document: "privacy" | "terms" | null; onClose: () => void }) {
+  const sections = activeDocument === "privacy" ? PRIVACY_SECTIONS : TERMS_SECTIONS;
+
+  return (
+    <PremiumModal
+      open={activeDocument !== null}
+      onClose={onClose}
+      titleId="legal-modal-title"
+      panelClassName="md:h-auto md:max-h-[85svh] md:max-w-2xl"
+    >
+      <div className="legal-modal">
+        <h2 id="legal-modal-title">{activeDocument === "privacy" ? "Privacy Policy" : "Terms"}</h2>
+        <div className="legal-modal-body">
+          {sections.map((section) => (
+            <section key={section.title}>
+              <h3>{section.title}</h3>
+              {section.body}
+            </section>
+          ))}
+        </div>
+      </div>
+    </PremiumModal>
   );
 }
 
