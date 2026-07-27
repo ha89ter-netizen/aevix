@@ -71,6 +71,20 @@ const SYSTEM_INSTRUCTIONS = `Ты — AI-консультант digital-студ
 - ответ должен быть полезным и занимать примерно 120–250 слов;
 - верни только JSON по схеме, без markdown и без пояснений вне JSON.`;
 
+const QUICK_SYSTEM_INSTRUCTIONS = `Ты — AI-консультант digital-студии AEVIX.
+
+Тебе задают КОРОТКИЙ вопрос. Ответь коротко и конкретно: 1–3 предложения, без списков, без заголовков, без разделов, без воды. Не превращай ответ в доклад.
+
+Цены AEVIX (₸): AI-консультант — от 120 000; Telegram-бот — от 150 000; WhatsApp-бот — от 180 000; сайт / лендинг — от 100 000; комплексная автоматизация — от 350 000; CRM — по составу проекта; NFC — бонус к комплексным проектам.
+
+Правила:
+- на первый проект действует скидка 10%. Если вопрос про цену, стоимость или скидки — обязательно назови её;
+- если передан контекст бизнеса (businessContext) — отвечай применительно именно к нему, не переспрашивай нишу заново;
+- если для точного ответа нужен расчёт — коротко предложи открыть калькулятор или получить бесплатную консультацию;
+- цену называй как «от N ₸», не выдумывай гарантии, сроки, статистику и результаты;
+- отвечай только на русском;
+- верни только JSON по схеме {answer}, без markdown.`;
+
 const ESTIMATE_SYSTEM_INSTRUCTIONS = `Ты — AI-консультант digital-студии AEVIX.
 
 Твоя задача — подготовить предварительный план проекта по бизнес-контексту и выбранным модулям.
@@ -115,6 +129,18 @@ const BUSINESS_ANALYSIS_SCHEMA = {
     callToAction: {
       type: "string",
       description: "Мягкое предложение обсудить проект через WhatsApp, Telegram или email.",
+    },
+  },
+};
+
+const QUICK_ANSWER_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["answer"],
+  properties: {
+    answer: {
+      type: "string",
+      description: "Короткий ответ на вопрос: 1–3 предложения, без списков и разделов.",
     },
   },
 };
@@ -350,6 +376,73 @@ export async function POST(request: Request) {
 
       return NextResponse.json(
         { error: "Не удалось подготовить AI-рекомендацию. Используйте локальный расчет." },
+        { status: 502 },
+      );
+    }
+  }
+
+  const quickQuestionRaw = body?.quickQuestion;
+  if (typeof quickQuestionRaw === "string" && quickQuestionRaw.trim()) {
+    const quickQuestion = quickQuestionRaw.trim().slice(0, 500);
+    const businessContextRaw = body?.businessContext;
+    const businessContext =
+      typeof businessContextRaw === "string" ? businessContextRaw.trim().slice(0, 400) : "";
+
+    if (isRateLimited(getClientId(request))) {
+      return NextResponse.json(
+        { error: "Слишком много запросов подряд. Подождите минуту и попробуйте снова." },
+        { status: 429 },
+      );
+    }
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "AI-консультант временно недоступен. Серверный ключ OpenAI еще не настроен." },
+        { status: 503 },
+      );
+    }
+
+    try {
+      const client = new OpenAI({ apiKey });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      const response = await client.responses.create(
+        {
+          model: "gpt-4.1-mini",
+          instructions: QUICK_SYSTEM_INSTRUCTIONS,
+          input: JSON.stringify({ question: quickQuestion, businessContext: businessContext || null }),
+          max_output_tokens: 320,
+          text: {
+            format: {
+              type: "json_schema",
+              name: "aevix_quick_answer",
+              strict: true,
+              schema: QUICK_ANSWER_SCHEMA,
+            },
+            verbosity: "medium",
+          },
+        },
+        { signal: controller.signal },
+      );
+      clearTimeout(timeout);
+
+      const rawAnswer = response.output_text?.trim();
+      if (!rawAnswer) {
+        return NextResponse.json({ error: "AI-консультант не смог ответить." }, { status: 502 });
+      }
+
+      const parsed = JSON.parse(rawAnswer) as { answer?: unknown };
+      const answer = typeof parsed.answer === "string" ? parsed.answer.trim() : "";
+      if (!answer) {
+        return NextResponse.json({ error: "AI-консультант вернул пустой ответ." }, { status: 502 });
+      }
+
+      return NextResponse.json({ answer });
+    } catch {
+      console.error("Quick answer failed");
+      return NextResponse.json(
+        { error: "Не удалось получить ответ. Попробуйте еще раз немного позже." },
         { status: 502 },
       );
     }

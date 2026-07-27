@@ -448,16 +448,60 @@ const aiQuickPrompts = [
  */
 const quickReplies: Record<string, string> = {
   "Сколько это стоит?":
-    "Коротко: лендинг — от 100–200К ₸, боты и автоматизация — от 120К ₸. Точная цена зависит от задач. Хотите конкретику — откройте калькулятор или получите бесплатную консультацию.",
+    "Коротко: лендинг — от 100 000 ₸, боты и автоматизация — от 120 000 ₸. На первый проект — скидка 10%. Точная цена зависит от задач: откройте калькулятор или получите бесплатную консультацию.",
   "Сколько занимает разработка?":
     "Обычно первая версия — 1–3 недели, зависит от объёма и интеграций. Точный срок назовём после короткого разбора.",
   "Как работает AI?":
     "AI отвечает клиенту в WhatsApp и Telegram, уточняет задачу, собирает данные и передаёт сотруднику готовое обращение. Сложное сразу уходит человеку.",
   "Можно улучшить существующий сайт?":
     "Да. Разбираем текущую структуру и путь клиента, затем предлагаем точечные улучшения или новую версию — без переделки ради переделки.",
+  "Покажи автоматизацию":
+    "Автоматизация убирает ручные шаги: заявки, статусы, напоминания и типовые ответы идут по сценарию сами. Опишите бизнес одним сообщением — покажу сценарий под вас.",
+  "Создай концепт сайта":
+    "Нажмите «Получить концепт сайта» слева — за минуту соберём интерактивный макет с вашими услугами и примерными ценами.",
+  "У меня барбершоп":
+    "Для барбершопа обычно нужны онлайн-запись, выбор мастера, напоминания и ответы в WhatsApp. Опишите детали — соберу решение и назову цену.",
   "Что если у меня несколько филиалов?":
     "Каждый филиал ведём отдельно: своё расписание, заявки и статусы. Владелец видит все точки в одном месте.",
 };
+
+/**
+ * Lightweight intent detection so the consultant answers a short question with a short reply,
+ * and only produces the full structured analysis (вывод / проблемы / рекомендации / карта) after
+ * a real business description. Kept deliberately simple and dependency-free.
+ */
+function classifyMessage(message: string): { mode: "full" | "quick"; setsTopic: boolean } {
+  const m = message.trim().toLowerCase();
+  const words = m.split(/\s+/).filter(Boolean);
+  const isQuestion =
+    m.includes("?") ||
+    /^(а |и )?(есть|можно|как|что|сколько|когда|почему|какой|какие|какая|нужно|нужен|будет|вы |делаете|подойд|можете|реально|а есть|а что)/.test(m);
+  const nicheWords =
+    /(бизнес|салон|магазин|барбершоп|барбер|кофейн|ресторан|кафе|стоматолог|зуб|клиник|фитнес|тренаж|автосервис|доставк|отель|гостиниц|пекарн|цвет|аптек|студи|мастерск|шиномонтаж|автомойк|груминг)/;
+  const mentionsBusiness = nicheWords.test(m) || /(^|\s)(у меня|мой|моя|моё|мои)\s/.test(m);
+  const processWords =
+    /(вручну|тетрад|блокнот|теряем|не успева|путаниц|excel|таблиц|напомина|отвеча|обраба|поток|очеред|переписк|звонк|заявк|запис|заказ|клиент)/;
+
+  const isFull =
+    (!isQuestion && mentionsBusiness && (words.length >= 9 || processWords.test(m))) || words.length >= 16;
+  const setsTopic = isFull || (!isQuestion && mentionsBusiness && words.length <= 12);
+  return { mode: isFull ? "full" : "quick", setsTopic };
+}
+
+/** Offline fallback for the most common short questions, so quick mode still works without AI. */
+function localQuickAnswer(message: string, topic: string): string | null {
+  const m = message.toLowerCase();
+  const ctx = topic ? ` Под «${topic}» подберём оптимальный набор.` : "";
+  if (/скидк/.test(m)) return `Да, на первый проект действует скидка 10%.${ctx} Точную цену покажет калькулятор.`;
+  if (/(цена|стоит|стоимост|прайс|бюджет|сколько.*(стоит|цен|денег))/.test(m))
+    return "Лендинг — от 100 000 ₸, боты и автоматизация — от 120 000 ₸. На первый проект скидка 10%. Точный расчёт — в калькуляторе или на бесплатной консультации.";
+  if (/(срок|как долго|за сколько|сколько.*(врем|занима|дел|недел|дней))/.test(m))
+    return "Обычно первая версия — 1–3 недели, зависит от объёма и интеграций.";
+  if (/crm/.test(m)) return "Да, CRM подключаем: заявки, статусы и история в одном окне. Состав — по вашему процессу.";
+  if (/(бот|telegram|whatsapp|ватсап|телеграм)/.test(m))
+    return "Да, делаем ботов для Telegram и WhatsApp: ответы, заявки и сценарии. От 150 000 ₸, на первый проект скидка 10%.";
+  return null;
+}
 
 const analysisStages = [
   "Изучаем описание бизнеса",
@@ -1517,22 +1561,28 @@ function AiConsultantScene() {
   ]);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [isThinking, setThinking] = useState(false);
+  const [thinkingMode, setThinkingMode] = useState<"full" | "quick">("full");
   const [stageIndex, setStageIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [expandedNode, setExpandedNode] = useState<number | null>(null);
+  // Remembered business context so a follow-up like "есть скидки?" stays about the same
+  // business the visitor already described. Also the target of the "repeat analysis" button.
+  const businessTopicRef = useRef("");
+  const lastFullRef = useRef("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const canSend = input.trim().length > 0 && input.trim().length <= 1500 && !isThinking;
   const flow = getSafeFlow(analysis, input);
   // Услуги от дорогих к дешёвым (по запросу — сначала более дорогие).
   const servicesByPrice = [...serviceCatalog].sort((a, b) => (b.price || 0) - (a.price || 0));
+  const fullThinking = isThinking && thinkingMode === "full";
   const progress =
-    analysis || isThinking
+    analysis || fullThinking
       ? ((analysis ? analysisStages.length - 1 : stageIndex) / (analysisStages.length - 1)) * 100
       : 0;
 
   useEffect(() => {
-    if (!isThinking) {
+    if (!isThinking || thinkingMode !== "full") {
       if (!analysis) setStageIndex(0);
       return;
     }
@@ -1540,7 +1590,7 @@ function AiConsultantScene() {
       setStageIndex((current) => Math.min(current + 1, analysisStages.length - 1));
     }, 900);
     return () => window.clearInterval(timer);
-  }, [analysis, isThinking]);
+  }, [analysis, isThinking, thinkingMode]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -1558,6 +1608,8 @@ function AiConsultantScene() {
     if (businessInput && businessInput !== lastSyncedRef.current) {
       lastSyncedRef.current = businessInput;
       setInput(businessInput);
+      // The Hero description becomes the remembered context for follow-up questions.
+      businessTopicRef.current = businessInput;
     }
   }, [businessInput]);
 
@@ -1575,8 +1627,81 @@ function AiConsultantScene() {
     });
   };
 
-  const sendAnalysis = async (messageOverride?: string) => {
-    const message = (messageOverride ?? input).trim();
+  const pushAi = (text: string) =>
+    setMessages((current) => [...current, { id: `ai-${Date.now()}`, role: "ai", text }]);
+
+  // Full structured analysis — only after a real business description.
+  const runFullAnalysis = async (message: string) => {
+    if (!message) return;
+    lastFullRef.current = message;
+    businessTopicRef.current = message;
+    setError(null);
+    setAnalysis(null);
+    setExpandedNode(null);
+    setThinkingMode("full");
+    setThinking(true);
+
+    try {
+      const response = await fetch("/api/business-analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
+      const data = (await response.json()) as { analysis?: string; result?: AnalysisResult; error?: string };
+      if (!response.ok) throw new Error(data.error || "Не удалось выполнить анализ. Попробуйте еще раз.");
+
+      const result = data.result;
+      const text =
+        data.analysis ||
+        [result?.summary, result?.callToAction].filter(Boolean).join("\n\n");
+      if (!text) throw new Error("AI-консультант не вернул ответ. Попробуйте переформулировать запрос.");
+
+      setAnalysis(result ?? formatFallbackAnalysis(text));
+      pushAi("Разобрал ваш бизнес — вывод, что мешает, что поможет и карта решения ниже.");
+    } catch (requestError) {
+      if (aiQuickPrompts.some((prompt) => prompt === message)) {
+        setAnalysis(getQuickPromptFallback(message));
+        pushAi("OpenAI временно недоступен. Показываю проверенный локальный ответ AEVIX.");
+        setError(null);
+      } else {
+        setError(
+          requestError instanceof Error ? requestError.message : "Не удалось выполнить анализ. Попробуйте еще раз.",
+        );
+      }
+    } finally {
+      setThinking(false);
+    }
+  };
+
+  // Short, concrete answer for a simple question — no report, keeps the business context.
+  const runQuickAnswer = async (message: string) => {
+    setError(null);
+    setThinkingMode("quick");
+    setThinking(true);
+    const topic = businessTopicRef.current;
+
+    try {
+      const response = await fetch("/api/business-analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quickQuestion: message, businessContext: topic }),
+      });
+      const data = (await response.json()) as { answer?: string; error?: string };
+      if (!response.ok || !data.answer) throw new Error(data.error || "no answer");
+      pushAi(data.answer);
+    } catch {
+      pushAi(
+        localQuickAnswer(message, businessTopicRef.current) ??
+          "Коротко ответить не вышло — сеть недоступна. Опишите бизнес одним сообщением или получите бесплатную консультацию.",
+      );
+    } finally {
+      setThinking(false);
+    }
+  };
+
+  // Single entry point for a typed message: classify intent, then route to full vs quick.
+  const handleUserMessage = async (rawText: string) => {
+    const message = rawText.trim();
     if (isThinking) return;
     if (!message) {
       setError("Опишите бизнес или задачу, чтобы AI-консультант смог провести анализ.");
@@ -1587,85 +1712,27 @@ function AiConsultantScene() {
       return;
     }
 
-    setError(null);
     setInput(""); // clear the composer after sending
-    setAnalysis(null);
-    setExpandedNode(null);
-    setThinking(true);
     const userMessageId = `user-${Date.now()}`;
-    setMessages((current) => [
-      ...current,
-      { id: userMessageId, role: "user", text: message },
-    ]);
+    setMessages((current) => [...current, { id: userMessageId, role: "user", text: message }]);
     scrollMessageToTop(userMessageId);
 
-    try {
-      const response = await fetch("/api/business-analysis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
-      });
-      const data = (await response.json()) as {
-        analysis?: string;
-        result?: AnalysisResult;
-        error?: string;
-      };
-      if (!response.ok) {
-        throw new Error(data.error || "Не удалось выполнить анализ. Попробуйте еще раз.");
-      }
-
-      const result = data.result;
-      const text =
-        data.analysis ||
-        [
-          result?.summary,
-          result?.problems?.length ? `Что мешает: ${result.problems.join("; ")}.` : null,
-          result?.recommendations?.length ? `Что можно автоматизировать: ${result.recommendations.join("; ")}.` : null,
-          result?.callToAction,
-        ]
-          .filter(Boolean)
-          .join("\n\n");
-
-      if (!text) {
-        throw new Error("AI-консультант не вернул ответ. Попробуйте переформулировать запрос.");
-      }
-
-      setAnalysis(result ?? formatFallbackAnalysis(text));
-      setMessages((current) => [
-        ...current,
-        { id: `analysis-${Date.now()}`, role: "ai", text: "Готово. Я разложил ответ на вывод, проблемы, рекомендации и карту решения ниже." },
-      ]);
-    } catch (requestError) {
-      if (aiQuickPrompts.some((prompt) => prompt === message)) {
-        setAnalysis(getQuickPromptFallback(message));
-        setMessages((current) => [
-          ...current,
-          { id: `fallback-${Date.now()}`, role: "ai", text: "OpenAI временно недоступен. Показываю проверенный локальный ответ AEVIX." },
-        ]);
-        setError(null);
-      } else {
-        setError(
-          requestError instanceof Error
-            ? requestError.message
-            : "Не удалось выполнить анализ. Попробуйте еще раз.",
-        );
-      }
-    } finally {
-      setThinking(false);
-    }
+    const { mode, setsTopic } = classifyMessage(message);
+    if (setsTopic) businessTopicRef.current = message;
+    if (mode === "full") await runFullAnalysis(message);
+    else await runQuickAnswer(message);
   };
 
-  // Factual quick questions get a short canned reply (no long report); the rest run the
-  // full analysis.
+  // Quick-prompt buttons: factual ones get an instant canned reply; the rest go through the
+  // normal intent router (so "У меня барбершоп" sets context, etc.).
   const handleQuickPrompt = (prompt: string) => {
+    if (isThinking) return;
     const reply = quickReplies[prompt];
     if (!reply) {
-      void sendAnalysis(prompt);
+      void handleUserMessage(prompt);
       return;
     }
-    if (isThinking) return;
     setError(null);
-    setAnalysis(null);
     const userMessageId = `user-${Date.now()}`;
     setMessages((current) => [
       ...current,
@@ -1707,17 +1774,17 @@ function AiConsultantScene() {
                 key={stage}
                 className={cn(
                   "flex items-center gap-3 rounded-2xl border p-4 transition",
-                  analysis || (isThinking && index < stageIndex)
+                  analysis || (fullThinking && index < stageIndex)
                     ? "border-emerald-500/16 bg-emerald-50/70 text-ink"
-                    : isThinking && index === stageIndex
+                    : fullThinking && index === stageIndex
                       ? "border-violet/24 bg-violet/10 text-ink"
                       : "border-ink/8 bg-white/48 text-ink/52",
                 )}
               >
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-xs shadow-[0_8px_20px_rgba(9,8,7,0.06)]">
-                  {analysis || (isThinking && index < stageIndex) ? (
+                  {analysis || (fullThinking && index < stageIndex) ? (
                     <Check className="h-3.5 w-3.5 text-emerald-600" />
-                  ) : isThinking && index === stageIndex ? (
+                  ) : fullThinking && index === stageIndex ? (
                     <span className="h-2 w-2 animate-pulse rounded-full bg-violet" />
                   ) : (
                     index + 1
@@ -1786,8 +1853,8 @@ function AiConsultantScene() {
                   <span className="aevix-thinking-dot h-1.5 w-1.5 rounded-full bg-violet/70 [animation-delay:160ms]" />
                   <span className="aevix-thinking-dot h-1.5 w-1.5 rounded-full bg-violet/45 [animation-delay:320ms]" />
                 </span>
-                <span key={stageIndex} className="aevix-thinking-label">
-                  {analysisStages[stageIndex]}
+                <span key={thinkingMode === "quick" ? "quick" : stageIndex} className="aevix-thinking-label">
+                  {thinkingMode === "quick" ? "Печатает ответ…" : analysisStages[stageIndex]}
                 </span>
               </motion.div>
             ) : null}
@@ -1999,7 +2066,7 @@ function AiConsultantScene() {
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
-                  void sendAnalysis();
+                  void handleUserMessage(input);
                 }
               }}
               maxLength={1500}
@@ -2022,15 +2089,15 @@ function AiConsultantScene() {
               <button
                 type="button"
                 aria-label="Повторить анализ"
-                onClick={() => void sendAnalysis()}
-                disabled={!canSend}
+                onClick={() => void runFullAnalysis(lastFullRef.current)}
+                disabled={isThinking || !lastFullRef.current}
                 className="aevix-icon-action mb-0.5 hidden h-10 w-10 shrink-0 items-center justify-center rounded-full border border-ink/8 bg-white text-ink/56 transition hover:border-violet/22 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 sm:flex"
               >
                 <RotateCcw className="h-4 w-4" />
               </button>
             ) : null}
             <Button
-              onClick={() => void sendAnalysis()}
+              onClick={() => void handleUserMessage(input)}
               aria-label="Проанализировать бизнес"
               aria-disabled={!canSend}
               disabled={!canSend}
@@ -2122,45 +2189,15 @@ function ScenarioModal({
   onClose: () => void;
 }) {
   const Icon = module.icon;
-  const closeRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    closeRef.current?.focus();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="scenario-title"
-      className="fixed inset-0 z-50 flex items-end bg-ink/48 p-0 backdrop-blur-xl md:items-center md:justify-center md:p-4"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
+    <PremiumModal
+      open
+      onClose={onClose}
+      titleId="scenario-title"
+      panelClassName="!bg-[#0d1013] !border-white/10 md:h-auto md:max-h-[92svh] md:max-w-4xl"
     >
-      <motion.div
-        initial={{ opacity: 0, y: 28, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.32, ease: "easeOut" }}
-        className="dark-glass relative max-h-[92svh] w-full overflow-y-auto rounded-t-[2rem] p-5 text-porcelain md:max-w-4xl md:rounded-[2rem] md:p-7"
-      >
-        <button
-          ref={closeRef}
-          type="button"
-          onClick={onClose}
-          aria-label="Закрыть демонстрацию сценария"
-          className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/8 text-porcelain/70 transition hover:bg-white/14 hover:text-porcelain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/40"
-        >
-          <X className="h-5 w-5" />
-        </button>
+      <div className="scenario-modal-body flex min-h-0 flex-1 flex-col overflow-y-auto p-5 text-porcelain md:p-7">
         <div className="flex flex-col gap-5 pr-12 md:flex-row md:items-start">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-porcelain text-ink shadow-glow">
             <Icon className="h-7 w-7" />
@@ -2241,8 +2278,8 @@ function ScenarioModal({
             </a>
           </Button>
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </PremiumModal>
   );
 }
 
@@ -3283,9 +3320,9 @@ export default function Home() {
             <ProblemsScene />
             <FeatureModules />
             <ServicePricingScene />
+            <PricingCalculatorScene />
             <CasesScene />
             <FounderScene />
-            <PricingCalculatorScene />
             <FaqScene />
             <ContactScene />
             <FooterScene />

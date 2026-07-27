@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { PremiumModal } from "@/components/ui/premium-modal";
 import { cn } from "@/lib/utils";
 import { conceptImagesFor, type ConceptImagery } from "@/lib/concept-images";
+import { conceptServicesFor, type ConceptServiceCatalog } from "@/lib/concept-services";
 import {
   buildFallbackWebsiteConcept,
   conceptBusinessTypes,
@@ -108,11 +109,34 @@ function ConceptSection({
   section,
   onDemoAction,
   imagery,
+  services,
 }: {
   section: WebsiteConceptSection;
   onDemoAction: () => void;
   imagery: ConceptImagery;
+  services: ConceptServiceCatalog;
 }) {
+  if (section.type === "pricing") {
+    return (
+      <section className="concept-section concept-list-section">
+        <div className="concept-section-heading">
+          <p>Услуги и цены</p>
+          <h3>{section.title}</h3>
+        </div>
+        <div className="concept-pricelist">
+          {services.items.map((service) => (
+            <div key={service.name} className="concept-pricelist-row">
+              <strong>{service.name}</strong>
+              <span className="concept-pricelist-dots" aria-hidden="true" />
+              <span className="concept-pricelist-price">{service.price}</span>
+            </div>
+          ))}
+        </div>
+        <p className="concept-pricelist-note">{services.note}</p>
+      </section>
+    );
+  }
+
   if (section.type === "gallery") {
     const labels = section.items.length ? section.items : ["Пространство", "Детали", "Результат"];
     return (
@@ -176,6 +200,11 @@ function ConceptSection({
     );
   }
 
+  const cards =
+    section.type === "services"
+      ? services.items.slice(0, 6).map((service) => ({ title: service.name, sub: service.price }))
+      : section.items.slice(0, 4).map((item) => ({ title: item, sub: "Понятный формат без лишних шагов" }));
+
   return (
     <section className="concept-section concept-list-section">
       <div className="concept-section-heading">
@@ -184,11 +213,11 @@ function ConceptSection({
         {section.text ? <span>{section.text}</span> : null}
       </div>
       <div className="concept-list-grid">
-        {section.items.slice(0, 4).map((item, index) => (
-          <article key={item}>
+        {cards.map((card, index) => (
+          <article key={card.title}>
             <small>{String(index + 1).padStart(2, "0")}</small>
-            <strong>{item}</strong>
-            <span>{section.type === "pricing" ? "Состав уточняется после короткого разговора" : "Понятный формат без лишних шагов"}</span>
+            <strong>{card.title}</strong>
+            <span>{card.sub}</span>
           </article>
         ))}
       </div>
@@ -215,6 +244,7 @@ function ConceptPreview({
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const imagery = conceptImagesFor(concept.businessType);
+  const services = conceptServicesFor(concept.businessType);
   const style = {
     "--concept-bg": concept.palette.background,
     "--concept-surface": concept.palette.surface,
@@ -286,7 +316,7 @@ function ConceptPreview({
             </section>
             <div className={cn("concept-preview-piece", revealIndex >= 4 && "is-visible")}>
               {activePage.sections.map((section, index) => (
-                <ConceptSection key={`${section.type}-${index}`} section={section} onDemoAction={onDemoAction} imagery={imagery} />
+                <ConceptSection key={`${section.type}-${index}`} section={section} onDemoAction={onDemoAction} imagery={imagery} services={services} />
               ))}
             </div>
           </motion.main>
@@ -665,7 +695,17 @@ export function WebsiteConceptExperience() {
                   onClick={() => {
                     setInput(demo.input);
                     setPreviewMode("desktop");
-                    setConcept(buildFallbackWebsiteConcept(demo.input));
+                    // Carry the descriptive label (e.g. "Стоматология") as the concept's
+                    // businessType so imagery, the service catalogue and the hero eyebrow match
+                    // the real niche, even when the wizard type is the generic "Другое".
+                    const base = buildFallbackWebsiteConcept(demo.input);
+                    setConcept({
+                      ...base,
+                      businessType: demo.label,
+                      pages: base.pages.map((page, index) =>
+                        index === 0 ? { ...page, hero: { ...page.hero, eyebrow: demo.label } } : page,
+                      ),
+                    });
                   }}
                 >
                   <span>{String(index + 1).padStart(2, "0")}</span>
