@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -46,7 +45,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { PremiumModal } from "@/components/ui/premium-modal";
 import { WebsiteConceptExperience } from "@/components/website-concept-experience";
+import { EcosystemSceneLoader } from "@/components/ecosystem-scene/EcosystemSceneLoader";
 import { cn } from "@/lib/utils";
+import { usePrefersReducedMotion } from "@/lib/use-prefers-reduced-motion";
 import {
   getBusinessContent,
   heroPlaceholderExamples,
@@ -1103,18 +1104,6 @@ function TopNav() {
       </PremiumModal>
     </>
   );
-}
-
-function usePrefersReducedMotion() {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReduced(query.matches);
-    update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
-  return reduced;
 }
 
 /**
@@ -2181,14 +2170,25 @@ function AiConsultantScene() {
   );
 }
 
-// Nodes sit on a circle around the core, evenly spaced starting from straight up.
-const ECOSYSTEM_ANGLE_STEP = 360 / ecosystemNodes.length;
-const ECOSYSTEM_START_ANGLE = -90;
+/** Same fine-pointer/desktop convention used by usePremiumMotion/MagneticShell elsewhere in
+ * this file — the 3D scene renders fewer sphere segments and skips a few expensive layers below
+ * this breakpoint rather than running two separate rendering paths. */
+function useEcosystemQuality(): "high" | "low" {
+  const [quality, setQuality] = useState<"high" | "low">("high");
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 768px) and (hover: hover) and (pointer: fine)");
+    const update = () => setQuality(query.matches ? "high" : "low");
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  return quality;
+}
 
 function ProblemsScene() {
   const [mode, setMode] = useState<"before" | "after">("before");
   const [activeId, setActiveId] = useState<string | null>(null);
-  const activeNode = ecosystemNodes.find((node) => node.id === activeId) ?? null;
+  const quality = useEcosystemQuality();
 
   useEffect(() => {
     if (!activeId) return;
@@ -2202,145 +2202,36 @@ function ProblemsScene() {
   return (
     <section id="проблемы" className="scene problems-scene relative flex items-center overflow-hidden">
       <div className="mx-auto w-full max-w-7xl">
-        <div data-reveal className="flex flex-col justify-between gap-7 lg:flex-row lg:items-end">
-          <div className="max-w-3xl">
+        <div className="ecosystem-layout">
+          <div data-reveal className="ecosystem-heading-col">
             <p className="mb-4 text-sm font-medium uppercase text-violet">До и после AEVIX</p>
-            <h2 className="section-title text-balance font-semibold">
+            <h2 className="ecosystem-heading-title text-balance font-semibold">
               <span data-heading-line className="heading-line">Переключите рабочий процесс.</span>{" "}
               <span data-heading-line className="heading-line">Посмотрите, что меняется внутри.</span>
             </h2>
-          </div>
-          <div className="before-after-switch" aria-label="Режим сравнения">
-            <button type="button" aria-pressed={mode === "before"} onClick={() => setMode("before")}>До AEVIX</button>
-            <button type="button" aria-pressed={mode === "after"} onClick={() => setMode("after")}>После AEVIX</button>
-          </div>
-        </div>
-
-        <div data-reveal className={cn("ecosystem-wrap mt-10", mode === "after" && "is-after", activeId && "is-detail-open")}>
-          <div className="ecosystem-stage" role="list" aria-label="Процессы бизнеса до и после AEVIX">
-            {ecosystemNodes.map((node, index) => {
-              const angle = ECOSYSTEM_START_ANGLE + index * ECOSYSTEM_ANGLE_STEP;
-              return (
-                <span
-                  key={`spoke-${node.id}`}
-                  className="ecosystem-spoke"
-                  style={{ "--angle": `${angle}deg` } as CSSProperties}
-                  aria-hidden="true"
-                />
-              );
-            })}
-
-            <div className="ecosystem-core">
-              <span>{mode === "before" ? "Сейчас" : "После AEVIX"}</span>
+            <div className="before-after-switch ecosystem-switch-prominent" aria-label="Режим сравнения">
+              <button type="button" aria-pressed={mode === "before"} onClick={() => setMode("before")}>До AEVIX</button>
+              <button type="button" aria-pressed={mode === "after"} onClick={() => setMode("after")}>После AEVIX</button>
             </div>
-
-            {ecosystemNodes.map((node, index) => {
-              const angle = ECOSYSTEM_START_ANGLE + index * ECOSYSTEM_ANGLE_STEP;
-              const Icon = node.icon;
-              return (
-                <motion.button
-                  key={node.id}
-                  type="button"
-                  role="listitem"
-                  className="ecosystem-node"
-                  style={{ "--angle": `${angle}deg`, "--i": index } as CSSProperties}
-                  onClick={() => setActiveId(node.id)}
-                  aria-label={`Подробнее: ${mode === "before" ? node.before : node.after}`}
-                >
-                  <span className="ecosystem-node-dot">
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <span className="ecosystem-node-label">{mode === "before" ? node.before : node.after}</span>
-                </motion.button>
-              );
-            })}
-          </div>
-
-          <div className="ecosystem-result">
-            <span>{mode === "before" ? "Разрозненный процесс" : "Единый рабочий контур"}</span>
-            <strong>{mode === "before" ? "Команда держит систему в голове" : "AEVIX ведёт следующий шаг автоматически"}</strong>
-            <p>
+            <p className="ecosystem-heading-note">
               {mode === "before"
-                ? "Переключитесь на «После AEVIX», чтобы собрать процесс, или нажмите на узел сети — подробности справа."
-                : "AI, CRM, запись и статусы работают как одна последовательность. Нажмите на узел, чтобы увидеть детали."}
+                ? "Переключитесь на «После AEVIX», чтобы собрать процесс, или нажмите на сферу — подробности рядом."
+                : "AI, CRM, запись и статусы работают как одна последовательность. Нажмите на сферу, чтобы увидеть детали."}
             </p>
           </div>
+
+          <div data-reveal className="ecosystem-visual-col">
+            <EcosystemSceneLoader
+              nodes={ecosystemNodes}
+              mode={mode}
+              activeId={activeId}
+              onSelect={setActiveId}
+              quality={quality}
+            />
+          </div>
         </div>
       </div>
-
-      <AnimatePresence>
-        {activeNode ? (
-          <EcosystemDetail node={activeNode} mode={mode} onClose={() => setActiveId(null)} />
-        ) : null}
-      </AnimatePresence>
     </section>
-  );
-}
-
-function EcosystemDetail({
-  node,
-  mode,
-  onClose,
-}: {
-  node: EcosystemNode;
-  mode: "before" | "after";
-  onClose: () => void;
-}) {
-  const Icon = node.icon;
-  const label = mode === "before" ? node.before : node.after;
-  const text = mode === "before" ? node.beforeText : node.afterText;
-
-  if (typeof document === "undefined") return null;
-
-  // Portaled to <body>, matching PremiumModal's own pattern: nested this deep inside <main>,
-  // no z-index could ever out-stack the fixed site header (a sibling of <main>, not an
-  // ancestor) — a child's stacking level is capped by its own ancestor's, not just its own value.
-  return createPortal(
-    <motion.div
-      className="ecosystem-detail"
-      role="dialog"
-      aria-modal="true"
-      aria-label={label}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.28 }}
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <button type="button" className="ecosystem-detail-close" onClick={onClose} aria-label="Закрыть">
-        <X className="h-4 w-4" />
-      </button>
-      <div className="ecosystem-detail-body">
-        {/* Entrance-only animation (no `exit`): AnimatePresence waits for every nested
-            motion element's own exit transition before it will unmount the wrapper, and
-            two independent staggered exits here previously stacked into a ~1.7s hang before
-            the panel actually closed. The wrapper's own fade below is enough for a clean close. */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.55, y: 10 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
-          className={cn("ecosystem-detail-orb", mode === "after" && "is-after")}
-        >
-          <span className="ecosystem-node-dot">
-            <Icon className="h-7 w-7" />
-          </span>
-          <span className="ecosystem-node-label">{label}</span>
-        </motion.div>
-        <motion.div
-          className="ecosystem-detail-copy"
-          initial={{ opacity: 0, x: 24 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.12, duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <p className="ecosystem-detail-eyebrow">{mode === "before" ? "Что мешает" : "Что меняет AEVIX"}</p>
-          <h3>{label}</h3>
-          <p className="ecosystem-detail-text">{text}</p>
-        </motion.div>
-      </div>
-    </motion.div>,
-    document.body,
   );
 }
 

@@ -2928,22 +2928,74 @@ body::before {
    as dim, slowly twinkling dead stars; "after" wakes the whole network with colour and a
    steady glow. Clicking a satellite orb hands off to .ecosystem-detail via a shared layoutId,
    so framer-motion animates it growing into place rather than just appearing. */
-.ecosystem-wrap {
+/* --- Section layout: heading + prominent switch on the left, the (now dominant, ~1.6x larger)
+   visual on the right. Below the xl breakpoint the visual has the section to itself, so the
+   heading stays above it rather than squeezing both into cramped side-by-side columns. */
+.ecosystem-layout {
   display: grid;
-  gap: 2rem;
-  align-items: center;
+  gap: 2.5rem;
 }
 
-@media (min-width: 1024px) {
-  .ecosystem-wrap {
-    grid-template-columns: 1.1fr 0.9fr;
+@media (min-width: 1280px) {
+  .ecosystem-layout {
+    grid-template-columns: 0.72fr 1.28fr;
+    align-items: center;
+    gap: 3.5rem;
   }
+}
+
+.ecosystem-heading-col {
+  max-width: 34rem;
+}
+
+.ecosystem-heading-title {
+  max-width: 17ch;
+  text-wrap: balance;
+  font-size: clamp(1.9rem, 1.4rem + 2vw, 2.75rem);
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+}
+
+.ecosystem-switch-prominent {
+  margin-top: 1.75rem;
+  transform: scale(1.08);
+  transform-origin: left center;
+}
+
+.ecosystem-heading-note {
+  margin-top: 1.5rem;
+  max-width: 26rem;
+  color: rgba(9, 8, 7, 0.54);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.ecosystem-visual-col {
+  position: relative;
+}
+
+.ecosystem-canvas-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 0.92;
+}
+
+.ecosystem-canvas {
+  width: 100% !important;
+  height: 100% !important;
+  touch-action: none;
+}
+
+.ecosystem-wrap {
+  display: grid;
+  gap: 1.75rem;
+  align-items: center;
 }
 
 .ecosystem-stage {
   position: relative;
   width: 100%;
-  max-width: 30rem;
+  max-width: 42rem;
   aspect-ratio: 1;
   margin: 0 auto;
 }
@@ -3209,6 +3261,79 @@ body::before {
   color: rgba(9, 8, 7, 0.62);
   font-size: 1rem;
   line-height: 1.65;
+}
+
+/* --- The real-3D-scene detail card: a drei <Html> panel anchored to the focused sphere's
+   projected screen position (screen-space billboard, not the pricier `transform` 3D mode).
+   Offset to the lower-right of the sphere so it reads as emerging from its surface rather than
+   a separate rectangle — deliberately compact, matching the brief's "not a big card off to the
+   side" requirement. */
+.ecosystem-3d-panel {
+  position: relative;
+  left: 5.5rem;
+  top: 1rem;
+  width: min(19rem, 72vw);
+  border-radius: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.72);
+  padding: 1.1rem 1.25rem;
+  box-shadow: 0 24px 60px rgba(17, 20, 24, 0.16);
+  backdrop-filter: blur(18px);
+}
+
+.ecosystem-3d-panel-close {
+  position: absolute;
+  right: 0.6rem;
+  top: 0.6rem;
+  display: grid;
+  height: 1.75rem;
+  width: 1.75rem;
+  place-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  color: rgba(9, 8, 7, 0.55);
+}
+
+.ecosystem-3d-panel-icon {
+  display: grid;
+  height: 2rem;
+  width: 2rem;
+  place-content: center;
+  border-radius: 50%;
+  background: rgb(var(--accent-r, 118) var(--accent-g, 89) var(--accent-b, 247) / 0.12);
+  color: #5d45cc;
+}
+
+.ecosystem-3d-panel-eyebrow {
+  margin-top: 0.65rem;
+  color: #7257e8;
+  font-size: 0.66rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ecosystem-3d-panel-title {
+  margin-top: 0.3rem;
+  font-family: var(--font-manrope), sans-serif;
+  font-size: 1.15rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.ecosystem-3d-panel-text {
+  margin-top: 0.5rem;
+  color: rgba(9, 8, 7, 0.62);
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+
+@media (max-width: 767px) {
+  .ecosystem-3d-panel {
+    left: 0;
+    top: 3.5rem;
+    width: min(20rem, 82vw);
+  }
 }
 
 .module-output-chain {
@@ -4233,6 +4358,10 @@ textarea {
 
   .before-after-switch button {
     flex: 1;
+  }
+
+  .ecosystem-switch-prominent {
+    transform: none;
   }
 
   .ecosystem-stage {
