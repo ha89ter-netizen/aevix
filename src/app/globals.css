@@ -3263,6 +3263,17 @@ body::before {
   line-height: 1.65;
 }
 
+.ecosystem-detail-highlight {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  max-width: 30rem;
+  border-top: 1px solid rgb(var(--accent-r, 118) var(--accent-g, 89) var(--accent-b, 247) / 0.18);
+  color: #5d45cc;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
 /* --- The real-3D-scene detail card: a drei <Html> panel anchored to the focused sphere's
    projected screen position (screen-space billboard, not the pricier `transform` 3D mode).
    Offset to the lower-right of the sphere so it reads as emerging from its surface rather than
@@ -3334,6 +3345,311 @@ body::before {
     top: 3.5rem;
     width: min(20rem, 82vw);
   }
+}
+
+.ecosystem-3d-panel-highlight {
+  margin-top: 0.65rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid rgb(var(--accent-r, 118) var(--accent-g, 89) var(--accent-b, 247) / 0.18);
+  color: #5d45cc;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+/* The anchor is a zero-size point at the sphere's own screen position (Html's `center` mode);
+   the stem is a short glowing thread from that point to the panel's corner, so the panel reads
+   as connected to the object rather than a separate floating rectangle. */
+.ecosystem-3d-panel-anchor {
+  position: relative;
+}
+
+.ecosystem-3d-panel-stem {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 4.6rem;
+  height: 1px;
+  transform-origin: 0 50%;
+  transform: rotate(9deg);
+  background: linear-gradient(90deg, rgb(var(--accent-r, 118) var(--accent-g, 89) var(--accent-b, 247) / 0.65), rgb(var(--accent-r, 118) var(--accent-g, 89) var(--accent-b, 247) / 0.05));
+}
+
+@media (max-width: 767px) {
+  .ecosystem-3d-panel-stem {
+    width: 1px;
+    height: 3rem;
+    transform: rotate(90deg) translateX(-0.5px);
+    transform-origin: 0 0;
+  }
+}
+
+/* --- Persistent, always-visible node label — a small glass tag anchored to each node's stable
+   slot position (never the sphere's own cosmetic jitter), always camera-facing because drei's
+   <Html> default mode is a flat screen-space overlay. */
+.ecosystem-node-label-tag {
+  display: grid;
+  justify-items: center;
+  gap: 0.15rem;
+  transform: translateY(2.6rem);
+  padding: 0.4rem 0.75rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 26px rgba(17, 20, 24, 0.1);
+  text-align: center;
+  white-space: nowrap;
+  transition: opacity 500ms var(--ease-premium), transform 200ms var(--ease-premium);
+}
+
+.ecosystem-node-label-tag:hover {
+  transform: translateY(2.6rem) scale(1.04);
+}
+
+.ecosystem-node-label-tag[data-dimmed="true"] {
+  opacity: 0.45;
+}
+
+.ecosystem-node-label-title {
+  font-family: var(--font-manrope), sans-serif;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: rgba(9, 8, 7, 0.82);
+  letter-spacing: -0.01em;
+}
+
+.ecosystem-node-label-caption {
+  font-size: 0.68rem;
+  color: rgba(9, 8, 7, 0.5);
+  line-height: 1.3;
+}
+
+@media (max-width: 767px) {
+  .ecosystem-node-label-title {
+    font-size: 0.9rem;
+  }
+}
+
+/* --- Prev/next arrows — one of several redundant ways to move between processes. */
+.ecosystem-arrows {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  /* Higher than drei's <Html> labels/panels (zIndexRange up to 5) — nav chrome must never be
+     blocked by a node label that happens to project near the same screen spot. */
+  z-index: 20;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 0.25rem;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.ecosystem-arrow {
+  display: grid;
+  height: 2.75rem;
+  width: 2.75rem;
+  place-content: center;
+  border-radius: 50%;
+  border: 1px solid rgba(9, 8, 7, 0.1);
+  background: rgba(255, 255, 255, 0.75);
+  color: rgba(9, 8, 7, 0.7);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 28px rgba(17, 20, 24, 0.1);
+  pointer-events: auto;
+  transition: background 200ms var(--ease-premium), transform 200ms var(--ease-premium);
+}
+
+.ecosystem-arrow:hover {
+  background: #fff;
+  transform: scale(1.06);
+}
+
+/* --- The circular navigation dial: a compact, premium "control puck" at the bottom of the
+   scene, not a decorative giant wheel. Drag to rotate, snaps to each fixed process. */
+.ecosystem-dial-group {
+  position: absolute;
+  bottom: 0.75rem;
+  left: 50%;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  transform: translateX(-50%);
+}
+
+.ecosystem-dial {
+  position: relative;
+  height: 3.4rem;
+  width: 3.4rem;
+  border-radius: 50%;
+  border: 1px solid rgba(9, 8, 7, 0.12);
+  background: radial-gradient(circle at 38% 32%, rgba(255, 255, 255, 0.95), rgba(224, 226, 232, 0.75));
+  box-shadow: 0 14px 30px rgba(17, 20, 24, 0.14);
+  touch-action: none;
+  cursor: grab;
+}
+
+.ecosystem-dial:active {
+  cursor: grabbing;
+}
+
+.ecosystem-dial-face {
+  position: absolute;
+  inset: 0;
+}
+
+.ecosystem-dial-tick {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  height: 0.4rem;
+  width: 2px;
+  transform-origin: 50% -0.85rem;
+  margin-top: -1.25rem;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: rgba(9, 8, 7, 0.28);
+}
+
+.ecosystem-dial-tick[data-active="true"] {
+  background: rgb(var(--accent-r, 118) var(--accent-g, 89) var(--accent-b, 247));
+  box-shadow: 0 0 8px rgb(var(--accent-r, 118) var(--accent-g, 89) var(--accent-b, 247) / 0.7);
+}
+
+.ecosystem-dial-hub {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  height: 1.1rem;
+  width: 1.1rem;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: rgba(9, 8, 7, 0.12);
+}
+
+.ecosystem-dial-readout {
+  display: grid;
+  line-height: 1.25;
+}
+
+.ecosystem-dial-index {
+  font-family: var(--font-manrope), sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(9, 8, 7, 0.5);
+}
+
+.ecosystem-dial-label {
+  max-width: 9rem;
+  overflow: hidden;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(9, 8, 7, 0.78);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  .ecosystem-dial {
+    height: 3.9rem;
+    width: 3.9rem;
+  }
+
+  .ecosystem-dial-label {
+    display: none;
+  }
+}
+
+/* --- "Узнавание проблемы" — a compact tag row, deliberately not a card grid. */
+.recognition-tag {
+  border-radius: 999px;
+  border: 1px solid rgba(9, 8, 7, 0.1);
+  background: rgba(255, 255, 255, 0.6);
+  padding: 0.6rem 1.1rem;
+  font-size: 0.92rem;
+  color: rgba(9, 8, 7, 0.68);
+}
+
+/* --- "Что такое AEVIX" — the four-step flow, connected by arrows on desktop. */
+.what-is-flow-step {
+  position: relative;
+  text-align: center;
+}
+
+.what-is-flow-index {
+  display: inline-block;
+  font-family: var(--font-manrope), sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgb(var(--accent-r, 118) var(--accent-g, 89) var(--accent-b, 247));
+}
+
+.what-is-flow-title {
+  margin-top: 0.5rem;
+  font-family: var(--font-manrope), sans-serif;
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.what-is-flow-text {
+  margin-top: 0.4rem;
+  color: rgba(9, 8, 7, 0.54);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.what-is-flow-arrow {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .what-is-flow-arrow {
+    position: absolute;
+    top: 0.1rem;
+    right: -1.4rem;
+    display: block;
+    color: rgba(9, 8, 7, 0.22);
+  }
+}
+
+/* --- "Процесс подключения" — five fixed, numbered steps. */
+.onboarding-step {
+  border-radius: 1.5rem;
+  border: 1px solid rgba(9, 8, 7, 0.08);
+  background: rgba(255, 255, 255, 0.56);
+  padding: 1.5rem 1.25rem;
+}
+
+.onboarding-step-index {
+  display: grid;
+  height: 2.25rem;
+  width: 2.25rem;
+  place-content: center;
+  border-radius: 50%;
+  background: rgb(var(--accent-r, 118) var(--accent-g, 89) var(--accent-b, 247) / 0.14);
+  color: #5d45cc;
+  font-family: var(--font-manrope), sans-serif;
+  font-weight: 700;
+}
+
+.onboarding-step-title {
+  margin-top: 1rem;
+  font-family: var(--font-manrope), sans-serif;
+  font-size: 1.02rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.onboarding-step-text {
+  margin-top: 0.5rem;
+  color: rgba(9, 8, 7, 0.56);
+  font-size: 0.86rem;
+  line-height: 1.55;
 }
 
 .module-output-chain {

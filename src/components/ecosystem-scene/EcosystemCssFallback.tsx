@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { EcosystemMode, EcosystemNodeData } from "./types";
+import type { EcosystemMode, EcosystemProcessData } from "./types";
 
 /**
  * The original flat-CSS orb visualization (spokes + core + satellite divs via
@@ -20,20 +20,20 @@ const ANGLE_STEP = 360 / 5;
 const START_ANGLE = -90;
 
 export type EcosystemCssFallbackProps = {
-  nodes: EcosystemNodeData[];
+  processes: EcosystemProcessData[];
   mode: EcosystemMode;
   activeId: string | null;
   onSelect: (id: string | null) => void;
 };
 
-export function EcosystemCssFallback({ nodes, mode, activeId, onSelect }: EcosystemCssFallbackProps) {
-  const activeNode = nodes.find((node) => node.id === activeId) ?? null;
+export function EcosystemCssFallback({ processes, mode, activeId, onSelect }: EcosystemCssFallbackProps) {
+  const activeNode = processes.find((node) => node.id === activeId) ?? null;
 
   return (
     <>
       <div className={cn("ecosystem-wrap", mode === "after" && "is-after", activeId && "is-detail-open")}>
         <div className="ecosystem-stage" role="list" aria-label="Процессы бизнеса до и после AEVIX">
-          {nodes.map((node, index) => {
+          {processes.map((node, index) => {
             const angle = START_ANGLE + index * ANGLE_STEP;
             return (
               <span
@@ -49,9 +49,10 @@ export function EcosystemCssFallback({ nodes, mode, activeId, onSelect }: Ecosys
             <span>{mode === "before" ? "Сейчас" : "После AEVIX"}</span>
           </div>
 
-          {nodes.map((node, index) => {
+          {processes.map((node, index) => {
             const angle = START_ANGLE + index * ANGLE_STEP;
             const Icon = node.icon;
+            const label = mode === "before" ? node.title.before : node.title.after;
             return (
               <button
                 key={node.id}
@@ -60,12 +61,12 @@ export function EcosystemCssFallback({ nodes, mode, activeId, onSelect }: Ecosys
                 className="ecosystem-node"
                 style={{ "--angle": `${angle}deg`, "--i": index } as CSSProperties}
                 onClick={() => onSelect(node.id)}
-                aria-label={`Подробнее: ${mode === "before" ? node.before : node.after}`}
+                aria-label={`Подробнее: ${label}`}
               >
                 <span className="ecosystem-node-dot">
                   <Icon className="h-4 w-4" />
                 </span>
-                <span className="ecosystem-node-label">{mode === "before" ? node.before : node.after}</span>
+                <span className="ecosystem-node-label">{label}</span>
               </button>
             );
           })}
@@ -96,13 +97,14 @@ function EcosystemCssDetail({
   mode,
   onClose,
 }: {
-  node: EcosystemNodeData;
+  node: EcosystemProcessData;
   mode: EcosystemMode;
   onClose: () => void;
 }) {
   const Icon = node.icon;
-  const label = mode === "before" ? node.before : node.after;
-  const text = mode === "before" ? node.beforeText : node.afterText;
+  const label = mode === "before" ? node.title.before : node.title.after;
+  const text = mode === "before" ? node.description.before : node.description.after;
+  const highlight = mode === "before" ? node.highlight?.before : node.highlight?.after;
 
   if (typeof document === "undefined") return null;
 
@@ -144,6 +146,7 @@ function EcosystemCssDetail({
           <p className="ecosystem-detail-eyebrow">{mode === "before" ? "Что мешает" : "Что меняет AEVIX"}</p>
           <h3>{label}</h3>
           <p className="ecosystem-detail-text">{text}</p>
+          {highlight ? <p className="ecosystem-detail-highlight">{highlight}</p> : null}
         </motion.div>
       </div>
     </motion.div>,

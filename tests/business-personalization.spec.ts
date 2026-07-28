@@ -116,7 +116,13 @@ test.describe("site personalisation", () => {
     // Counts are scroll-independent; the section lives in scroll-reveal blocks.
     await expect(faq.locator(".faq-item")).toHaveCount(3);
     await expect(faq.getByText(/FAQ · Барбершоп/)).toHaveCount(1);
-    // Scroll the actual item in (its reveal block sits below the heading) before asserting visibility.
+    // The section now sits further down a longer page, so scrollIntoViewIfNeeded's instant jump
+    // doesn't reliably cross the GSAP/ScrollTrigger reveal threshold on every viewport — force it
+    // visible the same way business-personalization's own AI-analysis test above does for the
+    // same class of scroll-reveal-hidden content.
+    await page.addStyleTag({
+      content: "[data-reveal]{opacity:1!important;visibility:visible!important;transform:none!important;filter:none!important}",
+    });
     const firstItem = faq.locator(".faq-item").first();
     await firstItem.scrollIntoViewIfNeeded();
     await expect(firstItem.getByText(/Как клиенты будут записываться/)).toBeVisible();

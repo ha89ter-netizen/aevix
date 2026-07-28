@@ -22,27 +22,42 @@ type EcosystemDetailPanelProps = {
   onClose: () => void;
 };
 
-export function EcosystemDetailPanel({ icon: Icon, eyebrow, label, text, onClose }: EcosystemDetailPanelProps) {
+type EcosystemDetailPanelExtraProps = {
+  highlight?: string;
+};
+
+export function EcosystemDetailPanel({
+  icon: Icon,
+  eyebrow,
+  label,
+  text,
+  highlight,
+  onClose,
+}: EcosystemDetailPanelProps & EcosystemDetailPanelExtraProps) {
   return (
     <Html center zIndexRange={[10, 0]} pointerEvents="none">
-      <motion.div
-        className="ecosystem-3d-panel"
-        initial={{ opacity: 0, scale: 0.85, y: 8 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.9 }}
-        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-        style={{ pointerEvents: "auto" }}
-      >
-        <button type="button" className="ecosystem-3d-panel-close" onClick={onClose} aria-label="Закрыть">
-          <X className="h-3.5 w-3.5" />
-        </button>
-        <span className="ecosystem-3d-panel-icon">
-          <Icon className="h-4 w-4" />
-        </span>
-        <p className="ecosystem-3d-panel-eyebrow">{eyebrow}</p>
-        <h3 className="ecosystem-3d-panel-title">{label}</h3>
-        <p className="ecosystem-3d-panel-text">{text}</p>
-      </motion.div>
+      <div className="ecosystem-3d-panel-anchor">
+        <span className="ecosystem-3d-panel-stem" aria-hidden="true" />
+        <motion.div
+          className="ecosystem-3d-panel"
+          initial={{ opacity: 0, scale: 0.85, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.9 }}
+          transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+          style={{ pointerEvents: "auto" }}
+        >
+          <button type="button" className="ecosystem-3d-panel-close" onClick={onClose} aria-label="Закрыть">
+            <X className="h-3.5 w-3.5" />
+          </button>
+          <span className="ecosystem-3d-panel-icon">
+            <Icon className="h-4 w-4" />
+          </span>
+          <p className="ecosystem-3d-panel-eyebrow">{eyebrow}</p>
+          <h3 className="ecosystem-3d-panel-title">{label}</h3>
+          <p className="ecosystem-3d-panel-text">{text}</p>
+          {highlight ? <p className="ecosystem-3d-panel-highlight">{highlight}</p> : null}
+        </motion.div>
+      </div>
     </Html>
   );
 }

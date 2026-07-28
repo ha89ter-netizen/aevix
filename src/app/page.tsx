@@ -46,6 +46,9 @@ import { Button } from "@/components/ui/button";
 import { PremiumModal } from "@/components/ui/premium-modal";
 import { WebsiteConceptExperience } from "@/components/website-concept-experience";
 import { EcosystemSceneLoader } from "@/components/ecosystem-scene/EcosystemSceneLoader";
+import type { EcosystemDevice } from "@/components/ecosystem-scene/EcosystemScene";
+import { EcosystemArrows, EcosystemDial, useEcosystemGestureNav } from "@/components/ecosystem-scene/EcosystemNav";
+import { ecosystemProcesses } from "@/components/ecosystem-scene/data";
 import { cn } from "@/lib/utils";
 import { usePrefersReducedMotion } from "@/lib/use-prefers-reduced-motion";
 import {
@@ -119,7 +122,7 @@ const navItems = [
   { label: "Проблемы", href: "#проблемы", desc: "Что съедает время команды" },
   { label: "Возможности", href: "#возможности", desc: "Модули и автоматизации AEVIX" },
   { label: "Стоимость", href: "#стоимость", desc: "Открытые цены и расчёт" },
-  { label: "Сценарии", href: "#сценарии", desc: "Как это работает в вашей нише" },
+  { label: "Кто мы", href: "#кто-мы", desc: "Команда и подход AEVIX" },
   { label: "FAQ", href: "#faq", desc: "Частые вопросы по вашему бизнесу" },
   { label: "Контакты", href: "#контакты", desc: "Обсудить проект" },
 ];
@@ -398,85 +401,6 @@ const modules: Module[] = [
       "Действие сохраняется в общей системе.",
     ],
     result: "Офлайн-точка становится частью цифрового процесса.",
-  },
-];
-
-type EcosystemNode = {
-  id: string;
-  icon: IconComponent;
-  before: string;
-  after: string;
-  beforeText: string;
-  afterText: string;
-};
-
-const ecosystemNodes: EcosystemNode[] = [
-  {
-    id: "replies",
-    icon: Bot,
-    before: "Ручные ответы",
-    after: "AI-консультант",
-    beforeText: "Сотрудник вручную отвечает на одни и те же вопросы в WhatsApp, Telegram и на сайте — время уходит на повторение, а не на дело.",
-    afterText: "AI-консультант отвечает клиенту мгновенно в любом канале, уточняет задачу и передаёт сотруднику уже готовое, понятное обращение.",
-  },
-  {
-    id: "sheets",
-    icon: Layers3,
-    before: "Excel и таблицы",
-    after: "Единая CRM",
-    beforeText: "Заявки и статусы клиентов живут в разных таблицах и чатах — сложно понять, что происходит прямо сейчас.",
-    afterText: "Каждое обращение, статус и история клиента — в одном рабочем контуре, видном всей команде.",
-  },
-  {
-    id: "notebook",
-    icon: Workflow,
-    before: "Записи в блокноте",
-    after: "Автоматические сценарии",
-    beforeText: "Запись клиентов и повторяющиеся шаги ведутся вручную на бумаге — легко забыть, перепутать или потерять.",
-    afterText: "AEVIX сам продвигает заявку по нужным шагам: назначает статус, напоминание и следующее действие.",
-  },
-  {
-    id: "missed",
-    icon: Repeat2,
-    before: "Пропущенные сообщения",
-    after: "Понятные статусы",
-    beforeText: "Сообщения теряются между каналами — сложно понять, кому уже ответили, а кто до сих пор ждёт.",
-    afterText: "Каждое обращение получает понятный статус, и видно, что уже сделано, а что требует внимания.",
-  },
-  {
-    id: "calls",
-    icon: CalendarCheck,
-    before: "Звонки без контекста",
-    after: "Онлайн-запись",
-    beforeText: "Клиент звонит, а сотрудник вручную уточняет свободное время и данные — долго и без единой картины расписания.",
-    afterText: "Клиент сам выбирает удобное время в боте или на сайте, а запись сразу попадает в общее расписание.",
-  },
-];
-
-const applicationScenarios = [
-  {
-    label: "Барбершоп / салон",
-    now: "Клиенты пишут в разные чаты, администратор отвечает вручную и сверяет свободное время.",
-    aevix: "AEVIX отвечает, уточняет услугу, предлагает время, фиксирует запись и запускает напоминание.",
-    owner: "Владельцу проще видеть входящие обращения, загрузку команды и повторяющиеся вопросы.",
-  },
-  {
-    label: "Магазин",
-    now: "Покупатели уточняют наличие, цену, доставку и детали заказа в переписке.",
-    aevix: "Система отвечает на типовые вопросы, собирает данные заказа и передает сложные случаи сотруднику.",
-    owner: "Команда меньше отвлекается на одинаковые сообщения и быстрее понимает, что нужно клиенту.",
-  },
-  {
-    label: "Кофейня / ресторан",
-    now: "Гости спрашивают меню, бронь, адрес, доставку и акции в разных каналах.",
-    aevix: "AEVIX помогает выбрать сценарий: бронь, меню, вопрос по заказу или обратная связь.",
-    owner: "Повторяющиеся вопросы уходят в понятный сценарий, а команда остается в операционной работе.",
-  },
-  {
-    label: "Локальная сеть",
-    now: "Каждая точка работает по-своему, а обращения и статусы сложно собрать в одну картину.",
-    aevix: "Система объединяет входящие обращения, статусы и контрольные действия в одном интерфейсе.",
-    owner: "Проще сравнивать процессы между точками и видеть, где нужен управленческий фокус.",
   },
 ];
 
@@ -2185,10 +2109,94 @@ function useEcosystemQuality(): "high" | "low" {
   return quality;
 }
 
+/** A separate signal from quality: this decides which of the two hand-authored fixed
+ * compositions (and which camera rig) the 3D scene uses — a real breakpoint, not the
+ * fine-pointer heuristic quality relies on, since a touch tablet at a wide viewport should still
+ * get the desktop layout. */
+function useEcosystemDevice(): EcosystemDevice {
+  const [device, setDevice] = useState<EcosystemDevice>("desktop");
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 767px)");
+    const update = () => setDevice(query.matches ? "mobile" : "desktop");
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  return device;
+}
+
+const recognitionSymptoms = [
+  "Обращения в разных каналах",
+  "Потерянные заявки",
+  "Ручные ответы",
+  "Отсутствие единого контроля",
+  "Зависимость от отдельных сотрудников",
+];
+
+/** Short recognition block — deliberately not a card grid, just a compact list of familiar
+ * symptoms a small-business owner will recognise immediately. */
+function ProblemRecognitionScene() {
+  return (
+    <section id="узнавание" className="scene recognition-scene flex items-center">
+      <div className="mx-auto w-full max-w-5xl text-center">
+        <div data-reveal>
+          <p className="mb-4 text-sm font-medium uppercase tracking-[0.28em] text-violet">Знакомо?</p>
+          <h2 className="section-title text-balance font-semibold">
+            <span data-heading-line className="heading-line">Так выглядит день без единой системы</span>
+          </h2>
+          <ul className="recognition-list mt-8 flex flex-wrap items-center justify-center gap-3">
+            {recognitionSymptoms.map((item) => (
+              <li key={item} className="recognition-tag">
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const aevixFlowSteps = [
+  ["Клиент обращается", "В WhatsApp, Telegram или на сайте — в удобном для него канале."],
+  ["AEVIX понимает запрос", "AI разбирает сообщение и уточняет, что именно нужно клиенту."],
+  ["Система выполняет действие", "Запись, ответ, статус или напоминание — без ручного шага."],
+  ["Команда видит результат", "Всё обращение и его статус — в одном рабочем контуре."],
+];
+
+/** Short explainer — AEVIX isn't a standalone chatbot, it's one connected operating loop. */
+function WhatIsAevixScene() {
+  return (
+    <section id="что-такое-aevix" className="scene what-is-scene flex items-center">
+      <div className="mx-auto w-full max-w-6xl">
+        <div data-reveal className="mx-auto max-w-2xl text-center">
+          <p className="mb-4 text-sm font-medium uppercase tracking-[0.28em] text-violet">Что такое AEVIX</p>
+          <h2 className="section-title text-balance font-semibold">
+            <span data-heading-line className="heading-line">Не отдельный чат-бот —</span>{" "}
+            <span data-heading-line className="heading-line">единый рабочий контур бизнеса</span>
+          </h2>
+        </div>
+        <div data-reveal className="what-is-flow mt-12 grid gap-4 md:grid-cols-4">
+          {aevixFlowSteps.map(([title, text], index) => (
+            <div key={title} className="what-is-flow-step">
+              <span className="what-is-flow-index">{String(index + 1).padStart(2, "0")}</span>
+              <p className="what-is-flow-title">{title}</p>
+              <p className="what-is-flow-text">{text}</p>
+              {index < aevixFlowSteps.length - 1 ? <ArrowRight className="what-is-flow-arrow h-4 w-4" /> : null}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ProblemsScene() {
   const [mode, setMode] = useState<"before" | "after">("before");
   const [activeId, setActiveId] = useState<string | null>(null);
   const quality = useEcosystemQuality();
+  const device = useEcosystemDevice();
+  const visualColRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!activeId) return;
@@ -2198,6 +2206,21 @@ function ProblemsScene() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [activeId]);
+
+  const activeIndex = ecosystemProcesses.findIndex((node) => node.id === activeId);
+  const currentIndex = activeIndex >= 0 ? activeIndex : 0;
+
+  const navigate = (direction: 1 | -1) => {
+    const count = ecosystemProcesses.length;
+    const base = activeIndex >= 0 ? activeIndex : direction === 1 ? -1 : 0;
+    const nextIndex = ((base + direction) % count + count) % count;
+    setActiveId(ecosystemProcesses[nextIndex].id);
+  };
+
+  useEcosystemGestureNav(visualColRef, navigate);
+
+  const currentLabel =
+    mode === "before" ? ecosystemProcesses[currentIndex].title.before : ecosystemProcesses[currentIndex].title.after;
 
   return (
     <section id="проблемы" className="scene problems-scene relative flex items-center overflow-hidden">
@@ -2220,13 +2243,21 @@ function ProblemsScene() {
             </p>
           </div>
 
-          <div data-reveal className="ecosystem-visual-col">
+          <div data-reveal className="ecosystem-visual-col" ref={visualColRef} tabIndex={-1}>
             <EcosystemSceneLoader
-              nodes={ecosystemNodes}
+              processes={ecosystemProcesses}
               mode={mode}
               activeId={activeId}
               onSelect={setActiveId}
               quality={quality}
+              device={device}
+            />
+            <EcosystemArrows onPrev={() => navigate(-1)} onNext={() => navigate(1)} />
+            <EcosystemDial
+              count={ecosystemProcesses.length}
+              activeIndex={currentIndex}
+              currentLabel={currentLabel}
+              onSelectIndex={(index) => setActiveId(ecosystemProcesses[index].id)}
             />
           </div>
         </div>
@@ -2857,28 +2888,36 @@ function PricingCalculatorScene() {
   );
 }
 
-function CasesScene() {
+/** Replaces the old industry-picker ("Сценарии применения" tabs for coffee shop/salon/clinic) —
+ * that block is explicitly excluded from the rebuilt site structure. What's kept is the
+ * genuinely useful part: a personalized, honest "as it was / what we automated / what we got"
+ * breakdown driven by the visitor's own described business (never a fabricated client story,
+ * consistent with FounderScene's own "no invented clients" principle). Paired directly with the
+ * calculator right after it — proof of value immediately before the price. */
+function ResultsScene() {
   const { status, profile, content } = useBusiness();
-  const [active, setActive] = useState(0);
-  const scenario = applicationScenarios[active];
   const personalized = status === "ready" && profile && content;
 
+  const genericCards: Array<[string, string, string]> = [
+    ["01", "Как было", "Команда вручную отвечает в нескольких чатах, часть заявок и звонков теряется в потоке."],
+    ["02", "Что автоматизировали", "AI-консультант, единая очередь обращений и CRM с понятными статусами."],
+    ["03", "Что получилось", "Ни одно обращение не теряется, а владелец видит всю картину в одном месте."],
+  ];
+
   return (
-    <section id="сценарии" className="scene cases-scene flex items-center text-ink">
+    <section id="результаты" className="scene results-scene flex items-center text-ink">
       <div className="mx-auto w-full max-w-7xl">
-        <div data-reveal className="mb-10 flex flex-col justify-between gap-6 md:flex-row md:items-end">
-          <div>
-            <p className="mb-4 text-sm font-medium uppercase tracking-[0.28em] text-violet">
-              Сценарии применения
+        <div data-reveal className="mb-10 max-w-3xl">
+          <p className="mb-4 text-sm font-medium uppercase tracking-[0.28em] text-violet">Результаты</p>
+          <h2 className="section-title text-balance font-semibold">
+            <span data-heading-line className="heading-line">Что меняется после подключения AEVIX</span>
+          </h2>
+          {!personalized ? (
+            <p className="mt-4 text-lg leading-7 text-ink/52">
+              Иллюстративный пример, а не результат конкретного клиента — опишите свой бизнес выше, чтобы увидеть
+              персональный сценарий.
             </p>
-            <h2 className="section-title max-w-3xl text-balance font-semibold">
-              <span data-heading-line className="heading-line">Как AEVIX может изменить</span>{" "}
-              <span data-heading-line className="heading-line">ежедневную работу бизнеса</span>
-            </h2>
-          </div>
-          <p className="max-w-sm text-lg leading-7 text-ink/52">
-            Возможные сценарии применения, а не результаты реальных клиентов.
-          </p>
+          ) : null}
         </div>
 
         {personalized ? (
@@ -2893,11 +2932,13 @@ function CasesScene() {
               <Sparkles className="h-4 w-4" /> Ваш сценарий · {profile.label}
             </div>
             <div className="grid gap-4 lg:grid-cols-3">
-              {[
-                ["01", "Как было", content.caseBefore],
-                ["02", "Что автоматизировали", content.caseAutomated],
-                ["03", "Что получилось", content.caseResult],
-              ].map(([index, title, text]) => (
+              {(
+                [
+                  ["01", "Как было", content.caseBefore],
+                  ["02", "Что автоматизировали", content.caseAutomated],
+                  ["03", "Что получилось", content.caseResult],
+                ] as Array<[string, string, string]>
+              ).map(([index, title, text]) => (
                 <div key={title} className="relative rounded-2xl border border-ink/8 bg-white/70 p-5">
                   <span className="price-display text-sm font-semibold text-violet/70">{index}</span>
                   <p className="mt-2 text-xs uppercase tracking-[0.2em] text-violet">{title}</p>
@@ -2906,49 +2947,18 @@ function CasesScene() {
               ))}
             </div>
           </motion.div>
-        ) : null}
-
-        <div data-reveal className="flex gap-2 overflow-x-auto pb-3">
-          {applicationScenarios.map((item, index) => (
-            <button
-              key={item.label}
-              type="button"
-              onClick={() => setActive(index)}
-              aria-pressed={active === index}
-              className={cn(
-                "shrink-0 rounded-full border px-4 py-2 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/40",
-                active === index
-                  ? "border-ink bg-ink text-porcelain"
-                  : "border-ink/10 bg-white/56 text-ink/58 hover:bg-white hover:text-ink",
-              )}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-        <motion.div
-          key={scenario.label}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="card-field mt-5 grid gap-4 lg:grid-cols-3"
-        >
-          {[
-            ["Сейчас", scenario.now],
-            ["Что делает AEVIX", scenario.aevix],
-            ["Для владельца", scenario.owner],
-          ].map(([title, text]) => (
-            <article
-              key={title}
-              className="relative overflow-hidden rounded-[2rem] border border-ink/8 bg-white/62 p-6"
-            >
-              <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-violet/30 to-transparent" />
-              <p className="text-sm uppercase tracking-[0.22em] text-violet">{title}</p>
-              <p className="mt-10 text-2xl font-semibold leading-9 tracking-[-0.03em] text-ink/78">
-                {text}
-              </p>
-            </article>
-          ))}
-        </motion.div>
+        ) : (
+          <div className="card-field grid gap-4 lg:grid-cols-3">
+            {genericCards.map(([index, title, text]) => (
+              <div key={title} className="relative overflow-hidden rounded-[2rem] border border-ink/8 bg-white/62 p-6">
+                <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-violet/30 to-transparent" />
+                <span className="price-display text-sm font-semibold text-violet/70">{index}</span>
+                <p className="mt-2 text-xs uppercase tracking-[0.2em] text-violet">{title}</p>
+                <p className="mt-3 text-xl leading-8 text-ink/78">{text}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
@@ -2956,7 +2966,7 @@ function CasesScene() {
 
 function FounderScene() {
   return (
-    <section className="scene founder-scene flex items-center">
+    <section id="кто-мы" className="scene founder-scene flex items-center">
       <div className="mx-auto grid w-full max-w-7xl gap-8 lg:grid-cols-[0.75fr_1.25fr]">
         <div data-reveal className="dark-glass rounded-lg p-7 text-porcelain">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-porcelain text-ink">
@@ -2978,6 +2988,39 @@ function FounderScene() {
             <div key={title} className="founder-note rounded-lg border border-ink/8 bg-white/58 p-6">
               <p className="text-sm uppercase tracking-[0.22em] text-violet">{title}</p>
               <p className="mt-7 text-xl leading-8 text-ink/68">{text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const onboardingSteps = [
+  ["Диагностика", "Разбираем текущий процесс, каналы обращений и ручные шаги команды."],
+  ["Проектирование", "Собираем сценарий: какие модули нужны и как они связаны друг с другом."],
+  ["Сборка", "Настраиваем AI, CRM, запись и сценарии под конкретный бизнес."],
+  ["Запуск", "Проверяем на реальных обращениях и подключаем команду."],
+  ["Поддержка и развитие", "Донастраиваем сценарии по мере роста и новых задач."],
+];
+
+/** The onboarding path — five fixed, numbered steps, not a long feature grid. */
+function OnboardingProcessScene() {
+  return (
+    <section id="процесс" className="scene onboarding-scene flex items-center">
+      <div className="mx-auto w-full max-w-6xl">
+        <div data-reveal className="mb-10 max-w-2xl">
+          <p className="mb-4 text-sm font-medium uppercase tracking-[0.28em] text-violet">Как проходит подключение</p>
+          <h2 className="section-title text-balance font-semibold">
+            <span data-heading-line className="heading-line">Понятный путь от разбора до запуска</span>
+          </h2>
+        </div>
+        <div data-reveal className="onboarding-steps grid gap-4 md:grid-cols-5">
+          {onboardingSteps.map(([title, text], index) => (
+            <div key={title} className="onboarding-step">
+              <span className="onboarding-step-index">{index + 1}</span>
+              <p className="onboarding-step-title">{title}</p>
+              <p className="onboarding-step-text">{text}</p>
             </div>
           ))}
         </div>
@@ -3494,13 +3537,16 @@ export default function Home() {
             <StructuredData />
             <TopNav />
             <HeroScene />
+            <ProblemRecognitionScene />
+            <WhatIsAevixScene />
             <AiConsultantScene />
             <ProblemsScene />
             <FeatureModules />
-            <ServicePricingScene />
+            <ResultsScene />
             <PricingCalculatorScene />
-            <CasesScene />
             <FounderScene />
+            <OnboardingProcessScene />
+            <ServicePricingScene />
             <FaqScene />
             <ContactScene />
             <FooterScene />

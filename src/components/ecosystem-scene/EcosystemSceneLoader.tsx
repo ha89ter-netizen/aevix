@@ -4,7 +4,8 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { usePrefersReducedMotion } from "@/lib/use-prefers-reduced-motion";
 import { EcosystemCssFallback } from "./EcosystemCssFallback";
-import type { EcosystemMode, EcosystemNodeData } from "./types";
+import type { EcosystemDevice } from "./EcosystemScene";
+import type { EcosystemMode, EcosystemProcessData } from "./types";
 
 /**
  * The only file page.tsx imports directly for this feature. Decides between three states:
@@ -26,17 +27,21 @@ const EcosystemScene = dynamic(() => import("./EcosystemScene"), {
 });
 
 export type EcosystemSceneLoaderProps = {
-  nodes: EcosystemNodeData[];
+  processes: EcosystemProcessData[];
   mode: EcosystemMode;
   activeId: string | null;
   onSelect: (id: string | null) => void;
   quality: "high" | "low";
+  device: EcosystemDevice;
 };
 
-export function EcosystemSceneLoader({ nodes, mode, activeId, onSelect, quality }: EcosystemSceneLoaderProps) {
+export function EcosystemSceneLoader({ processes, mode, activeId, onSelect, quality, device }: EcosystemSceneLoaderProps) {
   const reducedMotion = usePrefersReducedMotion();
   const containerRef = useRef<HTMLDivElement>(null);
-  const [inView, setInView] = useState(false);
+  // Sticky — once the chunk has loaded it stays mounted (no repeated download/dispose churn on
+  // every scroll in/out). isVisible instead toggles live and only pauses the render loop.
+  const [hasEnteredView, setHasEnteredView] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     if (reducedMotion) return;
@@ -44,10 +49,9 @@ export function EcosystemSceneLoader({ nodes, mode, activeId, onSelect, quality 
     if (!el) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) {
-          setInView(true);
-          observer.disconnect();
-        }
+        const visible = entries[0]?.isIntersecting ?? false;
+        setIsVisible(visible);
+        if (visible) setHasEnteredView(true);
       },
       { rootMargin: "400px" },
     );
@@ -56,22 +60,30 @@ export function EcosystemSceneLoader({ nodes, mode, activeId, onSelect, quality 
   }, [reducedMotion]);
 
   if (reducedMotion) {
-    return <EcosystemCssFallback nodes={nodes} mode={mode} activeId={activeId} onSelect={onSelect} />;
+    return <EcosystemCssFallback processes={processes} mode={mode} activeId={activeId} onSelect={onSelect} />;
   }
 
-  const fallback = <EcosystemCssFallback nodes={nodes} mode={mode} activeId={activeId} onSelect={onSelect} />;
+  const fallback = <EcosystemCssFallback processes={processes} mode={mode} activeId={activeId} onSelect={onSelect} />;
 
   return (
     <div ref={containerRef} className="ecosystem-canvas-wrap">
-      {inView ? (
+      {hasEnteredView ? (
         <>
           {/* 3D meshes aren't part of the DOM focus order, so raycasted onClick alone gives
               keyboard/screen-reader users no way to open a node. This mirrors the CSS
               fallback's real, visible buttons but visually hidden — same onSelect, same source
               of truth, just reachable by Tab instead of a pointer. */}
-          <EcosystemA11yControls nodes={nodes} mode={mode} activeId={activeId} onSelect={onSelect} />
+          <EcosystemA11yControls processes={processes} mode={mode} activeId={activeId} onSelect={onSelect} />
           <Suspense fallback={fallback}>
-            <EcosystemScene nodes={nodes} mode={mode} activeId={activeId} onSelect={onSelect} quality={quality} />
+            <EcosystemScene
+              processes={processes}
+              mode={mode}
+              activeId={activeId}
+              onSelect={onSelect}
+              quality={quality}
+              device={device}
+              paused={!isVisible}
+            />
           </Suspense>
         </>
       ) : (
@@ -81,11 +93,16 @@ export function EcosystemSceneLoader({ nodes, mode, activeId, onSelect, quality 
   );
 }
 
-function EcosystemA11yControls({ nodes, mode, activeId, onSelect }: Omit<EcosystemSceneLoaderProps, "quality">) {
+function EcosystemA11yControls({
+  processes,
+  mode,
+  activeId,
+  onSelect,
+}: Omit<EcosystemSceneLoaderProps, "quality" | "device">) {
   return (
     <div className="sr-only">
-      {nodes.map((node) => {
-        const label = mode === "before" ? node.before : node.after;
+      {processes.map((node) => {
+        const label = mode === "before" ? node.title.before : node.title.after;
         const isActive = activeId === node.id;
         return (
           <button
