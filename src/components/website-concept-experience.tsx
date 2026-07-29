@@ -10,12 +10,9 @@ import {
   Eye,
   Info,
   Laptop,
-  Maximize2,
-  MessageCircle,
+  Menu,
   Minimize2,
   Monitor,
-  Palette,
-  PencilLine,
   RefreshCw,
   Smartphone,
   Sparkles,
@@ -24,6 +21,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PremiumModal } from "@/components/ui/premium-modal";
+import { ConceptSidebar } from "@/components/concept-sidebar";
 import { cn } from "@/lib/utils";
 import { conceptImagesFor, type ConceptImagery } from "@/lib/concept-images";
 import { conceptServicesFor, type ConceptServiceCatalog } from "@/lib/concept-services";
@@ -352,6 +350,7 @@ export function WebsiteConceptExperience() {
   const [activePageId, setActivePageId] = useState("home");
   const [demoMessage, setDemoMessage] = useState<string | null>(null);
   const [previewRevealIndex, setPreviewRevealIndex] = useState(previewRevealStages.length - 1);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const hasConcept = concept !== null;
   const isPreview = viewMode === "preview";
   const panelRef = useRef<HTMLDivElement>(null);
@@ -393,6 +392,7 @@ export function WebsiteConceptExperience() {
     setViewMode("edit");
     setFullscreen(false);
     setPreviewChromeVisible(true);
+    setSidebarOpen(false);
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
   }, [open]);
 
@@ -521,14 +521,6 @@ export function WebsiteConceptExperience() {
     window.setTimeout(() => document.getElementById("контакты")?.scrollIntoView({ behavior: "smooth" }), 120);
   };
 
-  const activePageIndex = concept ? Math.max(0, concept.pages.findIndex((page) => page.id === activePageId)) : 0;
-
-  const movePreviewPage = (offset: number) => {
-    if (!concept) return;
-    const nextIndex = Math.min(Math.max(activePageIndex + offset, 0), concept.pages.length - 1);
-    setActivePageId(concept.pages[nextIndex].id);
-  };
-
   const showDemoAction = () => {
     setDemoMessage("Это демонстрация интерфейса. Функция будет подключена в готовом проекте.");
   };
@@ -548,7 +540,8 @@ export function WebsiteConceptExperience() {
       <PremiumModal
         open={open}
         onClose={() => {
-          // Escape unwinds one layer at a time: fullscreen -> preview -> close.
+          // Escape unwinds one layer at a time: sidebar -> fullscreen -> preview -> close.
+          if (sidebarOpen) { setSidebarOpen(false); return; }
           if (document.fullscreenElement) { void document.exitFullscreen(); return; }
           if (fullscreen) { setFullscreen(false); return; }
           if (isPreview) { exitPreview(); return; }
@@ -568,9 +561,16 @@ export function WebsiteConceptExperience() {
       >
         {concept ? (
           <div ref={panelRef} className="flex min-h-0 flex-1 flex-col bg-[#f7f8f9]">
-            <div className="concept-workspace-toolbar" hidden={isPreview}>
-              <div className="min-w-0 pr-12">
-                <p>Концепт сайта</p>
+            <div className="concept-topbar" hidden={isPreview}>
+              <div className="concept-topbar-identity min-w-0">
+                <button
+                  type="button"
+                  className="concept-hamburger"
+                  aria-label="Открыть панель проекта"
+                  onClick={() => setSidebarOpen(true)}
+                >
+                  <Menu className="h-4.5 w-4.5" />
+                </button>
                 {editingName ? (
                   <input
                     autoFocus
@@ -586,26 +586,7 @@ export function WebsiteConceptExperience() {
                   <h2 id="website-concept-title">{concept.businessName}</h2>
                 )}
               </div>
-              <div className="concept-toolbar-actions">
-                <span className="concept-draft-badge"><Info className="h-3.5 w-3.5" /> Предварительный макет</span>
-                <span className="concept-price-badge" title="Примерная стоимость такого лендинга при разработке в AEVIX">
-                  ≈ от {formatConceptPrice(estimateConceptPrice(concept).min)}
-                </span>
-                <div
-                  className="concept-page-switch"
-                  role="tablist"
-                  aria-label="Страницы концепта"
-                  onKeyDown={(event) => {
-                    if (event.key === "ArrowRight") { event.preventDefault(); movePreviewPage(1); }
-                    if (event.key === "ArrowLeft") { event.preventDefault(); movePreviewPage(-1); }
-                  }}
-                >
-                  {concept.navigation.map((item) => (
-                    <button key={item.pageId} type="button" role="tab" aria-selected={item.pageId === activePageId} onClick={() => setActivePageId(item.pageId)}>
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
+              <div className="concept-topbar-controls">
                 <div className="concept-mode-switch" aria-label="Размер preview">
                   {([
                     ["desktop", Monitor, "Desktop"],
@@ -617,25 +598,20 @@ export function WebsiteConceptExperience() {
                     </button>
                   ))}
                 </div>
-                <button type="button" onClick={() => void generateConcept()} disabled={isGenerating} title="Обновить концепт">
-                  <RefreshCw className="h-4 w-4" /><span>Обновить</span>
+                <button
+                  type="button"
+                  className="concept-topbar-refresh"
+                  onClick={() => void generateConcept()}
+                  disabled={isGenerating}
+                  title="Обновить концепт"
+                  aria-label="Обновить концепт"
+                  aria-busy={isGenerating}
+                >
+                  <RefreshCw className={cn("h-4 w-4", isGenerating && "animate-spin")} />
                 </button>
-                <button type="button" onClick={cyclePalette} title="Сменить палитру">
-                  <Palette className="h-4 w-4" /><span>Цвета</span>
-                </button>
-                <button type="button" onClick={cycleTemplate} title="Сменить стиль">
-                  <Sparkles className="h-4 w-4" /><span>{templateLabels[concept.template]}</span>
-                </button>
-                <button type="button" onClick={() => setEditingName(true)} title="Изменить название">
-                  <PencilLine className="h-4 w-4" /><span>Название</span>
-                </button>
-                <button type="button" onClick={() => setFullscreen((current) => !current)} title={fullscreen ? "Свернуть" : "Развернуть окно"}>
-                  {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-                  <span>{fullscreen ? "Свернуть" : "Развернуть"}</span>
-                </button>
-                <button type="button" className="concept-preview-cta" onClick={enterPreview} title="Открыть режим просмотра">
-                  <Eye className="h-4 w-4" /><span>Просмотр</span>
-                </button>
+                <Button type="button" size="sm" className="concept-topbar-preview" onClick={enterPreview} title="Просмотр">
+                  <Eye className="mr-2 h-4 w-4" /> <span>Просмотр</span>
+                </Button>
               </div>
             </div>
             {notice && !isPreview ? <p className="concept-notice">{notice}</p> : null}
@@ -650,45 +626,54 @@ export function WebsiteConceptExperience() {
                 </span>
               ))}
             </div>
-            <div className="concept-page-status" hidden={isPreview}>
-              <button type="button" onClick={() => movePreviewPage(-1)} disabled={activePageIndex === 0} aria-label="Предыдущая страница"><ArrowLeft className="h-4 w-4" /></button>
-              <span>{concept.pages[activePageIndex]?.name} · {activePageIndex + 1} из {concept.pages.length}</span>
-              <button type="button" onClick={() => movePreviewPage(1)} disabled={activePageIndex === concept.pages.length - 1} aria-label="Следующая страница"><ArrowRight className="h-4 w-4" /></button>
-            </div>
-            <div className="relative min-h-0 flex-1 overflow-hidden">
-              <ConceptPreview
-                concept={concept}
-                mode={isPreview ? "desktop" : previewMode}
-                revealIndex={previewRevealIndex}
-                activePageId={activePageId}
-                onPageChange={setActivePageId}
-                onDemoAction={showDemoAction}
-                isPreview={isPreview}
-              />
-              {isPreview ? (
-                <div className={cn("concept-preview-exit", !previewChromeVisible && "is-idle")}>
-                  <button type="button" onClick={exitPreview}>
-                    <ArrowLeft className="h-4 w-4" /> Вернуться к редактированию
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void toggleNativeFullscreen()}
-                    aria-label={nativeFullscreen ? "Выйти из полноэкранного режима" : "На весь экран"}
-                    title={nativeFullscreen ? "Выйти из полноэкранного режима" : "На весь экран"}
-                  >
-                    {nativeFullscreen ? <Minimize2 className="h-4 w-4" /> : <Expand className="h-4 w-4" />}
-                  </button>
-                </div>
+            <div className="concept-workspace-shell">
+              {!isPreview ? (
+                <ConceptSidebar
+                  concept={concept}
+                  activePageId={activePageId}
+                  onPageChange={setActivePageId}
+                  onCyclePalette={cyclePalette}
+                  onCycleTemplate={cycleTemplate}
+                  templateLabel={templateLabels[concept.template]}
+                  priceLabel={`от ${formatConceptPrice(estimateConceptPrice(concept).min)}`}
+                  onRename={() => setEditingName(true)}
+                  onEditParams={() => { setConcept(null); setFullscreen(false); setViewMode("edit"); }}
+                  fullscreen={fullscreen}
+                  onToggleFullscreen={() => setFullscreen((current) => !current)}
+                  onContact={contactAevix}
+                  mobileOpen={sidebarOpen}
+                  onMobileClose={() => setSidebarOpen(false)}
+                />
               ) : null}
-            </div>
-            {demoMessage ? <div className="concept-demo-toast" role="status">{demoMessage}</div> : null}
-            <div className="concept-workspace-footer" hidden={isPreview}>
-              <Button type="button" variant="glass" onClick={() => { setConcept(null); setFullscreen(false); setViewMode("edit"); }}>
-                <ArrowLeft className="mr-2 h-4 w-4" /> Изменить параметры
-              </Button>
-              <Button type="button" onClick={contactAevix}>
-                <MessageCircle className="mr-2 h-4 w-4" /> Разработать этот концепт
-              </Button>
+              <div className="concept-workspace-main">
+                <div className="relative min-h-0 flex-1 overflow-hidden">
+                  <ConceptPreview
+                    concept={concept}
+                    mode={isPreview ? "desktop" : previewMode}
+                    revealIndex={previewRevealIndex}
+                    activePageId={activePageId}
+                    onPageChange={setActivePageId}
+                    onDemoAction={showDemoAction}
+                    isPreview={isPreview}
+                  />
+                  {isPreview ? (
+                    <div className={cn("concept-preview-exit", !previewChromeVisible && "is-idle")}>
+                      <button type="button" onClick={exitPreview}>
+                        <ArrowLeft className="h-4 w-4" /> Вернуться к редактированию
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void toggleNativeFullscreen()}
+                        aria-label={nativeFullscreen ? "Выйти из полноэкранного режима" : "На весь экран"}
+                        title={nativeFullscreen ? "Выйти из полноэкранного режима" : "На весь экран"}
+                      >
+                        {nativeFullscreen ? <Minimize2 className="h-4 w-4" /> : <Expand className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+                {demoMessage ? <div className="concept-demo-toast" role="status">{demoMessage}</div> : null}
+              </div>
             </div>
           </div>
         ) : showExamples ? (

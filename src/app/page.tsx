@@ -120,8 +120,7 @@ const navItems = [
   { label: "Главная", href: "#главная", desc: "Начало и анализ бизнеса" },
   { label: "AI-анализ", href: "#ai-анализ", desc: "Разбор процессов вашего бизнеса" },
   { label: "Проблемы", href: "#проблемы", desc: "Что съедает время команды" },
-  { label: "Возможности", href: "#возможности", desc: "Модули и автоматизации AEVIX" },
-  { label: "Стоимость", href: "#стоимость", desc: "Открытые цены и расчёт" },
+  { label: "Стоимость", href: "#стоимость", desc: "Модули, автоматизации и открытые цены" },
   { label: "Кто мы", href: "#кто-мы", desc: "Команда и подход AEVIX" },
   { label: "FAQ", href: "#faq", desc: "Частые вопросы по вашему бизнесу" },
   { label: "Контакты", href: "#контакты", desc: "Обсудить проект" },
@@ -2133,30 +2132,6 @@ const recognitionSymptoms = [
   "Зависимость от отдельных сотрудников",
 ];
 
-/** Short recognition block — deliberately not a card grid, just a compact list of familiar
- * symptoms a small-business owner will recognise immediately. */
-function ProblemRecognitionScene() {
-  return (
-    <section id="узнавание" className="scene recognition-scene flex items-center">
-      <div className="mx-auto w-full max-w-5xl text-center">
-        <div data-reveal>
-          <p className="mb-4 text-sm font-medium uppercase tracking-[0.28em] text-violet">Знакомо?</p>
-          <h2 className="section-title text-balance font-semibold">
-            <span data-heading-line className="heading-line">Так выглядит день без единой системы</span>
-          </h2>
-          <ul className="recognition-list mt-8 flex flex-wrap items-center justify-center gap-3">
-            {recognitionSymptoms.map((item) => (
-              <li key={item} className="recognition-tag">
-                {item}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 const aevixFlowSteps = [
   ["Клиент обращается", "В WhatsApp, Telegram или на сайте — в удобном для него канале."],
   ["AEVIX понимает запрос", "AI разбирает сообщение и уточняет, что именно нужно клиенту."],
@@ -2164,7 +2139,9 @@ const aevixFlowSteps = [
   ["Команда видит результат", "Всё обращение и его статус — в одном рабочем контуре."],
 ];
 
-/** Short explainer — AEVIX isn't a standalone chatbot, it's one connected operating loop. */
+/** Replaces the old three-in-a-row sections (recognition / "what is AEVIX" / results intro),
+ * which repeated the same underlying idea. One compact section now carries all of it: the
+ * familiar symptoms as a tag row, the single "not a chatbot" claim, and the 4-step flow. */
 function WhatIsAevixScene() {
   return (
     <section id="что-такое-aevix" className="scene what-is-scene flex items-center">
@@ -2175,6 +2152,13 @@ function WhatIsAevixScene() {
             <span data-heading-line className="heading-line">Не отдельный чат-бот —</span>{" "}
             <span data-heading-line className="heading-line">единый рабочий контур бизнеса</span>
           </h2>
+          <ul className="recognition-list mt-6 flex flex-wrap items-center justify-center gap-2.5">
+            {recognitionSymptoms.map((item) => (
+              <li key={item} className="recognition-tag">
+                {item}
+              </li>
+            ))}
+          </ul>
         </div>
         <div data-reveal className="what-is-flow mt-12 grid gap-4 md:grid-cols-4">
           {aevixFlowSteps.map(([title, text], index) => (
@@ -2368,63 +2352,27 @@ function ScenarioModal({
   );
 }
 
-function FeatureModules() {
-  // Optional demo only — all module value is visible without clicking.
+/** Which richer `modules` entry (with its "what it does" bullets and demo scenario) best
+ * matches each priced `serviceCatalog` line — hand-mapped once, not fuzzy-matched, since the two
+ * catalogues don't share ids and only partially overlap by title. Kept deliberately real: every
+ * bullet shown still comes verbatim from an existing modules[] entry, never invented copy. */
+const catalogModuleMatch: Partial<Record<ServiceId, string>> = {
+  ai: "assistant",
+  telegram: "assistant",
+  whatsapp: "assistant",
+  site: "site",
+  crm: "crm",
+  automation: "automation",
+};
+
+/** Replaces the old "Возможности" (modules, no price) and "Услуги и стоимость" (price, no
+ * detail) sections — they showed the same modules from two angles back to back. Now each module
+ * is a single card: what it does + what it costs, positioned right before the calculator so the
+ * flow reads Pricing -> Calculator -> Final cost -> CTA instead of Calculator -> Pricing. */
+function ModulesPricingScene() {
+  const { status, profile, content } = useBusiness();
   const [scenarioId, setScenarioId] = useState<string | null>(null);
   const scenarioModule = modules.find((module) => module.id === scenarioId) ?? null;
-
-  return (
-    <section id="возможности" className="scene capabilities-scene relative flex items-center">
-      <div className="mx-auto w-full max-w-7xl">
-        <div data-reveal className="mb-10 max-w-3xl">
-          <p className="mb-4 text-sm font-medium uppercase tracking-[0.28em] text-violet">
-            Возможности
-          </p>
-          <h2 className="section-title text-balance font-semibold text-ink">
-            <span data-heading-line className="heading-line">Не набор функций.</span>{" "}
-            <span data-heading-line className="heading-line">Модули, которые закрывают конкретные участки работы.</span>
-          </h2>
-          <p className="mt-6 max-w-xl text-lg leading-8 text-ink/62">
-            Каждый модуль — понятный участок автоматизации. Сценарий можно посмотреть по желанию.
-          </p>
-        </div>
-        <div data-reveal className="card-field grid gap-4 md:grid-cols-2">
-          {modules.map((module) => {
-            const Icon = module.icon;
-            return (
-              <article key={module.id} className="capability-card interactive-surface glass-panel rounded-[1.75rem] p-6">
-                <div className="flex items-start justify-between gap-3">
-                  <span className="capability-icon">
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <button type="button" className="capability-demo" onClick={() => setScenarioId(module.id)}>
-                    <Zap className="h-3.5 w-3.5" /> Сценарий
-                  </button>
-                </div>
-                <h3 className="mt-5 text-2xl font-semibold tracking-[-0.02em]">{module.title}</h3>
-                <p className="mt-2 text-base leading-7 text-ink/62">{module.intro}</p>
-                <ul className="mt-4 grid gap-1.5">
-                  {module.what.slice(0, 3).map((item) => (
-                    <li key={item} className="flex gap-2.5 text-sm leading-6 text-ink/70">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-violet" />
-                      {item.replace(/\.$/, "")}
-                    </li>
-                  ))}
-                </ul>
-              </article>
-            );
-          })}
-        </div>
-      </div>
-      {scenarioModule ? (
-        <ScenarioModal module={scenarioModule} onClose={() => setScenarioId(null)} />
-      ) : null}
-    </section>
-  );
-}
-
-function ServicePricingScene() {
-  const { status, profile, content } = useBusiness();
   const personalized = status === "ready" && profile && content;
   const focusModules = content?.focusModules ?? [];
 
@@ -2433,7 +2381,7 @@ function ServicePricingScene() {
       <div className="mx-auto w-full max-w-7xl">
         <div data-reveal className="mb-10 max-w-3xl">
           <p className="mb-4 text-sm font-medium uppercase tracking-[0.28em] text-violet">
-            Услуги и стоимость
+            Возможности и стоимость
           </p>
           <h2 className="section-title text-balance font-semibold">
             <span data-heading-line className="heading-line">Открытая стоимость</span>{" "}
@@ -2442,7 +2390,7 @@ function ServicePricingScene() {
           <p className="mt-6 max-w-2xl text-lg leading-8 text-ink/62">
             {personalized
               ? `Отмечены модули, с которых стоит начать для «${profile.label}». Персональный расчёт — ниже.`
-              : "Изучите базовые модули. Персональный расчёт доступен перед финальным обращением."}
+              : "Каждый модуль — понятный участок автоматизации со своей ценой. Персональный расчёт — ниже."}
           </p>
         </div>
 
@@ -2450,6 +2398,7 @@ function ServicePricingScene() {
           {serviceCatalog.map((service) => {
             const Icon = service.icon;
             const recommended = personalized && focusModules.includes(service.title);
+            const linkedModule = modules.find((module) => module.id === catalogModuleMatch[service.id]);
             return (
               <article
                 key={service.id}
@@ -2461,9 +2410,26 @@ function ServicePricingScene() {
                 {recommended ? (
                   <span className="hero-recommend-badge absolute right-4 top-4">Рекомендуем</span>
                 ) : null}
-                <Icon className="h-6 w-6 text-violet" />
-                <h3 className="mt-8 text-2xl font-semibold">{service.title}</h3>
-                <p className="mt-3 text-base leading-7 text-ink/58">{service.description}</p>
+                <div className="flex items-start justify-between gap-3">
+                  <Icon className="h-6 w-6 text-violet" />
+                  {linkedModule ? (
+                    <button type="button" className="capability-demo" onClick={() => setScenarioId(linkedModule.id)}>
+                      <Zap className="h-3.5 w-3.5" /> Сценарий
+                    </button>
+                  ) : null}
+                </div>
+                <h3 className="mt-6 text-2xl font-semibold">{service.title}</h3>
+                <p className="mt-2 text-base leading-7 text-ink/58">{service.description}</p>
+                {linkedModule ? (
+                  <ul className="mt-4 grid gap-1.5">
+                    {linkedModule.what.slice(0, 3).map((item) => (
+                      <li key={item} className="flex gap-2.5 text-sm leading-6 text-ink/70">
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-violet" />
+                        {item.replace(/\.$/, "")}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
                 <p className="price-display mt-6 text-xl font-semibold">
                   {service.price ? `от ${formatKzt(service.price)}` : service.id === "nfc" ? "бонус" : "по составу проекта"}
                 </p>
@@ -2472,6 +2438,9 @@ function ServicePricingScene() {
           })}
         </div>
       </div>
+      {scenarioModule ? (
+        <ScenarioModal module={scenarioModule} onClose={() => setScenarioId(null)} />
+      ) : null}
     </section>
   );
 }
@@ -2910,7 +2879,7 @@ function ResultsScene() {
         <div data-reveal className="mb-10 max-w-3xl">
           <p className="mb-4 text-sm font-medium uppercase tracking-[0.28em] text-violet">Результаты</p>
           <h2 className="section-title text-balance font-semibold">
-            <span data-heading-line className="heading-line">Что меняется после подключения AEVIX</span>
+            <span data-heading-line className="heading-line">Как это выглядит на практике</span>
           </h2>
           {!personalized ? (
             <p className="mt-4 text-lg leading-7 text-ink/52">
@@ -2939,7 +2908,7 @@ function ResultsScene() {
                   ["03", "Что получилось", content.caseResult],
                 ] as Array<[string, string, string]>
               ).map(([index, title, text]) => (
-                <div key={title} className="relative rounded-2xl border border-ink/8 bg-white/70 p-5">
+                <div key={title} className="interactive-surface glass-panel relative rounded-2xl border border-ink/8 bg-white/70 p-5">
                   <span className="price-display text-sm font-semibold text-violet/70">{index}</span>
                   <p className="mt-2 text-xs uppercase tracking-[0.2em] text-violet">{title}</p>
                   <p className="mt-3 text-base leading-7 text-ink/74">{text}</p>
@@ -2950,7 +2919,7 @@ function ResultsScene() {
         ) : (
           <div className="card-field grid gap-4 lg:grid-cols-3">
             {genericCards.map(([index, title, text]) => (
-              <div key={title} className="relative overflow-hidden rounded-[2rem] border border-ink/8 bg-white/62 p-6">
+              <div key={title} className="interactive-surface glass-panel relative overflow-hidden rounded-[2rem] border border-ink/8 bg-white/62 p-6">
                 <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-violet/30 to-transparent" />
                 <span className="price-display text-sm font-semibold text-violet/70">{index}</span>
                 <p className="mt-2 text-xs uppercase tracking-[0.2em] text-violet">{title}</p>
@@ -3017,7 +2986,7 @@ function OnboardingProcessScene() {
         </div>
         <div data-reveal className="onboarding-steps grid gap-4 md:grid-cols-5">
           {onboardingSteps.map(([title, text], index) => (
-            <div key={title} className="onboarding-step">
+            <div key={title} className="onboarding-step interactive-surface glass-panel">
               <span className="onboarding-step-index">{index + 1}</span>
               <p className="onboarding-step-title">{title}</p>
               <p className="onboarding-step-text">{text}</p>
@@ -3260,8 +3229,8 @@ function FooterScene() {
             <p>Продукты</p>
             <a href="#ai-анализ">AI</a>
             <a href="#стоимость">Сайты</a>
-            <a href="#возможности">Автоматизация</a>
-            <a href="#возможности">Telegram</a>
+            <a href="#стоимость">Автоматизация</a>
+            <a href="#стоимость">Telegram</a>
             <a href="#ai-анализ">Концепты сайтов</a>
           </nav>
           <nav aria-label="Ресурсы AEVIX">
@@ -3537,16 +3506,14 @@ export default function Home() {
             <StructuredData />
             <TopNav />
             <HeroScene />
-            <ProblemRecognitionScene />
             <WhatIsAevixScene />
             <AiConsultantScene />
             <ProblemsScene />
-            <FeatureModules />
-            <ResultsScene />
+            <ModulesPricingScene />
             <PricingCalculatorScene />
+            <ResultsScene />
             <FounderScene />
             <OnboardingProcessScene />
-            <ServicePricingScene />
             <FaqScene />
             <ContactScene />
             <FooterScene />

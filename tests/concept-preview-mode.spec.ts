@@ -12,11 +12,10 @@ import { test, expect, type Page } from "@playwright/test";
  */
 
 const CHROME_SELECTORS = [
-  ".concept-workspace-toolbar",
+  ".concept-topbar",
   ".concept-disclaimer",
   ".concept-reveal-rail",
-  ".concept-page-status",
-  ".concept-workspace-footer",
+  ".concept-sidebar",
 ] as const;
 
 const STAGE = ".concept-preview-stage";
@@ -155,7 +154,7 @@ test.describe("concept preview mode", () => {
     await page.keyboard.press("Escape");
 
     // Back in edit mode, modal still open, concept intact.
-    await expect(page.locator(".concept-workspace-toolbar")).toBeVisible();
+    await expect(page.locator(".concept-topbar")).toBeVisible();
     await expect(page.locator(".concept-preview-exit")).toHaveCount(0);
     await expect(page.getByRole("dialog")).toBeVisible();
     await expect(page.locator("#website-concept-title")).toHaveText("FORMA");
@@ -206,7 +205,7 @@ test.describe("concept preview mode", () => {
     const exitButton = page.getByRole("button", { name: "Вернуться к редактированию" });
     await exitButton.click({ timeout: 5000 });
 
-    await expect(page.locator(".concept-workspace-toolbar")).toBeVisible();
+    await expect(page.locator(".concept-topbar")).toBeVisible();
     await expect(page.locator(".concept-preview-exit")).toHaveCount(0);
   });
 

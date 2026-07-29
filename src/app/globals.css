@@ -1569,8 +1569,7 @@ body::before {
   background: rgba(255, 255, 255, 0.7);
 }
 
-.concept-wizard-header > p,
-.concept-workspace-toolbar p {
+.concept-wizard-header > p {
   color: #7257e8;
   font-size: 0.75rem;
   font-weight: 600;
@@ -1663,7 +1662,7 @@ body::before {
 
 .concept-field input,
 .concept-field textarea,
-.concept-workspace-toolbar input {
+.concept-topbar input {
   width: 100%;
   border: 1px solid rgba(17, 20, 24, 0.1);
   border-radius: 8px;
@@ -1674,7 +1673,7 @@ body::before {
 }
 
 .concept-field input,
-.concept-workspace-toolbar input {
+.concept-topbar input {
   min-height: 3.25rem;
   padding: 0 1rem;
 }
@@ -1687,7 +1686,7 @@ body::before {
 
 .concept-field input:focus,
 .concept-field textarea:focus,
-.concept-workspace-toolbar input:focus {
+.concept-topbar input:focus {
   border-color: rgba(114, 87, 232, 0.48);
   box-shadow: 0 0 0 4px rgba(114, 87, 232, 0.08);
 }
@@ -1774,8 +1773,7 @@ body::before {
   font-size: 0.85rem;
 }
 
-.concept-wizard-footer,
-.concept-workspace-footer {
+.concept-wizard-footer {
   display: flex;
   min-height: 5.25rem;
   align-items: center;
@@ -1915,101 +1913,247 @@ body::before {
   }
 }
 
-.concept-workspace-toolbar {
+/* --- Workspace shell: sidebar + main column (top bar + preview), replacing the old single
+   cramped toolbar row. Desktop: sidebar is a permanent flex child. Mobile: sidebar becomes an
+   off-canvas drawer, shown only through CSS (visibility, not JS media-query state), which also
+   keeps it out of the tab order for free while closed. */
+.concept-workspace-shell {
   display: flex;
-  min-height: 5.25rem;
+  min-height: 0;
+  flex: 1;
+}
+
+.concept-workspace-main {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.concept-sidebar-backdrop {
+  display: none;
+}
+
+.concept-sidebar {
+  display: flex;
+  width: 272px;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 1.75rem;
+  overflow-y: auto;
+  border-right: 1px solid var(--line);
+  background: #fbfbfc;
+  padding: 1.5rem 1.1rem;
+}
+
+.concept-sidebar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.concept-sidebar-label {
+  margin-bottom: 0.15rem;
+  padding: 0 0.6rem;
+  color: rgba(9, 8, 7, 0.38);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.concept-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.concept-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  border-radius: 0.65rem;
+  padding: 0.55rem 0.6rem;
+  color: rgba(9, 8, 7, 0.66);
+  font-size: 0.86rem;
+  font-weight: 550;
+  text-align: left;
+  transition: background 160ms var(--ease-premium), color 160ms var(--ease-premium);
+}
+
+.concept-sidebar-item:hover {
+  background: rgba(17, 20, 24, 0.045);
+  color: #17181b;
+}
+
+.concept-sidebar-item[aria-current="page"] {
+  background: #17181b;
+  color: #fff;
+}
+
+.concept-sidebar-price {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-top: 0.25rem;
+  border-radius: 0.75rem;
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.07);
+  padding: 0.7rem 0.85rem;
+}
+
+.concept-sidebar-price span {
+  color: rgba(9, 8, 7, 0.5);
+  font-size: 0.68rem;
+}
+
+.concept-sidebar-price strong {
+  color: #5d45cc;
+  font-family: var(--font-manrope), sans-serif;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.concept-sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 767px) {
+  .concept-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 60;
+    width: min(84vw, 320px);
+    visibility: hidden;
+    transform: translateX(-100%);
+    box-shadow: 0 24px 60px rgba(17, 20, 24, 0.22);
+    transition: transform 260ms var(--ease-premium), visibility 260ms;
+  }
+
+  .concept-sidebar.is-open {
+    visibility: visible;
+    transform: translateX(0);
+  }
+
+  .concept-sidebar-backdrop.is-open {
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    display: block;
+    background: rgba(9, 8, 7, 0.4);
+    backdrop-filter: blur(2px);
+  }
+}
+
+/* --- The trimmed top bar: only workspace controls (device size, refresh, close), plus a
+   hamburger to open the sidebar drawer on mobile. Everything that used to live here (page tabs,
+   palette/template/rename, price badge, fullscreen) now lives in the sidebar. */
+.concept-topbar {
+  display: flex;
+  min-height: 3.75rem;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.85rem 4.5rem 0.85rem 1.25rem;
+  gap: 0.75rem;
+  padding: 0.7rem 4.5rem 0.7rem 1.1rem;
   border-bottom: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.9);
 }
 
-.concept-workspace-toolbar h2 {
+.concept-topbar-identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.concept-hamburger {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .concept-hamburger {
+    display: grid;
+    height: 2.35rem;
+    width: 2.35rem;
+    flex: 0 0 auto;
+    place-content: center;
+    border-radius: 0.65rem;
+    border: 1px solid rgba(17, 20, 24, 0.1);
+    color: rgba(9, 8, 7, 0.7);
+    transition: background 160ms var(--ease-premium);
+  }
+
+  .concept-hamburger:hover {
+    background: rgba(17, 20, 24, 0.045);
+  }
+}
+
+.concept-topbar h2 {
   overflow: hidden;
-  margin-top: 0.15rem;
-  font-size: 1.15rem;
+  font-size: 1rem;
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.concept-workspace-toolbar input {
-  max-width: 16rem;
-  min-height: 2.5rem;
-}
-
-.concept-toolbar-actions {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 0.45rem;
-  overflow-x: auto;
-  padding-bottom: 2px;
-}
-
-.concept-draft-badge {
-  display: inline-flex;
+.concept-topbar input {
+  max-width: 14rem;
   min-height: 2.35rem;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 0.4rem;
-  border: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.16);
-  border-radius: 999px;
-  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.08);
-  padding: 0 0.7rem;
-  color: #5d45cc;
-  font-size: 0.68rem;
-  font-weight: 650;
 }
 
-.concept-price-badge {
-  display: inline-flex;
-  min-height: 2.35rem;
-  flex: 0 0 auto;
-  align-items: center;
-  border: 1px solid rgba(17, 20, 24, 0.12);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.8);
-  padding: 0 0.75rem;
-  color: #090807;
-  font-family: var(--font-manrope), sans-serif;
-  font-size: 0.72rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.concept-page-switch {
+.concept-topbar-controls {
   display: flex;
   flex: 0 0 auto;
-  gap: 0.2rem;
-  padding: 0.2rem;
-  border: 1px solid rgba(17, 20, 24, 0.08);
-  border-radius: 999px;
-  background: #eef1f4;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.concept-page-switch button {
-  min-height: 2.35rem;
-  border-radius: 999px;
-  padding: 0 0.95rem;
-  color: rgba(9, 8, 7, 0.6);
-  font-size: 0.74rem;
-  font-weight: 680;
-  transition: background 200ms var(--ease-premium), color 200ms var(--ease-premium), box-shadow 200ms var(--ease-premium);
+.concept-topbar-refresh {
+  display: grid;
+  height: 2.35rem;
+  width: 2.35rem;
+  place-content: center;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(17, 20, 24, 0.1);
+  color: rgba(9, 8, 7, 0.7);
+  transition: background 160ms var(--ease-premium);
 }
 
-.concept-page-switch button:hover {
-  color: #17181b;
-  background: rgba(255, 255, 255, 0.7);
+.concept-topbar-refresh:hover {
+  background: rgba(17, 20, 24, 0.045);
 }
 
-.concept-page-switch button[aria-selected="true"] {
-  background: #17181b;
-  color: #fff;
-  box-shadow: 0 8px 20px rgba(18, 22, 27, 0.18);
+.concept-topbar-refresh:disabled {
+  opacity: 0.5;
+}
+
+/* Tablet: the sidebar stays permanent (same as desktop), but the top bar is narrower with less
+   room to spare, so the mode switch drops its text labels down to icon-only here too — instead
+   of only at the mobile breakpoint — to avoid crowding next to the identity and preview button. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .concept-mode-switch button span {
+    display: none;
+  }
+
+  .concept-mode-switch button {
+    width: 2.35rem;
+    padding: 0;
+  }
+
+  .concept-topbar-preview span {
+    display: none;
+  }
+
+  .concept-topbar-preview {
+    width: 2.35rem;
+    padding: 0 !important;
+  }
 }
 
 /* Auto-generated service price list inside a concept's "Цены" section. */
@@ -2058,7 +2202,6 @@ body::before {
   color: color-mix(in srgb, var(--concept-text) 50%, transparent);
 }
 
-.concept-toolbar-actions > button,
 .concept-mode-switch button {
   display: inline-flex;
   min-height: 2.5rem;
@@ -2076,16 +2219,11 @@ body::before {
   transition: 200ms var(--ease-premium);
 }
 
-.concept-toolbar-actions > button:hover,
 .concept-mode-switch button:hover,
 .concept-mode-switch button[aria-pressed="true"] {
   border-color: rgba(114, 87, 232, 0.24);
   background: rgba(114, 87, 232, 0.08);
   color: #17151e;
-}
-
-.concept-toolbar-actions > button:disabled {
-  opacity: 0.45;
 }
 
 .concept-mode-switch {
@@ -2132,33 +2270,6 @@ body::before {
   margin-top: 0.12rem;
   flex: 0 0 auto;
   color: #4a83ab;
-}
-
-.concept-page-status {
-  display: flex;
-  min-height: 2.6rem;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  border-bottom: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.84);
-  color: rgba(9, 8, 7, 0.5);
-  font-size: 0.7rem;
-}
-
-.concept-page-status button {
-  display: grid;
-  width: 1.9rem;
-  height: 1.9rem;
-  place-content: center;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: #fff;
-  color: #17181b;
-}
-
-.concept-page-status button:disabled {
-  opacity: 0.3;
 }
 
 .concept-preview-stage {
@@ -2242,12 +2353,6 @@ body::before {
   transform: translateY(-2px);
   color: #090807;
   box-shadow: 0 18px 48px rgba(18, 22, 27, 0.2);
-}
-
-.concept-preview-cta {
-  border-color: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.28) !important;
-  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.1) !important;
-  color: #5d45cc !important;
 }
 
 .concept-preview-stage::-webkit-scrollbar {
@@ -4240,14 +4345,12 @@ body::before {
 }
 
 .aevix-button svg,
-.concept-toolbar-actions button svg,
 .concept-mode-switch button svg,
 .aevix-icon-action svg {
   transition: transform 280ms var(--ease-premium);
 }
 
 :where(
-  .concept-toolbar-actions button,
   .concept-mode-switch button,
   .concept-progress button,
   .concept-choice-grid button,
@@ -4309,14 +4412,12 @@ body::before {
   }
 
   .aevix-button:hover svg,
-  .concept-toolbar-actions button:hover svg,
   .concept-mode-switch button:hover svg,
   .aevix-icon-action:hover svg {
     transform: translate3d(2px, -1px, 0);
   }
 
   :where(
-    .concept-toolbar-actions button,
     .concept-mode-switch button,
     .concept-progress button,
     .concept-choice-grid button,
@@ -4337,7 +4438,6 @@ body::before {
 
 .aevix-button:active,
 :where(
-  .concept-toolbar-actions button,
   .concept-mode-switch button,
   .concept-progress button,
   .concept-choice-grid button,
@@ -4530,8 +4630,7 @@ textarea {
     min-height: 3.75rem;
   }
 
-  .concept-wizard-footer,
-  .concept-workspace-footer {
+  .concept-wizard-footer {
     min-height: auto;
     padding: 0.8rem 1rem calc(0.8rem + env(safe-area-inset-bottom));
   }
@@ -4540,25 +4639,8 @@ textarea {
     display: none;
   }
 
-  .concept-workspace-toolbar {
-    display: grid;
-    min-height: auto;
-    gap: 0.65rem;
-    padding: 4.2rem 1rem 0.75rem;
-  }
-
-  .concept-toolbar-actions {
-    width: 100%;
-  }
-
-  .concept-toolbar-actions > button span,
   .concept-mode-switch button span {
     display: none;
-  }
-
-  .concept-toolbar-actions > button {
-    width: 2.6rem;
-    padding: 0;
   }
 
   .concept-mode-switch button {
@@ -4572,14 +4654,6 @@ textarea {
 
   .concept-device {
     min-height: calc(100svh - 13rem);
-  }
-
-  .concept-workspace-footer {
-    flex-direction: column-reverse;
-  }
-
-  .concept-workspace-footer > * {
-    width: 100%;
   }
 
   .pricing-compact-cta {

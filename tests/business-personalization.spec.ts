@@ -270,7 +270,7 @@ test.describe("navigation center", () => {
     await gotoHydrated(page);
     await openNavCenter(page);
     await expect(page.getByRole("heading", { name: "Навигация AEVIX" })).toBeVisible();
-    await expect(page.locator(".nav-center-card")).toHaveCount(8);
+    await expect(page.locator(".nav-center-card")).toHaveCount(7);
     // Idle: prompts the visitor to personalise.
     await expect(page.locator(".nav-center-status.is-idle")).toBeVisible();
   });
