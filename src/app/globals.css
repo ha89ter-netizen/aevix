@@ -5008,3 +5008,697 @@ textarea {
   from { transform: translateY(-120%); }
   to { transform: translateY(260%); }
 }
+
+/* =========================================================================
+   WORKSPACE — the AEVIX application shell (/app/*). A separate design
+   namespace from the marketing site's `.scene`/`.aevix-*` classes, but built
+   on the SAME tokens (--accent-r/g/b, --line, --ease-premium, --paper) so it
+   reads as one product, not a bolted-on admin panel.
+   ========================================================================= */
+
+.workspace-shell {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  min-height: 100dvh;
+  background: var(--paper);
+}
+
+/* ---- Sidebar ---- */
+
+.workspace-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 50;
+  display: flex;
+  width: 280px;
+  flex-direction: column;
+  gap: 0.25rem;
+  border-right: 1px solid var(--line);
+  background: rgba(250, 250, 248, 0.98);
+  padding: 1.1rem 0.9rem;
+  transform: translateX(-100%);
+  transition: transform 320ms var(--ease-premium);
+}
+
+.workspace-sidebar.is-open {
+  transform: translateX(0);
+  box-shadow: 0 30px 70px rgba(9, 8, 7, 0.22);
+}
+
+.workspace-sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  background: rgba(9, 8, 7, 0.34);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 280ms var(--ease-premium);
+}
+
+.workspace-sidebar-backdrop.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.workspace-sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0.5rem 0.9rem;
+}
+
+.workspace-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 999px;
+  padding: 0.3rem;
+}
+
+.workspace-brand-mark {
+  display: flex;
+  height: 2rem;
+  width: 2rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #111214;
+  color: #fafaf8;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.workspace-brand-name {
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #111214;
+}
+
+.workspace-sidebar-close {
+  display: flex;
+  height: 2rem;
+  width: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: rgba(9, 8, 7, 0.5);
+  transition: background 200ms var(--ease-premium), color 200ms var(--ease-premium);
+}
+
+.workspace-sidebar-close:hover {
+  background: rgba(9, 8, 7, 0.06);
+  color: #111214;
+}
+
+.workspace-nav {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.workspace-nav-spacer {
+  flex: 1;
+  min-height: 1rem;
+}
+
+.workspace-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 12px;
+  padding: 0.6rem 0.7rem;
+  color: rgba(9, 8, 7, 0.62);
+  font-size: 0.87rem;
+  font-weight: 560;
+  transition: background 200ms var(--ease-premium), color 200ms var(--ease-premium), transform 200ms var(--ease-premium);
+}
+
+.workspace-nav-item:hover {
+  background: rgba(9, 8, 7, 0.05);
+  color: #111214;
+}
+
+.workspace-nav-item.is-active {
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.12);
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+}
+
+.workspace-nav-item svg {
+  flex-shrink: 0;
+}
+
+.workspace-nav-item:active {
+  transform: scale(0.98);
+}
+
+.workspace-sidebar-exit {
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--line);
+  padding: 0.9rem 0.7rem 0.3rem;
+  color: rgba(9, 8, 7, 0.4);
+  font-size: 0.78rem;
+  font-weight: 550;
+  transition: color 200ms var(--ease-premium);
+}
+
+.workspace-sidebar-exit:hover {
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+}
+
+/* ---- Body / topbar ---- */
+
+.workspace-body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.workspace-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  min-height: 4rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--line);
+  background: rgba(246, 247, 248, 0.86);
+  padding: 0 1.25rem;
+  backdrop-filter: blur(16px);
+}
+
+.workspace-topbar-left {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.workspace-topbar-menu {
+  display: flex;
+  height: 2.25rem;
+  width: 2.25rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: rgba(9, 8, 7, 0.6);
+}
+
+.workspace-topbar-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #111214;
+  font-size: 1.02rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.workspace-topbar-business {
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.1);
+  padding: 0.3rem 0.7rem;
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+  font-size: 0.76rem;
+  font-weight: 600;
+  transition: background 200ms var(--ease-premium);
+}
+
+.workspace-topbar-business:hover {
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.16);
+}
+
+.workspace-topbar-search {
+  display: flex;
+  min-width: 0;
+  max-width: 24rem;
+  flex: 1;
+  align-items: center;
+  gap: 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 0.5rem 0.9rem;
+  color: rgba(9, 8, 7, 0.36);
+}
+
+.workspace-topbar-search input {
+  min-width: 0;
+  flex: 1;
+  background: transparent;
+  color: #111214;
+  font-size: 0.84rem;
+}
+
+.workspace-topbar-search input::placeholder {
+  color: rgba(9, 8, 7, 0.34);
+}
+
+.workspace-topbar-search input:disabled {
+  cursor: not-allowed;
+}
+
+.workspace-topbar-right {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.workspace-topbar-action {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  background: #111214;
+  padding: 0.55rem 1rem;
+  color: #fafaf8;
+  font-size: 0.8rem;
+  font-weight: 620;
+  transition: transform 200ms var(--ease-premium), box-shadow 200ms var(--ease-premium);
+}
+
+.workspace-topbar-action:hover {
+  box-shadow: 0 12px 28px rgba(9, 8, 7, 0.22);
+  transform: translateY(-1px);
+}
+
+.workspace-icon-button {
+  display: flex;
+  height: 2.25rem;
+  width: 2.25rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: rgba(9, 8, 7, 0.56);
+  transition: background 200ms var(--ease-premium), color 200ms var(--ease-premium);
+}
+
+.workspace-icon-button:hover {
+  background: rgba(9, 8, 7, 0.06);
+  color: #111214;
+}
+
+.workspace-avatar {
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+.workspace-main {
+  flex: 1;
+  padding: 1.75rem clamp(1rem, 3vw, 2.5rem) 4rem;
+}
+
+/* ---- Shared page chrome, used by every /app/* page ---- */
+
+.workspace-page {
+  display: grid;
+  gap: 1.75rem;
+  max-width: 76rem;
+  margin: 0 auto;
+}
+
+.workspace-page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.workspace-page-title {
+  font-size: 1.55rem;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+  color: #111214;
+}
+
+.workspace-page-desc {
+  margin-top: 0.4rem;
+  max-width: 40rem;
+  color: rgba(9, 8, 7, 0.56);
+  font-size: 0.94rem;
+  line-height: 1.6;
+}
+
+.workspace-page-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.6rem;
+}
+
+/* ---- Cards ---- */
+
+.workspace-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15.5rem, 1fr));
+  gap: 1rem;
+}
+
+.workspace-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 1.25rem;
+  text-align: left;
+  transition: transform 220ms var(--ease-premium), box-shadow 220ms var(--ease-premium), border-color 220ms var(--ease-premium);
+}
+
+a.workspace-card,
+button.workspace-card {
+  cursor: pointer;
+}
+
+a.workspace-card:hover,
+button.workspace-card:hover {
+  transform: translateY(-3px);
+  border-color: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.28);
+  box-shadow: 0 20px 48px rgba(9, 8, 7, 0.08);
+}
+
+.workspace-card-icon {
+  display: flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.1);
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+}
+
+.workspace-card-title {
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: #111214;
+}
+
+.workspace-card-desc {
+  color: rgba(9, 8, 7, 0.54);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.workspace-card-meta {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: rgba(9, 8, 7, 0.4);
+  font-size: 0.72rem;
+}
+
+/* ---- Empty states — used instead of any placeholder/fake seed content ---- */
+
+.workspace-empty {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  border-radius: 20px;
+  border: 1px dashed var(--line);
+  background: rgba(255, 255, 255, 0.6);
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+
+.workspace-empty-icon {
+  display: flex;
+  height: 3rem;
+  width: 3rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.1);
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+}
+
+.workspace-empty-title {
+  font-size: 0.98rem;
+  font-weight: 640;
+  color: #111214;
+}
+
+.workspace-empty-desc {
+  max-width: 26rem;
+  color: rgba(9, 8, 7, 0.54);
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+
+/* ---- Embedding the already-built landing-page features (AI Consultant, Pricing
+   calculator) inside a workspace page: neutralize their full-viewport marketing-section
+   chrome without touching the components themselves. ---- */
+
+.workspace-embed .scene {
+  min-height: auto;
+  border-top: none;
+  padding: 0;
+}
+
+.workspace-embed .aevix-ai-panel,
+.workspace-embed .aevix-chat-shell {
+  margin: 0;
+}
+
+/* ---- Responsive: desktop permanent / tablet icon rail / mobile slide-out drawer ---- */
+
+@media (min-width: 768px) {
+  .workspace-sidebar {
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .workspace-sidebar-backdrop {
+    display: none;
+  }
+
+  .workspace-sidebar-close {
+    display: none;
+  }
+
+  .workspace-topbar-menu {
+    display: none;
+  }
+}
+
+/* Tablet: a compact icon-only rail — an intentional third layout, not just a squeezed desktop
+   sidebar or a hidden one. */
+@media (min-width: 768px) and (max-width: 1023.98px) {
+  .workspace-sidebar {
+    width: 76px;
+    padding: 1.1rem 0.5rem;
+    align-items: center;
+  }
+
+  .workspace-brand-name,
+  .workspace-nav-item span,
+  .workspace-sidebar-exit {
+    display: none;
+  }
+
+  .workspace-brand {
+    padding: 0.3rem 0;
+  }
+
+  .workspace-nav-item {
+    justify-content: center;
+    padding: 0.65rem;
+  }
+
+  .workspace-topbar-search {
+    display: none;
+  }
+
+  .workspace-topbar-action span {
+    display: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .workspace-main {
+    padding: 2.25rem clamp(1.5rem, 3vw, 3rem) 4rem;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .workspace-topbar-title {
+    max-width: 9rem;
+  }
+
+  .workspace-topbar-search {
+    display: none;
+  }
+
+  .workspace-topbar-action span {
+    display: none;
+  }
+
+  .workspace-page-actions {
+    width: 100%;
+  }
+
+  .workspace-page-actions > * {
+    flex: 1;
+  }
+}
+
+/* ---- Section chrome + tabs + project list rows (Dashboard/Projects/Design Studio) ---- */
+
+.workspace-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.workspace-section-label {
+  margin-bottom: 0.75rem;
+  color: rgba(9, 8, 7, 0.42);
+  font-size: 0.74rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.workspace-section-head .workspace-section-label {
+  margin-bottom: 0;
+}
+
+.workspace-section-link {
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.workspace-tabs {
+  display: flex;
+  gap: 0.35rem;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.6rem;
+}
+
+.workspace-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  color: rgba(9, 8, 7, 0.52);
+  font-size: 0.84rem;
+  font-weight: 600;
+  transition: background 200ms var(--ease-premium), color 200ms var(--ease-premium);
+}
+
+.workspace-tab:hover {
+  background: rgba(9, 8, 7, 0.05);
+}
+
+.workspace-tab.is-active {
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.12);
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+}
+
+.workspace-tab span {
+  border-radius: 999px;
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.18);
+  padding: 0.05rem 0.4rem;
+  font-size: 0.7rem;
+}
+
+.workspace-project-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.workspace-project-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 0.6rem 0.75rem;
+  transition: border-color 200ms var(--ease-premium), box-shadow 200ms var(--ease-premium);
+}
+
+.workspace-project-row:hover {
+  border-color: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.24);
+  box-shadow: 0 12px 28px rgba(9, 8, 7, 0.06);
+}
+
+.workspace-project-row-main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.workspace-project-row-name {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #111214;
+  font-size: 0.9rem;
+  font-weight: 620;
+}
+
+.workspace-project-row-meta {
+  display: block;
+  color: rgba(9, 8, 7, 0.44);
+  font-size: 0.76rem;
+}
+
+.workspace-project-row-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.15rem;
+}
+
+.workspace-icon-button.is-active {
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+}
+
+.workspace-settings-list {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.workspace-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 1rem 1.1rem;
+}
+
+@media (max-width: 767.98px) {
+  .workspace-project-row {
+    flex-wrap: wrap;
+  }
+
+  .workspace-tabs {
+    overflow-x: auto;
+  }
+}

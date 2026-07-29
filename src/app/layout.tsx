@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Manrope } from "next/font/google";
+import { MotionConfig } from "framer-motion";
+import { BusinessProvider } from "@/lib/business-context";
+import { ProjectsProvider } from "@/lib/projects";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -71,7 +74,14 @@ export default function RootLayout({
           <span className="aevix-orb aevix-orb-3" />
           <span className="aevix-atmosphere-grain" />
         </div>
-        {children}
+        {/* Shared across the landing page and the Workspace, mounted once here so a business
+            described on either side carries over when the visitor navigates between them —
+            client-side navigation keeps this provider mounted, only the route content swaps. */}
+        <BusinessProvider>
+          <ProjectsProvider>
+            <MotionConfig reducedMotion="user">{children}</MotionConfig>
+          </ProjectsProvider>
+        </BusinessProvider>
       </body>
     </html>
   );
