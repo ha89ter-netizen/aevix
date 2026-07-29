@@ -1,15 +1,4 @@
-import {
-  Bot,
-  FolderKanban,
-  LayoutDashboard,
-  LineChart,
-  Palette,
-  Settings,
-  UserCircle,
-  Wallet,
-  Workflow,
-  type LucideIcon,
-} from "lucide-react";
+import { FolderKanban, LayoutDashboard, Settings, UserCircle, type LucideIcon } from "lucide-react";
 import type { Route } from "next";
 
 export type WorkspaceNavItem = {
@@ -19,30 +8,18 @@ export type WorkspaceNavItem = {
 };
 
 /**
- * Primary destinations, in the order they matter to someone running their business through
- * AEVIX: the home dashboard, the two ways to get an AI read on the business, the object library
- * (Projects) that both of those feed into, then the two build/price tools.
+ * The global Workspace sidebar only points at places OUTSIDE any project — the AI Consultant,
+ * Design Studio and Pricing calculator are no longer separate disconnected destinations here;
+ * they live inside each project's own sub-navigation (see project-nav.ts) so a saved analysis,
+ * design and price all stay attached to the business they belong to.
  */
 export const primaryNavItems: WorkspaceNavItem[] = [
   { href: "/app", label: "Дашборд", icon: LayoutDashboard },
-  { href: "/app/ai-consultant", label: "AI-консультант", icon: Bot },
   { href: "/app/projects", label: "Проекты", icon: FolderKanban },
-  { href: "/app/business-analysis", label: "Бизнес-анализ", icon: LineChart },
-  { href: "/app/design-studio", label: "Дизайн-студия", icon: Palette },
-  { href: "/app/workflow-builder", label: "Конструктор процессов", icon: Workflow },
-  { href: "/app/pricing", label: "Цены", icon: Wallet },
+  { href: "/app/settings", label: "Настройки", icon: Settings },
 ];
 
-/**
- * Favorites/Recent are deliberately NOT separate top-level destinations here — with no projects
- * yet, two more nav entries would just be two more empty states pointing at the same page.
- * They live as filters inside /app/projects instead (the same pattern Notion/Linear use for
- * "recent" — a view over one object list, not its own destination).
- */
-export const secondaryNavItems: WorkspaceNavItem[] = [
-  { href: "/app/settings", label: "Настройки", icon: Settings },
-  { href: "/app/account", label: "Аккаунт", icon: UserCircle },
-];
+export const secondaryNavItems: WorkspaceNavItem[] = [{ href: "/app/account", label: "Аккаунт", icon: UserCircle }];
 
 export function workspacePageTitle(pathname: string): string {
   const all = [...primaryNavItems, ...secondaryNavItems];

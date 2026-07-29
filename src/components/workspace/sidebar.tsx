@@ -2,14 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { X } from "lucide-react";
+import { FolderPlus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCreateAndOpenProject } from "./use-create-project";
 import { primaryNavItems, secondaryNavItems } from "./nav-config";
 
 export function WorkspaceSidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => void }) {
   const pathname = usePathname();
+  const createAndOpen = useCreateAndOpenProject();
 
-  const isActive = (href: string) => (href === "/app" ? pathname === "/app" : pathname.startsWith(href));
+  const isActive = (href: string) =>
+    href === "/app" ? pathname === "/app" : pathname === href || pathname.startsWith(`${href}/`);
+
+  const startNewProject = () => {
+    onClose();
+    createAndOpen({ name: "Новый проект", businessType: "", businessDescription: "" });
+  };
 
   return (
     <>
@@ -28,6 +36,11 @@ export function WorkspaceSidebar({ mobileOpen, onClose }: { mobileOpen: boolean;
             <X className="h-4 w-4" />
           </button>
         </div>
+
+        <button type="button" className="workspace-new-project" onClick={startNewProject}>
+          <FolderPlus className="h-[18px] w-[18px]" />
+          <span>Новый проект</span>
+        </button>
 
         <nav className="workspace-nav" aria-label="Основные разделы">
           {primaryNavItems.map((item) => {

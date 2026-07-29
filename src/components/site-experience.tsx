@@ -86,7 +86,7 @@ type AiMessage = {
   text: string;
 };
 
-type AnalysisResult = {
+export type AnalysisResult = {
   shortAnswer: string;
   reasons: string[];
   recommendedSolution: string;
@@ -97,11 +97,11 @@ type AnalysisResult = {
   callToAction: string;
 };
 
-type ServiceId = "ai" | "telegram" | "whatsapp" | "site" | "crm" | "automation" | "nfc";
-type BusinessType = "Барбершоп" | "Салон красоты" | "Магазин" | "Кофейня / ресторан" | "Локальная сеть" | "Другое";
-type BranchCount = "1" | "2–5" | "6–10" | "больше 10";
+export type ServiceId = "ai" | "telegram" | "whatsapp" | "site" | "crm" | "automation" | "nfc";
+export type BusinessType = "Барбершоп" | "Салон красоты" | "Магазин" | "Кофейня / ресторан" | "Локальная сеть" | "Другое";
+export type BranchCount = "1" | "2–5" | "6–10" | "больше 10";
 
-type EstimateForm = {
+export type EstimateForm = {
   businessType: BusinessType;
   selectedServices: ServiceId[];
   branchCount: BranchCount;
@@ -112,7 +112,7 @@ type EstimateForm = {
   contactEmail: string;
 };
 
-type EstimateResult = {
+export type EstimateResult = {
   summary: string;
   recommendedModules: string[];
   estimatedRange: string;
@@ -1540,7 +1540,18 @@ function getSafeFlow(result: AnalysisResult | null, input: string) {
   return fallbackFlow;
 }
 
-export function AiConsultantScene() {
+export function AiConsultantScene({
+  initialAnalysis = null,
+  onAnalysisSaved,
+}: {
+  /** Seeds the panel with a previously-saved result (e.g. reopening a project) instead of
+   * starting from a blank chat. */
+  initialAnalysis?: AnalysisResult | null;
+  /** Fired whenever a real analysis lands — success or local fallback — so a project can persist
+   * it. The component keeps working exactly the same with no props at all (used standalone on
+   * the landing page). */
+  onAnalysisSaved?: (analysis: AnalysisResult) => void;
+} = {}) {
   const { input: businessInput, openConsultation } = useBusiness();
   const [input, setInput] = useState("");
   const lastSyncedRef = useRef("");
@@ -1551,7 +1562,7 @@ export function AiConsultantScene() {
       text: "Опишите бизнес, и AI-консультант AEVIX покажет, какие процессы можно автоматизировать: ответы клиентам, запись, напоминания, CRM, боты и сбор отзывов.",
     },
   ]);
-  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(initialAnalysis);
   const [isThinking, setThinking] = useState(false);
   const [thinkingMode, setThinkingMode] = useState<"full" | "quick">("full");
   const [stageIndex, setStageIndex] = useState(0);
@@ -1592,6 +1603,13 @@ export function AiConsultantScene() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  // Reports every real result upward (success or local fallback) — covers every setAnalysis()
+  // call site uniformly instead of threading the save call through each one individually.
+  useEffect(() => {
+    if (analysis) onAnalysisSaved?.(analysis);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analysis]);
 
   // Prefill from the business the visitor described in the Hero (single source of truth:
   // the context). Syncs only when that description changes, so manual edits here are kept
@@ -2514,19 +2532,38 @@ function ModulesPricingScene() {
   );
 }
 
-export function PricingCalculatorScene() {
-  const [form, setForm] = useState<EstimateForm>(initialEstimateForm);
+export function PricingCalculatorScene({
+  initialForm,
+  onPricingChange,
+}: {
+  /** Restores a previously-saved selection (e.g. reopening a project) instead of starting the
+   * wizard from scratch. */
+  initialForm?: EstimateForm;
+  /** Fired with the current form + calculated result whenever the user has selected at least
+   * one service — not on the untouched default, so opening the tab alone doesn't record a
+   * "priced" project. Works exactly the same with no props (used standalone on the landing page). */
+  onPricingChange?: (form: EstimateForm, result: EstimateResult) => void;
+} = {}) {
+  const [form, setForm] = useState<EstimateForm>(initialForm ?? initialEstimateForm);
   const [step, setStep] = useState(0);
   const [aiEstimate, setAiEstimate] = useState<EstimateResult | null>(null);
   const [isEstimating, setEstimating] = useState(false);
   const [estimateError, setEstimateError] = useState<string | null>(null);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
   const localEstimate = calculateEstimate(form);
-  const finalEstimate = aiEstimate ?? buildFallbackEstimate(form);
+  // Memoized so its reference only changes when `aiEstimate`/`form` genuinely change — otherwise
+  // it's a fresh object every render, which would make the effect below fire (and, since it
+  // triggers a parent re-render via onPricingChange, loop) on every single render.
+  const finalEstimate = useMemo(() => aiEstimate ?? buildFallbackEstimate(form), [aiEstimate, form]);
   const requestText = buildRequestText(form, finalEstimate);
   const wizardSteps = ["Бизнес", "Решения", "Масштаб", "Задача", "Результат"];
   const canShowResult = form.selectedServices.length > 0;
   const canSendRequest = Boolean(form.contactName.trim() && form.contactHandle.trim());
+
+  useEffect(() => {
+    if (canShowResult) onPricingChange?.(form, finalEstimate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, finalEstimate, canShowResult]);
 
   const updateForm = (patch: Partial<EstimateForm>) => {
     setForm((current) => ({ ...current, ...patch }));

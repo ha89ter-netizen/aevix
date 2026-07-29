@@ -434,11 +434,21 @@ function ConceptPreview({
   );
 }
 
-export function WebsiteConceptExperience() {
-  const [open, setOpen] = useState(false);
+export function WebsiteConceptExperience({
+  initialConcept = null,
+  onConceptSaved,
+}: {
+  /** Restores a previously-saved concept (e.g. reopening a project) — shown immediately instead
+   * of behind the "get a concept" trigger button. */
+  initialConcept?: WebsiteConcept | null;
+  /** Fired whenever a concept is generated or edited, so a project can persist it. The component
+   * keeps working exactly the same with no props (used standalone on the landing page). */
+  onConceptSaved?: (concept: WebsiteConcept) => void;
+} = {}) {
+  const [open, setOpen] = useState(Boolean(initialConcept));
   const [step, setStep] = useState(0);
   const [input, setInput] = useState<WebsiteConceptInput>(initialInput);
-  const [concept, setConcept] = useState<WebsiteConcept | null>(null);
+  const [concept, setConcept] = useState<WebsiteConcept | null>(initialConcept);
   const [isGenerating, setGenerating] = useState(false);
   const [generationId, setGenerationId] = useState(0);
   const [thinkingLabel, setThinkingLabel] = useState<string>(THINKING_STAGES[0]);
@@ -471,6 +481,13 @@ export function WebsiteConceptExperience() {
     document.addEventListener("fullscreenchange", sync);
     return () => document.removeEventListener("fullscreenchange", sync);
   }, []);
+
+  // Reports every generated/edited concept upward (covers regeneration, palette/style cycling —
+  // anything that calls setConcept) so a project can persist the latest version.
+  useEffect(() => {
+    if (concept) onConceptSaved?.(concept);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [concept]);
 
   const toggleNativeFullscreen = async () => {
     try {
