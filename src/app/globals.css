@@ -1730,47 +1730,47 @@ body::before {
   box-shadow: 0 12px 32px rgba(114, 87, 232, 0.1);
 }
 
-.concept-palette-grid {
+.concept-color-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.6rem;
 }
 
-.concept-palette-grid > button {
+.concept-color-grid > button {
   display: grid;
-  gap: 0.75rem;
-  padding: 0.9rem;
+  justify-items: center;
+  gap: 0.45rem;
+  padding: 0.75rem 0.4rem;
   border: 1px solid rgba(17, 20, 24, 0.09);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.66);
-  text-align: left;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.64);
+  text-align: center;
   transition: transform 220ms var(--ease-premium), border-color 220ms var(--ease-premium), box-shadow 220ms var(--ease-premium);
 }
 
-.concept-palette-grid > button:hover {
+.concept-color-grid > button:hover {
   transform: translateY(-2px);
+  background: #fff;
 }
 
-.concept-palette-grid > button[aria-pressed="true"] {
+.concept-color-grid > button[aria-pressed="true"] {
   border-color: rgba(114, 87, 232, 0.44);
   box-shadow: 0 12px 32px rgba(114, 87, 232, 0.12);
 }
 
-.concept-palette-grid > button > span {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  overflow: hidden;
-  height: 2.5rem;
-  border: 1px solid rgba(17, 20, 24, 0.08);
-  border-radius: 6px;
-}
-
-.concept-palette-grid i {
+.concept-color-grid i {
   display: block;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  border: 1px solid rgba(17, 20, 24, 0.14);
 }
 
-.concept-palette-grid strong {
-  font-size: 0.85rem;
+.concept-color-grid span {
+  color: rgba(9, 8, 7, 0.68);
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 .concept-wizard-footer {
@@ -2470,7 +2470,7 @@ body::before {
   display: flex;
   gap: 0.35rem;
   padding: 0.28rem;
-  border-radius: 999px;
+  border-radius: var(--concept-radius);
   background: color-mix(in srgb, var(--concept-text) 6%, transparent);
   color: color-mix(in srgb, var(--concept-text) 70%, transparent);
   font-size: 0.8rem;
@@ -2481,11 +2481,11 @@ body::before {
 .concept-action-section button {
   min-height: 2.65rem;
   padding: 0 1.1rem;
-  border-radius: 999px;
+  border-radius: var(--concept-radius);
   background: var(--concept-text);
   color: var(--concept-bg);
   font-size: 0.75rem;
-  font-weight: 650;
+  font-weight: var(--concept-heading-weight);
   transition: transform 240ms var(--ease-premium), box-shadow 240ms var(--ease-premium), background 240ms var(--ease-premium), color 240ms var(--ease-premium);
 }
 
@@ -2493,10 +2493,10 @@ body::before {
   position: relative;
   min-height: 2.4rem;
   padding: 0 0.95rem;
-  border-radius: 999px;
+  border-radius: var(--concept-radius-sm);
   color: color-mix(in srgb, var(--concept-text) 66%, transparent);
   font-size: 0.8rem;
-  font-weight: 640;
+  font-weight: var(--concept-body-weight);
   transition: color 220ms var(--ease-premium), background 220ms var(--ease-premium), box-shadow 220ms var(--ease-premium);
 }
 
@@ -2515,7 +2515,7 @@ body::before {
   .concept-nav > button:hover,
   .concept-hero button:hover,
   .concept-action-section button:hover {
-    box-shadow: 0 14px 30px color-mix(in srgb, var(--concept-text) 16%, transparent);
+    box-shadow: var(--concept-shadow-sm);
     transform: translateY(-2px) scale(1.03);
   }
 
@@ -2523,7 +2523,7 @@ body::before {
   .concept-hero-visual > div:hover,
   .concept-gallery-frame:hover {
     border-color: color-mix(in srgb, var(--concept-accent) 36%, transparent);
-    box-shadow: 0 22px 48px color-mix(in srgb, var(--concept-text) 12%, transparent);
+    box-shadow: var(--concept-shadow-lg);
     transform: translateY(-4px) scale(1.02);
   }
 }
@@ -2546,7 +2546,7 @@ body::before {
   grid-template-columns: minmax(0, 1.1fr) minmax(20rem, 0.9fr);
   align-items: center;
   gap: 3rem;
-  padding: 5rem 3.5rem;
+  padding: calc(5rem * var(--concept-spacing)) 3.5rem;
 }
 
 .concept-hero-copy > p,
@@ -2556,15 +2556,17 @@ body::before {
   color: var(--concept-accent);
   font-size: 0.72rem;
   font-weight: 650;
+  letter-spacing: var(--concept-letter-spacing);
   text-transform: uppercase;
 }
 
 .concept-hero-copy h2 {
   max-width: 12ch;
   margin-top: 1rem;
-  font-size: 4rem;
-  font-weight: 650;
+  font-size: calc(4rem * var(--concept-heading-scale));
+  font-weight: var(--concept-heading-weight);
   line-height: 0.98;
+  letter-spacing: var(--concept-letter-spacing);
 }
 
 .concept-hero-copy > span {
@@ -2592,8 +2594,8 @@ body::before {
   position: relative;
   min-height: 25rem;
   overflow: hidden;
-  border-radius: 10px;
-  box-shadow: 0 24px 60px color-mix(in srgb, var(--concept-text) 16%, transparent);
+  border-radius: var(--concept-radius);
+  box-shadow: var(--concept-shadow-lg);
 }
 
 /* Category photo fills its frame over a themed gradient (the graceful fallback). */
@@ -2656,7 +2658,7 @@ body::before {
 }
 
 .concept-section {
-  padding: 4.5rem 3.5rem;
+  padding: calc(4.5rem * var(--concept-spacing)) 3.5rem;
   border-top: 1px solid color-mix(in srgb, var(--concept-text) 8%, transparent);
 }
 
@@ -2665,9 +2667,10 @@ body::before {
 .concept-action-section h3 {
   max-width: 18ch;
   margin-top: 0.75rem;
-  font-size: 2.6rem;
-  font-weight: 630;
+  font-size: calc(2.6rem * var(--concept-heading-scale));
+  font-weight: var(--concept-heading-weight);
   line-height: 1.08;
+  letter-spacing: var(--concept-letter-spacing);
 }
 
 .concept-section-heading > span {
@@ -2690,8 +2693,8 @@ body::before {
   min-height: 12rem;
   align-content: space-between;
   padding: 1.35rem;
-  border: 1px solid color-mix(in srgb, var(--concept-text) 10%, transparent);
-  border-radius: 8px;
+  border: var(--concept-border-width) solid var(--concept-border);
+  border-radius: var(--concept-radius);
   background: var(--concept-surface);
 }
 
@@ -2746,7 +2749,7 @@ body::before {
   align-items: flex-end;
   overflow: hidden;
   padding: 1rem;
-  border-radius: 8px;
+  border-radius: var(--concept-radius);
   color: #fff;
   font-weight: 650;
 }
@@ -2800,8 +2803,8 @@ body::before {
 .concept-contact-details > div {
   min-height: 3.6rem;
   padding: 0.9rem 1rem;
-  border: 1px solid color-mix(in srgb, var(--concept-text) 10%, transparent);
-  border-radius: 8px;
+  border: var(--concept-border-width) solid var(--concept-border);
+  border-radius: var(--concept-radius-sm);
   background: var(--concept-surface);
   color: color-mix(in srgb, var(--concept-text) 54%, transparent);
   font-size: 0.74rem;
@@ -2847,34 +2850,6 @@ body::before {
   background: var(--concept-text);
   color: var(--concept-bg);
   font-size: 0.78rem;
-}
-
-.concept-template-warm-editorial .concept-hero-copy h2,
-.concept-template-warm-editorial .concept-section h3 {
-  font-family: Georgia, "Times New Roman", serif;
-  font-weight: 500;
-}
-
-.concept-template-warm-editorial .concept-hero-visual > div:first-child {
-  background: var(--concept-text);
-}
-
-.concept-template-modern-technological .concept-site,
-.concept-template-modern-technological small,
-.concept-template-modern-technological .concept-hero-copy > p,
-.concept-template-modern-technological .concept-section-heading > p {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
-
-.concept-template-modern-technological .concept-hero-visual,
-.concept-template-modern-technological .concept-list-grid {
-  gap: 2px;
-}
-
-.concept-template-modern-technological .concept-hero-visual > div,
-.concept-template-modern-technological .concept-list-grid article {
-  border-radius: 2px;
-  box-shadow: none;
 }
 
 @container (max-width: 680px) {
@@ -4362,7 +4337,7 @@ body::before {
   .concept-mode-switch button,
   .concept-progress button,
   .concept-choice-grid button,
-  .concept-palette-grid button,
+  .concept-color-grid button,
   .estimate-modal-panel button,
   .aevix-icon-action
 ) {
@@ -4429,7 +4404,7 @@ body::before {
     .concept-mode-switch button,
     .concept-progress button,
     .concept-choice-grid button,
-    .concept-palette-grid button,
+    .concept-color-grid button,
     .estimate-modal-panel button:not(.aevix-button),
     .aevix-icon-action
   ):not(:disabled):hover {
@@ -4449,7 +4424,7 @@ body::before {
   .concept-mode-switch button,
   .concept-progress button,
   .concept-choice-grid button,
-  .concept-palette-grid button,
+  .concept-color-grid button,
   .estimate-modal-panel button,
   .aevix-icon-action
 ):active {
@@ -4629,13 +4604,16 @@ textarea {
   }
 
   .concept-choice-grid,
-  .concept-choice-grid-large,
-  .concept-palette-grid {
+  .concept-choice-grid-large {
     grid-template-columns: 1fr;
   }
 
   .concept-choice-grid button {
     min-height: 3.75rem;
+  }
+
+  .concept-color-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .concept-wizard-footer {

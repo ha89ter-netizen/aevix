@@ -31,9 +31,9 @@ export type ConceptSidebarProps = {
   concept: WebsiteConcept;
   activePageId: string;
   onPageChange: (id: string) => void;
-  onCyclePalette: () => void;
-  onCycleTemplate: () => void;
-  templateLabel: string;
+  onCycleColor: () => void;
+  onCycleStyle: () => void;
+  styleLabel: string;
   priceLabel: string;
   /** Undefined/null = every page is available (fully built). While building, the exact set of
    * page ids already revealed in the live preview. */
@@ -53,9 +53,9 @@ export function ConceptSidebar({
   concept,
   activePageId,
   onPageChange,
-  onCyclePalette,
-  onCycleTemplate,
-  templateLabel,
+  onCycleColor,
+  onCycleStyle,
+  styleLabel,
   priceLabel,
   visiblePageIds,
   priceReady,
@@ -111,11 +111,11 @@ export function ConceptSidebar({
         <div className="concept-sidebar-group">
           <p className="concept-sidebar-label">Инструменты</p>
           <nav className="concept-sidebar-nav">
-            <button type="button" className="concept-sidebar-item" onClick={onCyclePalette} disabled={isBuilding}>
+            <button type="button" className="concept-sidebar-item" onClick={onCycleColor} disabled={isBuilding}>
               <Palette className="h-4 w-4" /> Цвета
             </button>
-            <button type="button" className="concept-sidebar-item" onClick={onCycleTemplate} disabled={isBuilding}>
-              <Sparkles className="h-4 w-4" /> {templateLabel}
+            <button type="button" className="concept-sidebar-item" onClick={onCycleStyle} disabled={isBuilding}>
+              <Sparkles className="h-4 w-4" /> {styleLabel}
             </button>
           </nav>
         </div>

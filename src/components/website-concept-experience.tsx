@@ -28,16 +28,15 @@ import { conceptServicesFor, type ConceptServiceCatalog } from "@/lib/concept-se
 import {
   buildFallbackWebsiteConcept,
   conceptBusinessTypes,
+  conceptColors,
   conceptGoals,
-  conceptMoods,
-  conceptPalettes,
   conceptSectionOptions,
-  conceptTemplates,
+  conceptStyles,
   estimateConceptPrice,
   formatConceptPrice,
+  generateVisualIdentity,
   type ConceptGoal,
   type ConceptSectionType,
-  type ConceptTemplate,
   type WebsiteConcept,
   type WebsiteConceptInput,
   type WebsiteConceptSection,
@@ -104,8 +103,8 @@ const wizardSteps = ["Бизнес", "Стиль", "Цвет", "Задача", "
 const initialInput: WebsiteConceptInput = {
   businessType: "Барбершоп",
   businessName: "FORMA",
-  visualMood: "Премиальный минимализм",
-  palettePreset: "silver-violet",
+  styleId: "minimal",
+  colorId: "purple",
   customColors: "",
   goals: ["Записывать клиентов", "Вызывать доверие"],
   sections: ["services", "pricing", "about", "gallery", "booking", "contacts"],
@@ -113,31 +112,25 @@ const initialInput: WebsiteConceptInput = {
 };
 
 const demoConcepts: Array<{ label: string; name: string; input: WebsiteConceptInput }> = [
-  ["Барбершоп", "FORMA", "Барбершоп", "Премиальный минимализм", "silver-violet"],
-  ["Салон красоты", "LUMI", "Салон красоты", "Теплый и элегантный", "soft-rose"],
-  ["Кофейня", "ROAST", "Кофейня", "Теплый и элегантный", "warm-ivory"],
-  ["Ресторан", "NORTH", "Ресторан", "Премиальный минимализм", "silver-violet"],
-  ["Парфюмерный магазин", "SILLAGE", "Парфюмерный магазин", "Теплый и элегантный", "soft-rose"],
-  ["Строительная компания", "MONOLITH", "Другое", "Современный технологичный", "cool-blue"],
-  ["Стоматология", "DENTA", "Другое", "Премиальный минимализм", "cool-blue"],
-  ["Фитнес-клуб", "PULSE", "Другое", "Современный технологичный", "silver-violet"],
-].map(([label, name, businessType, visualMood, palettePreset]) => ({
+  ["Барбершоп", "FORMA", "Барбершоп", "minimal", "purple"],
+  ["Салон красоты", "LUMI", "Салон красоты", "elegant", "pink"],
+  ["Кофейня", "ROAST", "Кофейня", "elegant", "beige"],
+  ["Ресторан", "NORTH", "Ресторан", "minimal", "navy"],
+  ["Парфюмерный магазин", "SILLAGE", "Парфюмерный магазин", "luxury", "gold"],
+  ["Строительная компания", "MONOLITH", "Другое", "brutalist", "gray"],
+  ["Стоматология", "DENTA", "Другое", "minimal", "teal"],
+  ["Фитнес-клуб", "PULSE", "Другое", "tech", "orange"],
+].map(([label, name, businessType, styleId, colorId]) => ({
   label,
   name,
   input: {
     ...initialInput,
     businessName: name,
     businessType,
-    visualMood,
-    palettePreset,
+    styleId,
+    colorId,
   } as WebsiteConceptInput,
 }));
-
-const templateLabels: Record<ConceptTemplate, string> = {
-  "premium-minimal": "Premium minimal",
-  "warm-editorial": "Warm editorial",
-  "modern-technological": "Modern technological",
-};
 
 function toggleKnown<T extends string>(items: T[], item: T) {
   return items.includes(item) ? items.filter((current) => current !== item) : [...items, item];
@@ -311,11 +304,28 @@ function ConceptPreview({
   const stageRef = useRef<HTMLDivElement>(null);
   const imagery = conceptImagesFor(concept.businessType, concept.businessName);
   const services = conceptServicesFor(concept.businessType);
+  const identity = useMemo(() => generateVisualIdentity(concept.colorId, concept.styleId), [concept.colorId, concept.styleId]);
   const style = {
-    "--concept-bg": concept.palette.background,
-    "--concept-surface": concept.palette.surface,
-    "--concept-text": concept.palette.text,
-    "--concept-accent": concept.palette.accent,
+    "--concept-bg": identity.palette.background,
+    "--concept-surface": identity.palette.surface,
+    "--concept-border": identity.palette.border,
+    "--concept-muted": identity.palette.muted,
+    "--concept-text": identity.palette.text,
+    "--concept-text-muted": identity.palette.textMuted,
+    "--concept-accent": identity.palette.accent,
+    "--concept-accent-hover": identity.palette.accentHover,
+    "--concept-accent-active": identity.palette.accentActive,
+    "--concept-secondary": identity.palette.secondary,
+    "--concept-radius": identity.tokens.radius,
+    "--concept-radius-sm": identity.tokens.radiusSmall,
+    "--concept-border-width": identity.tokens.borderWidth,
+    "--concept-letter-spacing": identity.tokens.letterSpacing,
+    "--concept-heading-weight": identity.tokens.headingWeight,
+    "--concept-body-weight": identity.tokens.bodyWeight,
+    "--concept-heading-scale": identity.tokens.headingScale,
+    "--concept-spacing": identity.tokens.spacing,
+    "--concept-shadow-sm": identity.tokens.shadowSm,
+    "--concept-shadow-lg": identity.tokens.shadowLg,
   } as CSSProperties;
   const activePage = concept.pages.find((page) => page.id === activePageId) ?? concept.pages[0];
   const pageIndex = concept.pages.findIndex((page) => page.id === activePage.id);
@@ -351,7 +361,7 @@ function ConceptPreview({
         className={cn("concept-device", `concept-device-${mode}`)}
         transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
       >
-        <div className={cn("concept-site", `concept-template-${concept.template}`)} style={style}>
+        <div className="concept-site" style={style}>
           <div className="concept-atmosphere" aria-hidden="true">
             <span className="concept-orb concept-orb-1" />
             <span className="concept-orb concept-orb-2" />
@@ -632,18 +642,18 @@ export function WebsiteConceptExperience() {
     }
   };
 
-  const cyclePalette = () => {
+  const cycleColor = () => {
     if (!concept) return;
-    const index = conceptPalettes.findIndex((palette) => palette.colors.accent.toUpperCase() === concept.palette.accent.toUpperCase());
-    const next = conceptPalettes[(index + 1 + conceptPalettes.length) % conceptPalettes.length];
-    setConcept({ ...concept, palette: { ...next.colors } });
+    const index = conceptColors.findIndex((color) => color.id === concept.colorId);
+    const next = conceptColors[(index + 1) % conceptColors.length];
+    setConcept({ ...concept, colorId: next.id });
   };
 
-  const cycleTemplate = () => {
+  const cycleStyle = () => {
     if (!concept) return;
-    const index = conceptTemplates.indexOf(concept.template);
-    const template = conceptTemplates[(index + 1) % conceptTemplates.length];
-    setConcept({ ...concept, template });
+    const index = conceptStyles.findIndex((style) => style.id === concept.styleId);
+    const next = conceptStyles[(index + 1) % conceptStyles.length];
+    setConcept({ ...concept, styleId: next.id });
   };
 
   const saveBusinessName = (name: string) => {
@@ -778,9 +788,9 @@ export function WebsiteConceptExperience() {
                     concept={concept}
                     activePageId={activePageId}
                     onPageChange={setActivePageId}
-                    onCyclePalette={cyclePalette}
-                    onCycleTemplate={cycleTemplate}
-                    templateLabel={templateLabels[concept.template]}
+                    onCycleColor={cycleColor}
+                    onCycleStyle={cycleStyle}
+                    styleLabel={conceptStyles.find((style) => style.id === concept.styleId)?.label ?? ""}
                     priceLabel={`от ${formatConceptPrice(estimateConceptPrice(concept).min)}`}
                     visiblePageIds={isSettled ? null : revealedPageIds}
                     priceReady={isSettled || priceVisible}
@@ -920,11 +930,11 @@ export function WebsiteConceptExperience() {
 
               {step === 1 ? (
                 <div className="concept-field">
-                  <span>Визуальное настроение</span>
-                  <div className="concept-choice-grid concept-choice-grid-large">
-                    {conceptMoods.map((option) => (
-                      <button key={option} type="button" aria-pressed={input.visualMood === option} onClick={() => updateInput({ visualMood: option })}>
-                        <Sparkles className="h-4 w-4" />{option}
+                  <span>Визуальный стиль</span>
+                  <div className="concept-choice-grid">
+                    {conceptStyles.map((option) => (
+                      <button key={option.id} type="button" aria-pressed={input.styleId === option.id} onClick={() => updateInput({ styleId: option.id })}>
+                        <Sparkles className="h-4 w-4" />{option.label}
                       </button>
                     ))}
                   </div>
@@ -934,19 +944,19 @@ export function WebsiteConceptExperience() {
               {step === 2 ? (
                 <div className="concept-step-grid">
                   <div className="concept-field concept-field-wide">
-                    <span>Готовые палитры</span>
-                    <div className="concept-palette-grid">
-                      {conceptPalettes.map((paletteOption) => (
-                        <button key={paletteOption.id} type="button" aria-pressed={input.palettePreset === paletteOption.id} onClick={() => updateInput({ palettePreset: paletteOption.id })}>
-                          <span>{Object.values(paletteOption.colors).map((color) => <i key={color} style={{ background: color }} />)}</span>
-                          <strong>{paletteOption.label}</strong>
+                    <span>Основной цвет</span>
+                    <div className="concept-color-grid">
+                      {conceptColors.map((colorOption) => (
+                        <button key={colorOption.id} type="button" aria-pressed={input.colorId === colorOption.id} onClick={() => updateInput({ colorId: colorOption.id })}>
+                          <i style={{ background: colorOption.swatch }} />
+                          <span>{colorOption.label}</span>
                         </button>
                       ))}
                     </div>
                   </div>
                   <label className="concept-field concept-field-wide">
-                    <span>Свои пожелания по цветам</span>
-                    <input value={input.customColors} onChange={(event) => updateInput({ customColors: event.target.value })} maxLength={180} placeholder="Например: светлый фон, серебро и холодный синий" />
+                    <span>Доп. пожелания по цвету и характеру</span>
+                    <input value={input.customColors} onChange={(event) => updateInput({ customColors: event.target.value })} maxLength={180} placeholder="Например: больше воздуха, тёплые акценты" />
                   </label>
                 </div>
               ) : null}

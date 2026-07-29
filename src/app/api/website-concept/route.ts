@@ -25,12 +25,11 @@ const SYSTEM_INSTRUCTIONS = `Ты — арт-директор digital-студи
 Правила:
 - возвращай только JSON по заданной схеме;
 - не генерируй HTML, React, JavaScript, CSS, markdown или исполняемый код;
-- используй только template и type из разрешенных значений схемы;
+- используй только type страниц и секций из разрешенных значений схемы;
 - не выдумывай клиентов, отзывы, награды, статистику, гарантии, сроки или финансовые результаты;
 - не придумывай конкретные цены бизнеса: используй нейтральные названия форматов;
 - создай короткий, естественный и премиальный текст без технического жаргона;
 - сохрани указанное название и тип бизнеса;
-- palette должна содержать только HEX-цвета формата #RRGGBB;
 - создай от 2 до 3 связанных страниц, первая страница всегда имеет id home;
 - navigation должна содержать ровно по одному пункту для каждой страницы;
 - названия страниц адаптируй под бизнес: услуги, меню, каталог, запись или контакты;
@@ -130,15 +129,19 @@ export async function POST(request: Request) {
     );
 
     const rawConcept = response.output_text?.trim();
-    const concept = rawConcept ? validateWebsiteConcept(JSON.parse(rawConcept)) : null;
+    const content = rawConcept ? validateWebsiteConcept(JSON.parse(rawConcept)) : null;
 
-    if (!concept) {
+    if (!content) {
       return NextResponse.json({
         concept: fallback,
         source: "fallback",
         notice: "AI вернул неподдерживаемую структуру. Показан безопасный локальный концепт.",
       });
     }
+
+    // Visual identity (color + style) always comes from the wizard's own input, never from the
+    // model — this guarantees a consistent, always-valid identity regardless of what the AI did.
+    const concept = { ...content, colorId: input.colorId, styleId: input.styleId };
 
     const generatedTypes = new Set(concept.pages.flatMap((page) => page.sections.map((section) => section.type)));
     const requiredTypes: ConceptSectionType[] = [

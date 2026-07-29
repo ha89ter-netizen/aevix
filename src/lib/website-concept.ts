@@ -8,15 +8,6 @@ export const conceptBusinessTypes = [
   "Другое",
 ] as const;
 
-export const conceptMoods = [
-  "Премиальный минимализм",
-  "Теплый и элегантный",
-  "Современный технологичный",
-  "Яркий и дружелюбный",
-  "Темная роскошь",
-  "Свой вариант",
-] as const;
-
 export const conceptGoals = [
   "Записывать клиентов",
   "Получать заявки",
@@ -49,47 +40,66 @@ export const conceptSectionOptions = [
   { id: "faq", label: "FAQ" },
 ] as const;
 
-export const conceptTemplates = [
-  "premium-minimal",
-  "warm-editorial",
-  "modern-technological",
+/**
+ * Primary color choices. `hue` is the base HSL hue used to generate the whole color system
+ * (background/surface/border/text/accent/...) for that color — see `generateVisualIdentity`.
+ * `mode` is the color's intrinsic light/dark identity: most colors sit on a light, tinted
+ * background; a few (black, navy, burgundy) read as moody/premium on a dark one instead.
+ * `neutral` colors (white/black/gray) ignore hue for saturation purposes and derive their
+ * accent from lightness contrast alone rather than a tinted hue.
+ */
+export const conceptColors = [
+  { id: "white", label: "Белый", swatch: "#FFFFFF", hue: 0, mode: "light", neutral: true },
+  { id: "black", label: "Чёрный", swatch: "#121212", hue: 0, mode: "dark", neutral: true },
+  { id: "gray", label: "Серый", swatch: "#6B7280", hue: 222, mode: "light", neutral: true },
+  { id: "blue", label: "Синий", swatch: "#2563EB", hue: 221, mode: "light", neutral: false },
+  { id: "navy", label: "Тёмно-синий", swatch: "#16233F", hue: 222, mode: "dark", neutral: false },
+  { id: "teal", label: "Бирюзовый", swatch: "#0D9488", hue: 174, mode: "light", neutral: false },
+  { id: "green", label: "Зелёный", swatch: "#16A34A", hue: 142, mode: "light", neutral: false },
+  { id: "olive", label: "Оливковый", swatch: "#6B7A3A", hue: 73, mode: "light", neutral: false },
+  { id: "brown", label: "Коричневый", swatch: "#8B5E34", hue: 27, mode: "light", neutral: false },
+  { id: "beige", label: "Бежевый", swatch: "#C9B896", hue: 39, mode: "light", neutral: false },
+  { id: "sand", label: "Песочный", swatch: "#D8B98C", hue: 34, mode: "light", neutral: false },
+  { id: "orange", label: "Оранжевый", swatch: "#EA580C", hue: 22, mode: "light", neutral: false },
+  { id: "red", label: "Красный", swatch: "#DC2626", hue: 358, mode: "light", neutral: false },
+  { id: "burgundy", label: "Бордовый", swatch: "#5E1934", hue: 340, mode: "dark", neutral: false },
+  { id: "purple", label: "Фиолетовый", swatch: "#7C3AED", hue: 262, mode: "light", neutral: false },
+  { id: "pink", label: "Розовый", swatch: "#DB2777", hue: 328, mode: "light", neutral: false },
+  { id: "gold", label: "Золотой", swatch: "#B8860B", hue: 45, mode: "light", neutral: false },
 ] as const;
 
-export const conceptPalettes = [
-  {
-    id: "silver-violet",
-    label: "Серебро и фиолетовый",
-    colors: { background: "#F5F6F8", surface: "#FFFFFF", text: "#17181B", accent: "#7257E8" },
-  },
-  {
-    id: "warm-ivory",
-    label: "Теплый фарфор",
-    colors: { background: "#F8F4EC", surface: "#FFFDF8", text: "#241F1A", accent: "#A35F42" },
-  },
-  {
-    id: "cool-blue",
-    label: "Холодный голубой",
-    colors: { background: "#EEF3F7", surface: "#FFFFFF", text: "#14202B", accent: "#297DB5" },
-  },
-  {
-    id: "soft-rose",
-    label: "Мягкий розовый",
-    colors: { background: "#F8F1F3", surface: "#FFFDFD", text: "#2B2024", accent: "#B55378" },
-  },
+/**
+ * Visual styles modulate structure — radius, shadow, letter-spacing, weight, scale, spacing —
+ * never font family. Combined with a primary color (see `conceptColors`) via
+ * `generateVisualIdentity`, they form the concept's full visual identity.
+ */
+export const conceptStyles = [
+  { id: "minimal", label: "Минимализм" },
+  { id: "luxury", label: "Роскошь" },
+  { id: "premium", label: "Премиум" },
+  { id: "tech", label: "Технологичный" },
+  { id: "organic", label: "Органический" },
+  { id: "elegant", label: "Элегантный" },
+  { id: "editorial", label: "Редакционный" },
+  { id: "modern", label: "Современный" },
+  { id: "brutalist", label: "Брутализм" },
+  { id: "glass", label: "Стекло" },
+  { id: "futuristic", label: "Футуризм" },
+  { id: "soft", label: "Мягкий" },
+  { id: "bold", label: "Дерзкий" },
 ] as const;
 
 export type ConceptBusinessType = (typeof conceptBusinessTypes)[number];
-export type ConceptMood = (typeof conceptMoods)[number];
 export type ConceptGoal = (typeof conceptGoals)[number];
 export type ConceptSectionType = (typeof conceptSectionTypes)[number];
-export type ConceptTemplate = (typeof conceptTemplates)[number];
-export type ConceptPaletteId = (typeof conceptPalettes)[number]["id"];
+export type ConceptColorId = (typeof conceptColors)[number]["id"];
+export type ConceptStyleId = (typeof conceptStyles)[number]["id"];
 
 export type WebsiteConceptInput = {
   businessType: ConceptBusinessType;
   businessName: string;
-  visualMood: ConceptMood;
-  palettePreset: ConceptPaletteId;
+  styleId: ConceptStyleId;
+  colorId: ConceptColorId;
   customColors: string;
   goals: ConceptGoal[];
   sections: ConceptSectionType[];
@@ -121,19 +131,16 @@ export type WebsiteConceptPage = {
 export type WebsiteConcept = {
   businessName: string;
   businessType: string;
-  template: ConceptTemplate;
-  style: string;
-  palette: {
-    background: string;
-    surface: string;
-    text: string;
-    accent: string;
-  };
+  colorId: ConceptColorId;
+  styleId: ConceptStyleId;
   navigation: Array<{ label: string; pageId: string }>;
   pages: WebsiteConceptPage[];
 };
 
-const HEX_COLOR = /^#[0-9A-F]{6}$/i;
+/** The AI only ever generates content (name/copy/structure) — visual identity (colorId/styleId)
+ * always comes from the wizard's own input, never from the model, so it's attached separately. */
+type WebsiteConceptContent = Omit<WebsiteConcept, "colorId" | "styleId">;
+
 const PAGE_ID = /^[a-z][a-z0-9-]{1,30}$/;
 const UNSAFE_GENERATED_CONTENT = /<\/?(?:script|style|iframe|object|embed|html|body|svg|form)|javascript:|data:text\/html|```|\b(?:eval|Function)\s*\(|=>|\b(?:import|export)\s+(?:default|from|const|function|class)/i;
 
@@ -177,15 +184,15 @@ export function validateWebsiteConceptInput(value: unknown): WebsiteConceptInput
   const sections = cleanKnownArray(candidate.sections, conceptSectionTypes, 3, conceptSectionTypes.length);
 
   if (!isOneOf(candidate.businessType, conceptBusinessTypes)) return null;
-  if (!isOneOf(candidate.visualMood, conceptMoods)) return null;
-  if (!isOneOf(candidate.palettePreset, conceptPalettes.map((palette) => palette.id))) return null;
+  if (!isOneOf(candidate.styleId, conceptStyles.map((style) => style.id))) return null;
+  if (!isOneOf(candidate.colorId, conceptColors.map((color) => color.id))) return null;
   if (!businessName || customColors === null || wishes === null || !goals || !sections) return null;
 
   return {
     businessType: candidate.businessType,
     businessName,
-    visualMood: candidate.visualMood,
-    palettePreset: candidate.palettePreset,
+    styleId: candidate.styleId,
+    colorId: candidate.colorId,
     customColors,
     goals,
     sections,
@@ -200,19 +207,14 @@ function cleanStringArray(value: unknown, maxItems: number, maxLength: number) {
   return items as string[];
 }
 
-export function validateWebsiteConcept(value: unknown): WebsiteConcept | null {
+export function validateWebsiteConcept(value: unknown): WebsiteConceptContent | null {
   if (!value || typeof value !== "object") return null;
-  const candidate = value as Partial<WebsiteConcept>;
-  if (!candidate.palette || typeof candidate.palette !== "object") return null;
-  if (!isOneOf(candidate.template, conceptTemplates)) return null;
+  const candidate = value as Partial<WebsiteConceptContent>;
 
   const businessName = cleanText(candidate.businessName, 80);
   const businessType = cleanText(candidate.businessType, 80);
-  const style = cleanText(candidate.style, 120);
-  const palette = candidate.palette as WebsiteConcept["palette"];
 
-  if (!businessName || !businessType || !style) return null;
-  if (![palette.background, palette.surface, palette.text, palette.accent].every((color) => HEX_COLOR.test(color))) return null;
+  if (!businessName || !businessType) return null;
 
   if (!Array.isArray(candidate.pages) || candidate.pages.length < 2 || candidate.pages.length > 3) return null;
   const pages: WebsiteConceptPage[] = [];
@@ -254,7 +256,7 @@ export function validateWebsiteConcept(value: unknown): WebsiteConcept | null {
 
   if (pages[0]?.id !== "home") return null;
   if (!Array.isArray(candidate.navigation) || candidate.navigation.length !== pages.length) return null;
-  const navigation: WebsiteConcept["navigation"] = [];
+  const navigation: WebsiteConceptContent["navigation"] = [];
   const navigationIds = new Set<string>();
   for (const rawItem of candidate.navigation) {
     if (!rawItem || typeof rawItem !== "object") return null;
@@ -270,23 +272,172 @@ export function validateWebsiteConcept(value: unknown): WebsiteConcept | null {
   return {
     businessName,
     businessType,
-    template: candidate.template,
-    style,
-    palette: {
-      background: palette.background.toUpperCase(),
-      surface: palette.surface.toUpperCase(),
-      text: palette.text.toUpperCase(),
-      accent: palette.accent.toUpperCase(),
-    },
     navigation,
     pages,
   };
 }
 
-function templateForMood(mood: ConceptMood): ConceptTemplate {
-  if (mood === "Теплый и элегантный") return "warm-editorial";
-  if (mood === "Современный технологичный" || mood === "Яркий и дружелюбный") return "modern-technological";
-  return "premium-minimal";
+export type ConceptColorSystem = {
+  background: string;
+  surface: string;
+  border: string;
+  muted: string;
+  text: string;
+  textMuted: string;
+  accent: string;
+  accentHover: string;
+  accentActive: string;
+  secondary: string;
+};
+
+export type ConceptVisualTokens = {
+  radius: string;
+  radiusSmall: string;
+  borderWidth: string;
+  letterSpacing: string;
+  headingWeight: number;
+  bodyWeight: number;
+  headingScale: number;
+  spacing: number;
+  shadowSm: string;
+  shadowLg: string;
+};
+
+export type ConceptVisualIdentity = {
+  palette: ConceptColorSystem;
+  tokens: ConceptVisualTokens;
+};
+
+type StyleDefinition = {
+  radius: number;
+  radiusSmall: number;
+  shadow: "none" | "soft" | "medium" | "strong" | "glow" | "hard";
+  letterSpacing: string;
+  headingWeight: number;
+  bodyWeight: number;
+  headingScale: number;
+  spacing: number;
+  borderWidth: number;
+  /** How strongly the primary color's hue bleeds into background/surface (0..1). */
+  tint: number;
+  /** Additive nudge on the accent's saturation/lightness — how punchy vs. restrained it reads. */
+  saturationBoost: number;
+};
+
+/**
+ * Structural tokens per visual style — radius, shadow language, tracking, weight, scale,
+ * density. Deliberately never touches font-family: hierarchy and character come from these
+ * dimensions, not from swapping typefaces.
+ */
+const styleDefinitions: Record<ConceptStyleId, StyleDefinition> = {
+  minimal: { radius: 10, radiusSmall: 8, shadow: "soft", letterSpacing: "-0.01em", headingWeight: 620, bodyWeight: 400, headingScale: 1, spacing: 1.05, borderWidth: 1, tint: 0.12, saturationBoost: -0.08 },
+  luxury: { radius: 3, radiusSmall: 3, shadow: "soft", letterSpacing: "0.05em", headingWeight: 520, bodyWeight: 400, headingScale: 0.96, spacing: 1.18, borderWidth: 1, tint: 0.38, saturationBoost: -0.12 },
+  premium: { radius: 14, radiusSmall: 10, shadow: "medium", letterSpacing: "-0.01em", headingWeight: 660, bodyWeight: 430, headingScale: 1.04, spacing: 1.1, borderWidth: 1, tint: 0.26, saturationBoost: 0 },
+  tech: { radius: 6, radiusSmall: 5, shadow: "strong", letterSpacing: "0em", headingWeight: 700, bodyWeight: 450, headingScale: 0.98, spacing: 0.92, borderWidth: 1, tint: 0.08, saturationBoost: 0.08 },
+  organic: { radius: 28, radiusSmall: 18, shadow: "soft", letterSpacing: "0em", headingWeight: 600, bodyWeight: 410, headingScale: 1, spacing: 1.22, borderWidth: 1, tint: 0.42, saturationBoost: -0.06 },
+  elegant: { radius: 6, radiusSmall: 6, shadow: "soft", letterSpacing: "0.03em", headingWeight: 520, bodyWeight: 400, headingScale: 0.98, spacing: 1.16, borderWidth: 1, tint: 0.3, saturationBoost: -0.1 },
+  editorial: { radius: 2, radiusSmall: 2, shadow: "none", letterSpacing: "0.02em", headingWeight: 600, bodyWeight: 400, headingScale: 1.06, spacing: 1.2, borderWidth: 1, tint: 0.18, saturationBoost: -0.14 },
+  modern: { radius: 12, radiusSmall: 9, shadow: "medium", letterSpacing: "-0.01em", headingWeight: 660, bodyWeight: 420, headingScale: 1.02, spacing: 1.02, borderWidth: 1, tint: 0.2, saturationBoost: 0.04 },
+  brutalist: { radius: 0, radiusSmall: 0, shadow: "hard", letterSpacing: "0em", headingWeight: 820, bodyWeight: 520, headingScale: 1.1, spacing: 0.92, borderWidth: 2, tint: 0.04, saturationBoost: 0.18 },
+  glass: { radius: 18, radiusSmall: 14, shadow: "glow", letterSpacing: "0em", headingWeight: 620, bodyWeight: 410, headingScale: 1, spacing: 1.1, borderWidth: 1, tint: 0.28, saturationBoost: 0.06 },
+  futuristic: { radius: 4, radiusSmall: 4, shadow: "glow", letterSpacing: "0.07em", headingWeight: 700, bodyWeight: 440, headingScale: 0.98, spacing: 0.94, borderWidth: 1, tint: 0.1, saturationBoost: 0.14 },
+  soft: { radius: 24, radiusSmall: 16, shadow: "soft", letterSpacing: "0em", headingWeight: 560, bodyWeight: 400, headingScale: 0.98, spacing: 1.2, borderWidth: 1, tint: 0.34, saturationBoost: -0.1 },
+  bold: { radius: 10, radiusSmall: 8, shadow: "strong", letterSpacing: "-0.02em", headingWeight: 800, bodyWeight: 470, headingScale: 1.08, spacing: 1, borderWidth: 1, tint: 0.16, saturationBoost: 0.16 },
+};
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function hsl(h: number, s: number, l: number) {
+  const hue = ((h % 360) + 360) % 360;
+  return `hsl(${Math.round(hue)}deg ${clamp(s, 0, 100).toFixed(0)}% ${clamp(l, 0, 100).toFixed(0)}%)`;
+}
+
+/**
+ * Derives a full color system + structural token set from a primary color and a visual style.
+ * Backgrounds and text always sit near opposite ends of the lightness scale (98%/12% in light
+ * mode, 8-12%/96% in dark mode), which guarantees strong, accessible contrast regardless of
+ * which of the 17 colors × 13 styles the user picked — no manual per-combination tuning needed.
+ */
+export function generateVisualIdentity(colorId: ConceptColorId, styleId: ConceptStyleId): ConceptVisualIdentity {
+  const color = conceptColors.find((item) => item.id === colorId) ?? conceptColors[0];
+  const def = styleDefinitions[styleId] ?? styleDefinitions.minimal;
+  const isDark = color.mode === "dark";
+  const hue = color.hue;
+  const neutral = color.neutral;
+  const tintSat = neutral ? 0 : clamp(6 + def.tint * 26, 4, 34);
+
+  let background: string, surface: string, border: string, muted: string, text: string, textMuted: string;
+
+  if (isDark) {
+    const bgL = 8 + def.tint * 3;
+    background = hsl(hue, tintSat, bgL);
+    surface = hsl(hue, tintSat, bgL + 4);
+    border = hsl(hue, tintSat * 0.8, bgL + 16);
+    muted = hsl(hue, tintSat * 0.6, bgL + 32);
+    text = hsl(hue, neutral ? 0 : 10, 96);
+    textMuted = hsl(hue, neutral ? 0 : 8, 68);
+  } else {
+    background = hsl(hue, tintSat, 98);
+    surface = hsl(hue, tintSat * 0.5, 100);
+    border = hsl(hue, tintSat, 89);
+    muted = hsl(hue, tintSat, 55);
+    text = hsl(hue, neutral ? 0 : 14, 12);
+    textMuted = hsl(hue, neutral ? 0 : 10, 42);
+  }
+
+  let accentSat: number;
+  let accentLight: number;
+
+  if (color.id === "white") {
+    accentSat = 0;
+    accentLight = 14;
+  } else if (color.id === "black") {
+    accentSat = 0;
+    accentLight = 94;
+  } else if (color.id === "gray") {
+    accentSat = 6;
+    accentLight = isDark ? 78 : 32;
+  } else {
+    accentSat = clamp(58 + def.saturationBoost * 100, 30, 92);
+    accentLight = isDark ? clamp(60 + def.saturationBoost * 20, 48, 72) : clamp(48 - def.saturationBoost * 12, 34, 58);
+  }
+
+  const accent = hsl(hue, accentSat, accentLight);
+  const accentHover = hsl(hue, accentSat, isDark ? accentLight + 7 : accentLight - 7);
+  const accentActive = hsl(hue, accentSat, isDark ? accentLight - 6 : accentLight + 6);
+  const secondary = hsl(hue + 26, clamp(accentSat - 18, 12, 70), isDark ? 30 : 88);
+
+  const shadowRgb = isDark ? "0,0,0" : "16,16,20";
+  const shadowByKeyword: Record<StyleDefinition["shadow"], { sm: string; lg: string }> = {
+    none: { sm: "none", lg: "none" },
+    soft: { sm: `0 8px 22px rgba(${shadowRgb},0.08)`, lg: `0 20px 50px rgba(${shadowRgb},0.1)` },
+    medium: { sm: `0 10px 26px rgba(${shadowRgb},0.12)`, lg: `0 26px 60px rgba(${shadowRgb},0.14)` },
+    strong: { sm: `0 14px 32px rgba(${shadowRgb},0.18)`, lg: `0 30px 70px rgba(${shadowRgb},0.2)` },
+    glow: {
+      sm: `0 0 0 1px color-mix(in srgb, ${accent} 30%, transparent), 0 10px 30px color-mix(in srgb, ${accent} 30%, transparent)`,
+      lg: `0 0 0 1px color-mix(in srgb, ${accent} 24%, transparent), 0 28px 70px color-mix(in srgb, ${accent} 32%, transparent)`,
+    },
+    hard: { sm: `4px 4px 0 0 ${text}`, lg: `8px 8px 0 0 ${text}` },
+  };
+  const shadows = shadowByKeyword[def.shadow];
+
+  return {
+    palette: { background, surface, border, muted, text, textMuted, accent, accentHover, accentActive, secondary },
+    tokens: {
+      radius: `${def.radius}px`,
+      radiusSmall: `${def.radiusSmall}px`,
+      borderWidth: `${def.borderWidth}px`,
+      letterSpacing: def.letterSpacing,
+      headingWeight: def.headingWeight,
+      bodyWeight: def.bodyWeight,
+      headingScale: def.headingScale,
+      spacing: def.spacing,
+      shadowSm: shadows.sm,
+      shadowLg: shadows.lg,
+    },
+  };
 }
 
 function sectionContent(type: ConceptSectionType, input: WebsiteConceptInput): WebsiteConceptSection {
@@ -370,7 +521,6 @@ export function formatConceptPrice(value: number): string {
 }
 
 export function buildFallbackWebsiteConcept(input: WebsiteConceptInput): WebsiteConcept {
-  const palette = conceptPalettes.find((item) => item.id === input.palettePreset) ?? conceptPalettes[0];
   const primaryGoal = input.goals[0] ?? "Получать заявки";
   const isBookingBusiness = ["Барбершоп", "Салон красоты", "Ресторан", "Кофейня"].includes(input.businessType);
   const middlePage = input.businessType === "Ресторан" || input.businessType === "Кофейня"
@@ -432,9 +582,8 @@ export function buildFallbackWebsiteConcept(input: WebsiteConceptInput): Website
   return {
     businessName: input.businessName,
     businessType: input.businessType,
-    template: templateForMood(input.visualMood),
-    style: input.visualMood,
-    palette: { ...palette.colors },
+    colorId: input.colorId,
+    styleId: input.styleId,
     navigation: pages.map((page) => ({ label: page.name, pageId: page.id })),
     pages,
   };
@@ -443,23 +592,10 @@ export function buildFallbackWebsiteConcept(input: WebsiteConceptInput): Website
 export const WEBSITE_CONCEPT_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["businessName", "businessType", "template", "style", "palette", "navigation", "pages"],
+  required: ["businessName", "businessType", "navigation", "pages"],
   properties: {
     businessName: { type: "string", maxLength: 80 },
     businessType: { type: "string", maxLength: 80 },
-    template: { type: "string", enum: conceptTemplates },
-    style: { type: "string", maxLength: 120 },
-    palette: {
-      type: "object",
-      additionalProperties: false,
-      required: ["background", "surface", "text", "accent"],
-      properties: {
-        background: { type: "string", pattern: "^#[0-9A-Fa-f]{6}$" },
-        surface: { type: "string", pattern: "^#[0-9A-Fa-f]{6}$" },
-        text: { type: "string", pattern: "^#[0-9A-Fa-f]{6}$" },
-        accent: { type: "string", pattern: "^#[0-9A-Fa-f]{6}$" },
-      },
-    },
     navigation: {
       type: "array",
       minItems: 2,
