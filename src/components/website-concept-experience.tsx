@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
   ArrowRight,
@@ -49,15 +49,55 @@ type ViewMode = "edit" | "preview";
 /** Idle delay before the floating "back to editor" pill fades out in preview mode. */
 const PREVIEW_CHROME_IDLE_MS = 2600;
 
-const generationStages = [
-  "Изучаем бизнес...",
-  "Планируем структуру...",
-  "Выбираем визуальный стиль...",
-  "Генерируем концепт...",
-  "Готовим preview...",
-] as const;
+/**
+ * The generation experience is two honest phases, never a fake progress bar:
+ *
+ *  1. "Thinking" — the real network request is in flight and its duration is unknown. These
+ *     three labels cycle for as long as that actually takes (a minimum dwell keeps the first one
+ *     from flashing by if the response is instant, e.g. the offline fallback). Nothing about this
+ *     phase claims work isn't happening — it IS happening, we just can't subdivide one HTTP call
+ *     into three real steps, so the labels describe the request honestly rather than pretending
+ *     to track it precisely.
+ *  2. "Reveal" — the concept has actually arrived in full. From here every stage corresponds to
+ *     real content becoming visible: a specific page's hero, a specific section, a specific
+ *     later page, the (really computed) price estimate. This is a choreographed reveal of data
+ *     that already exists, not simulated computation — the same honest pattern as a staged
+ *     fade-in, just paced to read as construction rather than a single jarring cut.
+ */
+const THINKING_STAGES = ["Изучаем бизнес", "Исследуем структуру ниши", "Планируем архитектуру сайта"] as const;
+const THINKING_STAGE_MS = 900;
+const REVEAL_STAGE_MS = 420;
 
-const previewRevealStages = ["Логотип", "Палитра", "Типографика", "Hero", "Разделы", "Desktop", "Tablet", "Mobile"] as const;
+const sectionRevealLabels: Record<ConceptSectionType, string> = {
+  services: "Собираем услуги",
+  pricing: "Формируем цены",
+  about: "Пишем о бренде",
+  gallery: "Добавляем галерею",
+  reviews: "Готовим отзывы",
+  booking: "Настраиваем запись",
+  contacts: "Добавляем контакты",
+  faq: "Готовим частые вопросы",
+};
+
+type PipelineReveal = { heroVisible?: true; sectionCount?: number; pageId?: string; price?: true };
+type PipelineStage = { label: string; reveal?: PipelineReveal };
+
+/** Built from the ACTUAL generated concept, so every stage matches what that specific business
+ * got — a coffee shop's pipeline mentions its real "Меню" page by its real name, a dental
+ * clinic's doesn't show a stage for a gallery it doesn't have. */
+function buildRevealPipeline(concept: WebsiteConcept): PipelineStage[] {
+  const [home, ...rest] = concept.pages;
+  const stages: PipelineStage[] = [{ label: "Создаём Hero", reveal: { heroVisible: true, pageId: home.id } }];
+  home.sections.forEach((section, index) => {
+    stages.push({ label: sectionRevealLabels[section.type] ?? "Собираем раздел", reveal: { sectionCount: index + 1 } });
+  });
+  rest.forEach((page) => {
+    stages.push({ label: `Готовим страницу «${page.name}»`, reveal: { pageId: page.id } });
+  });
+  stages.push({ label: "Считаем стоимость проекта", reveal: { price: true } });
+  stages.push({ label: "Финальная проверка качества" });
+  return stages;
+}
 
 const wizardSteps = ["Бизнес", "Стиль", "Цвет", "Задача", "Структура"] as const;
 
@@ -223,10 +263,31 @@ function ConceptSection({
   );
 }
 
+/** Shown in place of ConceptPreview before the real concept has arrived — the device frame
+ * itself, with no invented business content inside it, just an honest status readout. This is
+ * what makes the transition into real content read as continuous rather than a jarring swap
+ * from an abstract loading screen into the actual workspace. */
+function ConceptBuildingFrame({ mode, label }: { mode: PreviewMode; label: string }) {
+  return (
+    <div className="concept-preview-stage">
+      <div className={cn("concept-device", `concept-device-${mode}`)}>
+        <div className="concept-building-frame">
+          <div className="concept-generation-mark">
+            <WandSparkles className="h-6 w-6" />
+          </div>
+          <p role="status" aria-live="polite">{label}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ConceptPreview({
   concept,
   mode,
-  revealIndex,
+  heroVisible,
+  sectionCount,
+  visiblePageIds,
   activePageId,
   onPageChange,
   onDemoAction,
@@ -234,7 +295,14 @@ function ConceptPreview({
 }: {
   concept: WebsiteConcept;
   mode: PreviewMode;
-  revealIndex: number;
+  /** True once the active page's hero is part of the reveal — always true once settled. */
+  heroVisible: boolean;
+  /** How many of the HOME page's sections are visible so far. Pages other than home always
+   * show fully once they've appeared at all (see visiblePageIds) — only home reveals piece by
+   * piece, since it's the only page in view during most of the build. */
+  sectionCount: number;
+  /** Which pages exist yet, for the in-preview nav bar — null once fully built. */
+  visiblePageIds: string[] | null;
   activePageId: string;
   onPageChange: (pageId: string) => void;
   onDemoAction: () => void;
@@ -252,6 +320,10 @@ function ConceptPreview({
   const activePage = concept.pages.find((page) => page.id === activePageId) ?? concept.pages[0];
   const pageIndex = concept.pages.findIndex((page) => page.id === activePage.id);
   const nextPage = concept.pages[Math.min(pageIndex + 1, concept.pages.length - 1)];
+  const isHomePage = activePage.id === concept.pages[0]?.id;
+  const visibleNav = visiblePageIds
+    ? concept.navigation.filter((item) => visiblePageIds.includes(item.pageId))
+    : concept.navigation;
 
   useEffect(() => {
     stageRef.current?.scrollTo({
@@ -284,19 +356,30 @@ function ConceptPreview({
             <span className="concept-orb concept-orb-1" />
             <span className="concept-orb concept-orb-2" />
           </div>
-          <header className={cn("concept-nav concept-preview-piece", revealIndex >= 0 && "is-visible")}>
+          <header className={cn("concept-nav concept-preview-piece", heroVisible && "is-visible")}>
             <strong>{concept.businessName}</strong>
             <nav aria-label="Навигация демонстрационного сайта">
-              {concept.navigation.map((item) => (
-                <button key={item.pageId} type="button" aria-current={item.pageId === activePage.id ? "page" : undefined} onClick={() => onPageChange(item.pageId)}>
-                  {item.label}
-                </button>
-              ))}
+              <AnimatePresence initial={false}>
+                {visibleNav.map((item) => (
+                  <motion.button
+                    key={item.pageId}
+                    type="button"
+                    layout
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.2 }}
+                    aria-current={item.pageId === activePage.id ? "page" : undefined}
+                    onClick={() => onPageChange(item.pageId)}
+                  >
+                    {item.label}
+                  </motion.button>
+                ))}
+              </AnimatePresence>
             </nav>
             <button type="button" onClick={onDemoAction}>Связаться</button>
           </header>
           <motion.main key={activePage.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }}>
-            <section className={cn("concept-hero concept-preview-piece", revealIndex >= 3 && "is-visible")}>
+            <section className={cn("concept-hero concept-preview-piece", heroVisible && "is-visible")}>
               <div className="concept-hero-copy">
                 <p>{activePage.hero.eyebrow}</p>
                 <h2>{activePage.hero.title}</h2>
@@ -316,13 +399,20 @@ function ConceptPreview({
                 </div>
               </div>
             </section>
-            <div className={cn("concept-preview-piece", revealIndex >= 4 && "is-visible")}>
-              {activePage.sections.map((section, index) => (
-                <ConceptSection key={`${section.type}-${index}`} section={section} onDemoAction={onDemoAction} imagery={imagery} services={services} />
-              ))}
+            <div className={cn("concept-preview-piece", heroVisible && "is-visible")}>
+              {activePage.sections.map((section, index) => {
+                // Only the home page reveals section-by-section (it's the one on screen for
+                // most of the build); any other page, once it exists at all, shows in full.
+                const visible = !isHomePage || index < sectionCount;
+                return (
+                  <div key={`${section.type}-${index}`} className={cn("concept-section-piece", visible && "is-visible")}>
+                    <ConceptSection section={section} onDemoAction={onDemoAction} imagery={imagery} services={services} />
+                  </div>
+                );
+              })}
             </div>
           </motion.main>
-          <footer className={cn("concept-footer concept-preview-piece", revealIndex >= 4 && "is-visible")}>
+          <footer className={cn("concept-footer concept-preview-piece", heroVisible && "is-visible")}>
             <strong>{concept.businessName}</strong>
             <span>Концепт сайта, подготовленный AEVIX</span>
           </footer>
@@ -338,7 +428,14 @@ export function WebsiteConceptExperience() {
   const [input, setInput] = useState<WebsiteConceptInput>(initialInput);
   const [concept, setConcept] = useState<WebsiteConcept | null>(null);
   const [isGenerating, setGenerating] = useState(false);
-  const [stageIndex, setStageIndex] = useState(0);
+  const [generationId, setGenerationId] = useState(0);
+  const [thinkingLabel, setThinkingLabel] = useState<string>(THINKING_STAGES[0]);
+  const [pipelineLabel, setPipelineLabel] = useState<string | null>(null);
+  const [heroVisible, setHeroVisible] = useState(false);
+  const [sectionCount, setSectionCount] = useState(0);
+  const [priceVisible, setPriceVisible] = useState(false);
+  const [revealedPageIds, setRevealedPageIds] = useState<string[]>([]);
+  const [isSettled, setIsSettled] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("desktop");
   const [fullscreen, setFullscreen] = useState(false);
@@ -349,9 +446,9 @@ export function WebsiteConceptExperience() {
   const [showExamples, setShowExamples] = useState(false);
   const [activePageId, setActivePageId] = useState("home");
   const [demoMessage, setDemoMessage] = useState<string | null>(null);
-  const [previewRevealIndex, setPreviewRevealIndex] = useState(previewRevealStages.length - 1);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const hasConcept = concept !== null;
+  const isBuilding = isGenerating || (hasConcept && !isSettled);
   const isPreview = viewMode === "preview";
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -423,26 +520,65 @@ export function WebsiteConceptExperience() {
     };
   }, [isPreview]);
 
+  // Phase 1 — "thinking": cycles while the real request is in flight. Its total duration is
+  // however long that request actually takes; this only controls which of the three labels is
+  // legible right now, and stops the instant a response (real or fallback) actually arrives.
   useEffect(() => {
-    if (!hasConcept) return;
-    setActivePageId(concept?.pages[0]?.id ?? "home");
+    if (!isGenerating || concept) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    setThinkingLabel(THINKING_STAGES[0]);
+    let index = 0;
+    const timer = window.setInterval(() => {
+      index = (index + 1) % THINKING_STAGES.length;
+      setThinkingLabel(THINKING_STAGES[index]);
+    }, THINKING_STAGE_MS);
+    return () => window.clearInterval(timer);
+  }, [isGenerating, concept]);
+
+  // Phase 2 — "reveal": the concept is fully in hand. Keyed on generationId (bumped only by
+  // applyNewConcept), not on `concept` itself, so a palette/template tweak later — which also
+  // calls setConcept — never re-triggers this build-out.
+  useEffect(() => {
+    if (!concept) return;
+    setActivePageId(concept.pages[0]?.id ?? "home");
+    const stages = buildRevealPipeline(concept);
+    const applyStage = (stage: PipelineStage) => {
+      setPipelineLabel(stage.label);
+      if (!stage.reveal) return;
+      if (stage.reveal.heroVisible) setHeroVisible(true);
+      if (stage.reveal.sectionCount !== undefined) setSectionCount(stage.reveal.sectionCount);
+      if (stage.reveal.price) setPriceVisible(true);
+      if (stage.reveal.pageId) {
+        setRevealedPageIds((current) => (current.includes(stage.reveal!.pageId!) ? current : [...current, stage.reveal!.pageId!]));
+      }
+    };
+
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setPreviewRevealIndex(previewRevealStages.length - 1);
+      stages.forEach(applyStage);
+      setIsSettled(true);
       return;
     }
 
-    setPreviewRevealIndex(0);
+    setHeroVisible(false);
+    setSectionCount(0);
+    setPriceVisible(false);
+    setRevealedPageIds([]);
+    setIsSettled(false);
+
+    let index = 0;
+    applyStage(stages[0]);
     const timer = window.setInterval(() => {
-      setPreviewRevealIndex((current) => {
-        if (current >= previewRevealStages.length - 1) {
-          window.clearInterval(timer);
-          return current;
-        }
-        return current + 1;
-      });
-    }, 210);
+      index += 1;
+      if (index >= stages.length) {
+        window.clearInterval(timer);
+        setIsSettled(true);
+        return;
+      }
+      applyStage(stages[index]);
+    }, REVEAL_STAGE_MS);
     return () => window.clearInterval(timer);
-  }, [concept?.pages, hasConcept]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generationId]);
 
   useEffect(() => {
     if (!demoMessage) return;
@@ -461,14 +597,19 @@ export function WebsiteConceptExperience() {
     setInput((current) => ({ ...current, ...value }));
   };
 
+  /** The single place a newly-arrived concept enters state — used by both a real generation and
+   * picking a ready-made example, so both go through the identical build-out reveal instead of
+   * examples just snapping into view inconsistently with a real generation. */
+  const applyNewConcept = (nextConcept: WebsiteConcept, noticeText: string | null) => {
+    setConcept(nextConcept);
+    setNotice(noticeText);
+    setGenerationId((id) => id + 1);
+  };
+
   const generateConcept = async () => {
     if (isGenerating) return;
     setGenerating(true);
     setNotice(null);
-    setStageIndex(0);
-    const stageTimer = window.setInterval(() => {
-      setStageIndex((current) => Math.min(current + 1, generationStages.length - 1));
-    }, 700);
 
     try {
       const response = await fetch("/api/website-concept", {
@@ -483,13 +624,10 @@ export function WebsiteConceptExperience() {
         error?: string;
       };
       if (!response.ok || !data.concept) throw new Error(data.error || "Не удалось собрать концепт.");
-      setConcept(data.concept);
-      setNotice(data.notice ?? null);
+      applyNewConcept(data.concept, data.notice ?? null);
     } catch {
-      setConcept(buildFallbackWebsiteConcept(input));
-      setNotice("Сеть временно недоступна. Показан локальный концепт AEVIX.");
+      applyNewConcept(buildFallbackWebsiteConcept(input), "Сеть временно недоступна. Показан локальный концепт AEVIX.");
     } finally {
-      window.clearInterval(stageTimer);
       setGenerating(false);
     }
   };
@@ -559,103 +697,126 @@ export function WebsiteConceptExperience() {
               : undefined
         }
       >
-        {concept ? (
+        {concept || isGenerating ? (
           <div ref={panelRef} className="flex min-h-0 flex-1 flex-col bg-[#f7f8f9]">
             <div className="concept-topbar" hidden={isPreview}>
               <div className="concept-topbar-identity min-w-0">
-                <button
-                  type="button"
-                  className="concept-hamburger"
-                  aria-label="Открыть панель проекта"
-                  onClick={() => setSidebarOpen(true)}
-                >
-                  <Menu className="h-4.5 w-4.5" />
-                </button>
-                {editingName ? (
-                  <input
-                    autoFocus
-                    defaultValue={concept.businessName}
-                    aria-label="Название бизнеса"
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") saveBusinessName(event.currentTarget.value);
-                      if (event.key === "Escape") setEditingName(false);
-                    }}
-                    onBlur={(event) => saveBusinessName(event.currentTarget.value)}
-                  />
+                {concept ? (
+                  <button
+                    type="button"
+                    className="concept-hamburger"
+                    aria-label="Открыть панель проекта"
+                    onClick={() => setSidebarOpen(true)}
+                  >
+                    <Menu className="h-4.5 w-4.5" />
+                  </button>
+                ) : null}
+                {concept ? (
+                  editingName ? (
+                    <input
+                      autoFocus
+                      defaultValue={concept.businessName}
+                      aria-label="Название бизнеса"
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") saveBusinessName(event.currentTarget.value);
+                        if (event.key === "Escape") setEditingName(false);
+                      }}
+                      onBlur={(event) => saveBusinessName(event.currentTarget.value)}
+                    />
+                  ) : (
+                    <h2 id="website-concept-title">{concept.businessName}</h2>
+                  )
                 ) : (
-                  <h2 id="website-concept-title">{concept.businessName}</h2>
+                  <h2 id="website-concept-title">{input.businessName || "Новый проект"}</h2>
                 )}
               </div>
-              <div className="concept-topbar-controls">
-                <div className="concept-mode-switch" aria-label="Размер preview">
-                  {([
-                    ["desktop", Monitor, "Desktop"],
-                    ["tablet", Tablet, "Tablet"],
-                    ["mobile", Smartphone, "Mobile"],
-                  ] as const).map(([mode, Icon, label]) => (
-                    <button key={mode} type="button" onClick={() => setPreviewMode(mode)} aria-pressed={previewMode === mode} title={label}>
-                      <Icon className="h-4 w-4" /><span>{label}</span>
-                    </button>
-                  ))}
+              {concept ? (
+                <div className="concept-topbar-controls">
+                  <div className="concept-mode-switch" aria-label="Размер preview">
+                    {([
+                      ["desktop", Monitor, "Desktop"],
+                      ["tablet", Tablet, "Tablet"],
+                      ["mobile", Smartphone, "Mobile"],
+                    ] as const).map(([mode, Icon, label]) => (
+                      <button key={mode} type="button" onClick={() => setPreviewMode(mode)} aria-pressed={previewMode === mode} title={label}>
+                        <Icon className="h-4 w-4" /><span>{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className="concept-topbar-refresh"
+                    onClick={() => void generateConcept()}
+                    disabled={isGenerating}
+                    title="Обновить концепт"
+                    aria-label="Обновить концепт"
+                    aria-busy={isGenerating}
+                  >
+                    <RefreshCw className={cn("h-4 w-4", isGenerating && "animate-spin")} />
+                  </button>
+                  <Button type="button" size="sm" className="concept-topbar-preview" onClick={enterPreview} title="Просмотр" disabled={!isSettled}>
+                    <Eye className="mr-2 h-4 w-4" /> <span>Просмотр</span>
+                  </Button>
                 </div>
-                <button
-                  type="button"
-                  className="concept-topbar-refresh"
-                  onClick={() => void generateConcept()}
-                  disabled={isGenerating}
-                  title="Обновить концепт"
-                  aria-label="Обновить концепт"
-                  aria-busy={isGenerating}
-                >
-                  <RefreshCw className={cn("h-4 w-4", isGenerating && "animate-spin")} />
-                </button>
-                <Button type="button" size="sm" className="concept-topbar-preview" onClick={enterPreview} title="Просмотр">
-                  <Eye className="mr-2 h-4 w-4" /> <span>Просмотр</span>
-                </Button>
-              </div>
+              ) : null}
             </div>
             {notice && !isPreview ? <p className="concept-notice">{notice}</p> : null}
             <div className="concept-disclaimer" hidden={isPreview}>
               <Info className="h-4 w-4" />
               <p>Этот сайт является предварительным визуальным макетом, а не готовым продуктом. Здесь показаны дизайн, структура и общий пользовательский опыт. Формы, оплата, запись, интеграции и другие бизнес-функции подключаются на этапе полноценной разработки.</p>
             </div>
-            <div className="concept-reveal-rail" aria-label="Сборка preview" hidden={isPreview}>
-              {previewRevealStages.map((stage, index) => (
-                <span key={stage} className={index <= previewRevealIndex ? "is-complete" : undefined}>
-                  {index < previewRevealIndex ? <Check className="h-3.5 w-3.5" /> : index + 1} {stage}
-                </span>
-              ))}
-            </div>
+            {isBuilding ? (
+              <div className="concept-pipeline-status" aria-live="polite" hidden={isPreview}>
+                <span className="concept-pipeline-dot" />
+                {concept ? pipelineLabel : thinkingLabel}
+              </div>
+            ) : null}
             <div className="concept-workspace-shell">
               {!isPreview ? (
-                <ConceptSidebar
-                  concept={concept}
-                  activePageId={activePageId}
-                  onPageChange={setActivePageId}
-                  onCyclePalette={cyclePalette}
-                  onCycleTemplate={cycleTemplate}
-                  templateLabel={templateLabels[concept.template]}
-                  priceLabel={`от ${formatConceptPrice(estimateConceptPrice(concept).min)}`}
-                  onRename={() => setEditingName(true)}
-                  onEditParams={() => { setConcept(null); setFullscreen(false); setViewMode("edit"); }}
-                  fullscreen={fullscreen}
-                  onToggleFullscreen={() => setFullscreen((current) => !current)}
-                  onContact={contactAevix}
-                  mobileOpen={sidebarOpen}
-                  onMobileClose={() => setSidebarOpen(false)}
-                />
+                concept ? (
+                  <ConceptSidebar
+                    concept={concept}
+                    activePageId={activePageId}
+                    onPageChange={setActivePageId}
+                    onCyclePalette={cyclePalette}
+                    onCycleTemplate={cycleTemplate}
+                    templateLabel={templateLabels[concept.template]}
+                    priceLabel={`от ${formatConceptPrice(estimateConceptPrice(concept).min)}`}
+                    visiblePageIds={isSettled ? null : revealedPageIds}
+                    priceReady={isSettled || priceVisible}
+                    isBuilding={!isSettled}
+                    onRename={() => setEditingName(true)}
+                    onEditParams={() => { setConcept(null); setFullscreen(false); setViewMode("edit"); }}
+                    fullscreen={fullscreen}
+                    onToggleFullscreen={() => setFullscreen((current) => !current)}
+                    onContact={contactAevix}
+                    mobileOpen={sidebarOpen}
+                    onMobileClose={() => setSidebarOpen(false)}
+                  />
+                ) : (
+                  <aside className="concept-sidebar concept-sidebar-skeleton" aria-hidden="true">
+                    <p className="concept-sidebar-label">Страницы</p>
+                    <span className="concept-sidebar-pulse" />
+                  </aside>
+                )
               ) : null}
               <div className="concept-workspace-main">
                 <div className="relative min-h-0 flex-1 overflow-hidden">
-                  <ConceptPreview
-                    concept={concept}
-                    mode={isPreview ? "desktop" : previewMode}
-                    revealIndex={previewRevealIndex}
-                    activePageId={activePageId}
-                    onPageChange={setActivePageId}
-                    onDemoAction={showDemoAction}
-                    isPreview={isPreview}
-                  />
+                  {concept ? (
+                    <ConceptPreview
+                      concept={concept}
+                      mode={isPreview ? "desktop" : previewMode}
+                      heroVisible={isSettled || heroVisible}
+                      sectionCount={isSettled ? concept.pages[0]?.sections.length ?? 0 : sectionCount}
+                      visiblePageIds={isSettled ? null : revealedPageIds}
+                      activePageId={activePageId}
+                      onPageChange={setActivePageId}
+                      onDemoAction={showDemoAction}
+                      isPreview={isPreview}
+                    />
+                  ) : (
+                    <ConceptBuildingFrame mode={previewMode} label={thinkingLabel} />
+                  )}
                   {isPreview ? (
                     <div className={cn("concept-preview-exit", !previewChromeVisible && "is-idle")}>
                       <button type="button" onClick={exitPreview}>
@@ -695,13 +856,16 @@ export function WebsiteConceptExperience() {
                     // businessType so imagery, the service catalogue and the hero eyebrow match
                     // the real niche, even when the wizard type is the generic "Другое".
                     const base = buildFallbackWebsiteConcept(demo.input);
-                    setConcept({
-                      ...base,
-                      businessType: demo.label,
-                      pages: base.pages.map((page, index) =>
-                        index === 0 ? { ...page, hero: { ...page.hero, eyebrow: demo.label } } : page,
-                      ),
-                    });
+                    applyNewConcept(
+                      {
+                        ...base,
+                        businessType: demo.label,
+                        pages: base.pages.map((page, index) =>
+                          index === 0 ? { ...page, hero: { ...page.hero, eyebrow: demo.label } } : page,
+                        ),
+                      },
+                      null,
+                    );
                   }}
                 >
                   <span>{String(index + 1).padStart(2, "0")}</span>
@@ -737,20 +901,7 @@ export function WebsiteConceptExperience() {
             </div>
 
             <div className="concept-wizard-content">
-              {isGenerating ? (
-                <div className="concept-generating" role="status">
-                  <div className="concept-generation-mark"><WandSparkles className="h-7 w-7" /></div>
-                  <p>Создаём концепт</p>
-                  <h3>{generationStages[stageIndex]}</h3>
-                  <div><motion.span animate={{ width: `${((stageIndex + 1) / generationStages.length) * 100}%` }} /></div>
-                  <p className="concept-generating-note">
-                    Это первоначальный макет — для понимания структуры и стиля. Итоговый продукт
-                    будет в разы качественнее и точнее заточен под ваш бизнес.
-                  </p>
-                </div>
-              ) : null}
-
-              {!isGenerating && step === 0 ? (
+              {step === 0 ? (
                 <div className="concept-step-grid">
                   <label className="concept-field concept-field-wide">
                     <span>Название бизнеса</span>
@@ -767,7 +918,7 @@ export function WebsiteConceptExperience() {
                 </div>
               ) : null}
 
-              {!isGenerating && step === 1 ? (
+              {step === 1 ? (
                 <div className="concept-field">
                   <span>Визуальное настроение</span>
                   <div className="concept-choice-grid concept-choice-grid-large">
@@ -780,7 +931,7 @@ export function WebsiteConceptExperience() {
                 </div>
               ) : null}
 
-              {!isGenerating && step === 2 ? (
+              {step === 2 ? (
                 <div className="concept-step-grid">
                   <div className="concept-field concept-field-wide">
                     <span>Готовые палитры</span>
@@ -800,7 +951,7 @@ export function WebsiteConceptExperience() {
                 </div>
               ) : null}
 
-              {!isGenerating && step === 3 ? (
+              {step === 3 ? (
                 <div className="concept-field">
                   <span>Что должен делать сайт</span>
                   <div className="concept-choice-grid concept-choice-grid-large">
@@ -813,7 +964,7 @@ export function WebsiteConceptExperience() {
                 </div>
               ) : null}
 
-              {!isGenerating && step === 4 ? (
+              {step === 4 ? (
                 <div className="concept-step-grid">
                   <div className="concept-field concept-field-wide">
                     <span>Нужные разделы</span>
@@ -833,23 +984,21 @@ export function WebsiteConceptExperience() {
               ) : null}
             </div>
 
-            {!isGenerating ? (
-              <div className="concept-wizard-footer">
-                <Button type="button" variant="glass" disabled={step === 0} onClick={() => setStep((current) => Math.max(current - 1, 0))}>
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Назад
+            <div className="concept-wizard-footer">
+              <Button type="button" variant="glass" disabled={step === 0} onClick={() => setStep((current) => Math.max(current - 1, 0))}>
+                <ArrowLeft className="mr-2 h-4 w-4" /> Назад
+              </Button>
+              <span>{step + 1} / {wizardSteps.length}</span>
+              {step < wizardSteps.length - 1 ? (
+                <Button type="button" disabled={!canContinue} onClick={() => setStep((current) => Math.min(current + 1, wizardSteps.length - 1))}>
+                  Далее <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
-                <span>{step + 1} / {wizardSteps.length}</span>
-                {step < wizardSteps.length - 1 ? (
-                  <Button type="button" disabled={!canContinue} onClick={() => setStep((current) => Math.min(current + 1, wizardSteps.length - 1))}>
-                    Далее <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                ) : (
-                  <Button type="button" disabled={!canContinue} onClick={() => void generateConcept()}>
-                    <Laptop className="mr-2 h-4 w-4" /> Создать preview
-                  </Button>
-                )}
-              </div>
-            ) : null}
+              ) : (
+                <Button type="button" disabled={!canContinue} onClick={() => void generateConcept()}>
+                  <Laptop className="mr-2 h-4 w-4" /> Создать preview
+                </Button>
+              )}
+            </div>
           </div>
         )}
       </PremiumModal>

@@ -1790,26 +1790,26 @@ body::before {
   font-size: 0.8rem;
 }
 
-.concept-generating {
+/* The device-frame placeholder shown before a concept exists at all — same centered layout the
+   old pre-workspace loading screen used, just now living inside the actual device chrome so the
+   transition into real content reads as continuous. */
+.concept-building-frame {
   display: flex;
+  height: 100%;
   min-height: 24rem;
   align-items: center;
   justify-content: center;
   flex-direction: column;
   text-align: center;
+  gap: 1.25rem;
 }
 
-.concept-generating-note {
-  max-width: 26rem;
-  margin-top: 1.4rem;
-  border-radius: 0.9rem;
-  border: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.16);
-  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.06);
-  padding: 0.75rem 1rem;
-  color: rgba(9, 8, 7, 0.62);
-  font-size: 0.82rem;
-  line-height: 1.5;
-  animation: aevix-thinking-label-in 0.4s var(--ease-soft);
+.concept-building-frame p {
+  max-width: 20rem;
+  color: rgba(9, 8, 7, 0.6);
+  font-size: 0.95rem;
+  font-weight: 600;
+  animation: aevix-thinking-label-in 0.34s var(--ease-soft);
 }
 
 .concept-generation-mark {
@@ -1838,48 +1838,6 @@ body::before {
 
 .concept-generation-mark svg {
   animation: concept-mark-spin 5s linear infinite;
-}
-
-.concept-generating > p {
-  margin-top: 1.5rem;
-  color: #7257e8;
-  font-size: 0.75rem;
-  font-weight: 650;
-  text-transform: uppercase;
-}
-
-.concept-generating h3 {
-  margin-top: 0.5rem;
-  font-size: 1.75rem;
-  font-weight: 650;
-  animation: aevix-thinking-label-in 0.36s var(--ease-soft);
-}
-
-.concept-generating > div:last-child {
-  position: relative;
-  width: min(20rem, 80%);
-  height: 3px;
-  overflow: hidden;
-  margin-top: 1.5rem;
-  border-radius: 999px;
-  background: rgba(9, 8, 7, 0.08);
-}
-
-.concept-generating > div:last-child span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #7257e8, #9d8bff);
-  transition: width 0.5s var(--ease-premium);
-}
-
-.concept-generating > div:last-child span::after {
-  position: absolute;
-  inset: 0;
-  content: "";
-  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.5) 50%, transparent 70%);
-  background-size: 200% 100%;
-  animation: aevix-thinking-shimmer 1.6s ease-in-out infinite;
 }
 
 @keyframes concept-mark-breathe {
@@ -1992,6 +1950,26 @@ body::before {
   color: #fff;
 }
 
+.concept-sidebar-item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* A quiet placeholder row for a page not revealed yet — a pulse, not a page name, since there's
+   nothing real to show for it until its own pipeline stage actually completes. */
+.concept-sidebar-item-pending {
+  padding: 0.55rem 0.6rem;
+}
+
+.concept-sidebar-pulse {
+  display: block;
+  height: 0.85rem;
+  width: 60%;
+  border-radius: 0.3rem;
+  background: rgba(17, 20, 24, 0.07);
+  animation: concept-pipeline-pulse 1.4s ease-in-out infinite;
+}
+
 .concept-sidebar-price {
   display: flex;
   flex-direction: column;
@@ -2012,6 +1990,22 @@ body::before {
   font-family: var(--font-manrope), sans-serif;
   font-size: 0.95rem;
   font-variant-numeric: tabular-nums;
+}
+
+.concept-sidebar-price strong.is-pending {
+  color: rgba(9, 8, 7, 0.4);
+  font-weight: 550;
+}
+
+/* The sidebar-shaped placeholder shown before any concept exists — same width/position as the
+   real sidebar so nothing shifts when it's replaced by the genuine one. */
+.concept-sidebar-skeleton {
+  justify-content: flex-start;
+  gap: 0.5rem;
+}
+
+.concept-sidebar-skeleton .concept-sidebar-pulse {
+  width: 80%;
 }
 
 .concept-sidebar-footer {
@@ -4092,32 +4086,34 @@ body::before {
   color: #7257e8;
 }
 
-.concept-reveal-rail {
+/* A single honest status line ("● Собираем услуги…") instead of a fixed checklist — the real
+   pipeline is a different length for every business, so a rail of N boxes would either be wrong
+   or need to be built generically enough to lose meaning. One line, changing as each real stage
+   completes, stays true to whatever pipeline this specific concept actually has. */
+.concept-pipeline-status {
   display: flex;
-  gap: 0.45rem;
-  overflow-x: auto;
-  padding: 0.55rem 1rem;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.6rem 1rem;
   border-bottom: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.76);
+  color: rgba(9, 8, 7, 0.58);
+  font-size: 0.8rem;
+  font-weight: 550;
 }
 
-.concept-reveal-rail span {
-  display: inline-flex;
-  min-width: max-content;
-  align-items: center;
-  gap: 0.35rem;
-  border-radius: 999px;
-  background: #eef0f2;
-  padding: 0.35rem 0.6rem;
-  color: rgba(9, 8, 7, 0.4);
-  font-size: 0.66rem;
-  transition: background 260ms var(--ease-spring), color 260ms var(--ease-premium), transform 260ms var(--ease-spring);
+.concept-pipeline-dot {
+  height: 0.5rem;
+  width: 0.5rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+  animation: concept-pipeline-pulse 1.4s ease-in-out infinite;
 }
 
-.concept-reveal-rail span.is-complete {
-  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.1);
-  color: #5d45cc;
-  transform: scale(1.04);
+@keyframes concept-pipeline-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.8); }
 }
 
 .concept-preview-piece {
@@ -4131,6 +4127,18 @@ body::before {
   opacity: 1;
   transform: translateY(0);
   filter: blur(0);
+}
+
+/* Per-section reveal within the home page, as each pipeline stage genuinely finishes. */
+.concept-section-piece {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 380ms var(--ease-premium), transform 380ms var(--ease-premium);
+}
+
+.concept-section-piece.is-visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .premium-footer {
@@ -4887,7 +4895,7 @@ textarea {
     transform: none !important;
   }
 
-  .concept-reveal-rail {
+  .concept-pipeline-status {
     padding-inline: 0.75rem;
   }
 

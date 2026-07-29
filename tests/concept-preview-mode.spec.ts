@@ -14,7 +14,7 @@ import { test, expect, type Page } from "@playwright/test";
 const CHROME_SELECTORS = [
   ".concept-topbar",
   ".concept-disclaimer",
-  ".concept-reveal-rail",
+  ".concept-pipeline-status",
   ".concept-sidebar",
 ] as const;
 
