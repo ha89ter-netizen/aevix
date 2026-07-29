@@ -35,8 +35,11 @@ import {
   estimateConceptPrice,
   formatConceptPrice,
   generateVisualIdentity,
+  MAX_CONCEPT_COLORS,
+  type ConceptColorId,
   type ConceptGoal,
   type ConceptSectionType,
+  type ConceptStyleId,
   type WebsiteConcept,
   type WebsiteConceptInput,
   type WebsiteConceptSection,
@@ -104,33 +107,31 @@ const initialInput: WebsiteConceptInput = {
   businessType: "Барбершоп",
   businessName: "FORMA",
   styleId: "minimal",
-  colorId: "purple",
+  colorIds: ["purple"],
   customColors: "",
   goals: ["Записывать клиентов", "Вызывать доверие"],
   sections: ["services", "pricing", "about", "gallery", "booking", "contacts"],
   wishes: "",
 };
 
-const demoConcepts: Array<{ label: string; name: string; input: WebsiteConceptInput }> = [
-  ["Барбершоп", "FORMA", "Барбершоп", "minimal", "purple"],
-  ["Салон красоты", "LUMI", "Салон красоты", "elegant", "pink"],
-  ["Кофейня", "ROAST", "Кофейня", "elegant", "beige"],
-  ["Ресторан", "NORTH", "Ресторан", "minimal", "navy"],
-  ["Парфюмерный магазин", "SILLAGE", "Парфюмерный магазин", "luxury", "gold"],
-  ["Строительная компания", "MONOLITH", "Другое", "brutalist", "gray"],
-  ["Стоматология", "DENTA", "Другое", "minimal", "teal"],
-  ["Фитнес-клуб", "PULSE", "Другое", "tech", "orange"],
-].map(([label, name, businessType, styleId, colorId]) => ({
-  label,
-  name,
-  input: {
-    ...initialInput,
-    businessName: name,
-    businessType,
-    styleId,
-    colorId,
-  } as WebsiteConceptInput,
-}));
+const demoConceptSeeds: Array<[string, string, string, ConceptStyleId, ConceptColorId[]]> = [
+  ["Барбершоп", "FORMA", "Барбершоп", "minimal", ["purple"]],
+  ["Салон красоты", "LUMI", "Салон красоты", "elegant", ["pink", "beige"]],
+  ["Кофейня", "ROAST", "Кофейня", "elegant", ["beige", "brown"]],
+  ["Ресторан", "NORTH", "Ресторан", "minimal", ["navy"]],
+  ["Парфюмерный магазин", "SILLAGE", "Парфюмерный магазин", "luxury", ["gold", "burgundy"]],
+  ["Строительная компания", "MONOLITH", "Другое", "brutalist", ["gray", "black"]],
+  ["Стоматология", "DENTA", "Другое", "minimal", ["teal"]],
+  ["Фитнес-клуб", "PULSE", "Другое", "tech", ["orange", "black"]],
+];
+
+const demoConcepts: Array<{ label: string; name: string; input: WebsiteConceptInput }> = demoConceptSeeds.map(
+  ([label, name, businessType, styleId, colorIds]) => ({
+    label,
+    name,
+    input: { ...initialInput, businessName: name, businessType, styleId, colorIds } as WebsiteConceptInput,
+  }),
+);
 
 function toggleKnown<T extends string>(items: T[], item: T) {
   return items.includes(item) ? items.filter((current) => current !== item) : [...items, item];
@@ -304,7 +305,7 @@ function ConceptPreview({
   const stageRef = useRef<HTMLDivElement>(null);
   const imagery = conceptImagesFor(concept.businessType, concept.businessName);
   const services = conceptServicesFor(concept.businessType);
-  const identity = useMemo(() => generateVisualIdentity(concept.colorId, concept.styleId), [concept.colorId, concept.styleId]);
+  const identity = useMemo(() => generateVisualIdentity(concept.colorIds, concept.styleId), [concept.colorIds, concept.styleId]);
   const style = {
     "--concept-bg": identity.palette.background,
     "--concept-surface": identity.palette.surface,
@@ -316,6 +317,7 @@ function ConceptPreview({
     "--concept-accent-hover": identity.palette.accentHover,
     "--concept-accent-active": identity.palette.accentActive,
     "--concept-secondary": identity.palette.secondary,
+    "--concept-focus": identity.palette.focus,
     "--concept-radius": identity.tokens.radius,
     "--concept-radius-sm": identity.tokens.radiusSmall,
     "--concept-border-width": identity.tokens.borderWidth,
@@ -642,11 +644,14 @@ export function WebsiteConceptExperience() {
     }
   };
 
+  // Cycles only the primary color, keeping any secondary/focus colors the user picked in the
+  // wizard — a quick single-click variation rather than discarding their multi-color choice.
   const cycleColor = () => {
     if (!concept) return;
-    const index = conceptColors.findIndex((color) => color.id === concept.colorId);
+    const [primary, ...rest] = concept.colorIds;
+    const index = conceptColors.findIndex((color) => color.id === primary);
     const next = conceptColors[(index + 1) % conceptColors.length];
-    setConcept({ ...concept, colorId: next.id });
+    setConcept({ ...concept, colorIds: [next.id, ...rest] });
   };
 
   const cycleStyle = () => {
@@ -944,14 +949,39 @@ export function WebsiteConceptExperience() {
               {step === 2 ? (
                 <div className="concept-step-grid">
                   <div className="concept-field concept-field-wide">
-                    <span>Основной цвет</span>
+                    <div className="concept-field-header">
+                      <span>Цвета бренда — от 1 до {MAX_CONCEPT_COLORS}, первый выбранный станет основным</span>
+                      <span className="concept-color-count">{input.colorIds.length}/{MAX_CONCEPT_COLORS}</span>
+                    </div>
                     <div className="concept-color-grid">
-                      {conceptColors.map((colorOption) => (
-                        <button key={colorOption.id} type="button" aria-pressed={input.colorId === colorOption.id} onClick={() => updateInput({ colorId: colorOption.id })}>
-                          <i style={{ background: colorOption.swatch }} />
-                          <span>{colorOption.label}</span>
-                        </button>
-                      ))}
+                      {conceptColors.map((colorOption) => {
+                        const position = input.colorIds.indexOf(colorOption.id);
+                        const isSelected = position !== -1;
+                        const atLimit = input.colorIds.length >= MAX_CONCEPT_COLORS;
+                        return (
+                          <button
+                            key={colorOption.id}
+                            type="button"
+                            aria-pressed={isSelected}
+                            disabled={!isSelected && atLimit}
+                            onClick={() =>
+                              updateInput({
+                                colorIds: isSelected
+                                  ? input.colorIds.length > 1
+                                    ? input.colorIds.filter((id) => id !== colorOption.id)
+                                    : input.colorIds
+                                  : [...input.colorIds, colorOption.id],
+                              })
+                            }
+                          >
+                            <span className="concept-color-swatch-wrap">
+                              <i style={{ background: colorOption.swatch }} />
+                              {isSelected ? <em className="concept-color-order">{position + 1}</em> : null}
+                            </span>
+                            <span>{colorOption.label}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                   <label className="concept-field concept-field-wide">

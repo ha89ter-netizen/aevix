@@ -95,11 +95,16 @@ export type ConceptSectionType = (typeof conceptSectionTypes)[number];
 export type ConceptColorId = (typeof conceptColors)[number]["id"];
 export type ConceptStyleId = (typeof conceptStyles)[number]["id"];
 
+export const MAX_CONCEPT_COLORS = 5;
+
 export type WebsiteConceptInput = {
   businessType: ConceptBusinessType;
   businessName: string;
   styleId: ConceptStyleId;
-  colorId: ConceptColorId;
+  /** 1-5 colors, in priority order: [0] is primary, [1] secondary, [2] carries the focus/tertiary
+   * accent, and any beyond that only nudge the blended background/border tint (see
+   * `generateVisualIdentity`) — never assigned to their own dedicated UI element. */
+  colorIds: ConceptColorId[];
   customColors: string;
   goals: ConceptGoal[];
   sections: ConceptSectionType[];
@@ -131,15 +136,15 @@ export type WebsiteConceptPage = {
 export type WebsiteConcept = {
   businessName: string;
   businessType: string;
-  colorId: ConceptColorId;
+  colorIds: ConceptColorId[];
   styleId: ConceptStyleId;
   navigation: Array<{ label: string; pageId: string }>;
   pages: WebsiteConceptPage[];
 };
 
-/** The AI only ever generates content (name/copy/structure) — visual identity (colorId/styleId)
+/** The AI only ever generates content (name/copy/structure) — visual identity (colorIds/styleId)
  * always comes from the wizard's own input, never from the model, so it's attached separately. */
-type WebsiteConceptContent = Omit<WebsiteConcept, "colorId" | "styleId">;
+type WebsiteConceptContent = Omit<WebsiteConcept, "colorIds" | "styleId">;
 
 const PAGE_ID = /^[a-z][a-z0-9-]{1,30}$/;
 const UNSAFE_GENERATED_CONTENT = /<\/?(?:script|style|iframe|object|embed|html|body|svg|form)|javascript:|data:text\/html|```|\b(?:eval|Function)\s*\(|=>|\b(?:import|export)\s+(?:default|from|const|function|class)/i;
@@ -182,17 +187,22 @@ export function validateWebsiteConceptInput(value: unknown): WebsiteConceptInput
   const wishes = cleanOptionalText(candidate.wishes, 700);
   const goals = cleanKnownArray(candidate.goals, conceptGoals, 1, conceptGoals.length);
   const sections = cleanKnownArray(candidate.sections, conceptSectionTypes, 3, conceptSectionTypes.length);
+  const colorIds = cleanKnownArray(
+    candidate.colorIds,
+    conceptColors.map((color) => color.id) as readonly ConceptColorId[],
+    1,
+    MAX_CONCEPT_COLORS,
+  );
 
   if (!isOneOf(candidate.businessType, conceptBusinessTypes)) return null;
   if (!isOneOf(candidate.styleId, conceptStyles.map((style) => style.id))) return null;
-  if (!isOneOf(candidate.colorId, conceptColors.map((color) => color.id))) return null;
-  if (!businessName || customColors === null || wishes === null || !goals || !sections) return null;
+  if (!businessName || customColors === null || wishes === null || !goals || !sections || !colorIds) return null;
 
   return {
     businessType: candidate.businessType,
     businessName,
     styleId: candidate.styleId,
-    colorId: candidate.colorId,
+    colorIds,
     customColors,
     goals,
     sections,
@@ -288,6 +298,7 @@ export type ConceptColorSystem = {
   accentHover: string;
   accentActive: string;
   secondary: string;
+  focus: string;
 };
 
 export type ConceptVisualTokens = {
@@ -354,60 +365,99 @@ function hsl(h: number, s: number, l: number) {
   return `hsl(${Math.round(hue)}deg ${clamp(s, 0, 100).toFixed(0)}% ${clamp(l, 0, 100).toFixed(0)}%)`;
 }
 
+/** Circular mean of hue angles (0-360°) — averaging hues naively would break near the 0/360
+ * wrap-around (e.g. red 358° and red 2° would "average" to a nonsensical 180°/cyan). */
+function circularMeanHue(hues: number[]) {
+  if (!hues.length) return 0;
+  const sumSin = hues.reduce((sum, h) => sum + Math.sin((h * Math.PI) / 180), 0);
+  const sumCos = hues.reduce((sum, h) => sum + Math.cos((h * Math.PI) / 180), 0);
+  if (sumSin === 0 && sumCos === 0) return hues[0];
+  return ((Math.atan2(sumSin, sumCos) * 180) / Math.PI + 360) % 360;
+}
+
+type ConceptColorDef = (typeof conceptColors)[number];
+
+/** Saturation/lightness for a color acting as an accent (vivid, interactive) — white/black/gray
+ * derive from lightness contrast alone since they have no true hue. */
+function accentTone(color: ConceptColorDef, isDark: boolean, saturationBoost: number) {
+  if (color.id === "white") return { sat: 0, light: 14 };
+  if (color.id === "black") return { sat: 0, light: 94 };
+  if (color.id === "gray") return { sat: 6, light: isDark ? 78 : 32 };
+  const sat = clamp(58 + saturationBoost * 100, 30, 92);
+  const light = isDark ? clamp(60 + saturationBoost * 20, 48, 72) : clamp(48 - saturationBoost * 12, 34, 58);
+  return { sat, light };
+}
+
+/** Saturation/lightness for a color acting as a soft supporting tone (secondary/focus) — same
+ * hue as `accentTone`, pulled toward a quieter, more restrained lightness. */
+function softTone(color: ConceptColorDef, isDark: boolean) {
+  if (color.neutral) return hsl(0, 0, isDark ? 30 : 88);
+  const { sat } = accentTone(color, isDark, 0);
+  return hsl(color.hue, clamp(sat - 18, 12, 70), isDark ? 30 : 88);
+}
+
 /**
- * Derives a full color system + structural token set from a primary color and a visual style.
- * Backgrounds and text always sit near opposite ends of the lightness scale (98%/12% in light
- * mode, 8-12%/96% in dark mode), which guarantees strong, accessible contrast regardless of
- * which of the 17 colors × 13 styles the user picked — no manual per-combination tuning needed.
+ * Derives ONE harmonious color system + structural token set from 1-5 selected colors and a
+ * visual style — never a naive one-color-per-element assignment. The first color sets the
+ * light/dark identity and (unless it's neutral with a chromatic color also selected) the main
+ * accent; the next colors become secondary/focus tones; every selected color's hue blends into
+ * the background/surface/border/muted tint via a circular mean, so a 5-color palette reads as
+ * one considered system, not five clashing accents. Backgrounds and text always sit near
+ * opposite ends of the lightness scale (98%/12% light, 8-12%/96% dark), guaranteeing strong,
+ * accessible contrast regardless of which colors × style were picked.
  */
-export function generateVisualIdentity(colorId: ConceptColorId, styleId: ConceptStyleId): ConceptVisualIdentity {
-  const color = conceptColors.find((item) => item.id === colorId) ?? conceptColors[0];
+export function generateVisualIdentity(colorIds: ConceptColorId[], styleId: ConceptStyleId): ConceptVisualIdentity {
+  const resolved = colorIds
+    .map((id) => conceptColors.find((item) => item.id === id))
+    .filter((item): item is ConceptColorDef => Boolean(item))
+    .slice(0, MAX_CONCEPT_COLORS);
+  const colors = resolved.length ? resolved : [conceptColors[0]];
   const def = styleDefinitions[styleId] ?? styleDefinitions.minimal;
-  const isDark = color.mode === "dark";
-  const hue = color.hue;
-  const neutral = color.neutral;
-  const tintSat = neutral ? 0 : clamp(6 + def.tint * 26, 4, 34);
+
+  const primary = colors[0];
+  const isDark = primary.mode === "dark";
+
+  const chromaticHues = colors.filter((color) => !color.neutral).map((color) => color.hue);
+  const allNeutral = chromaticHues.length === 0;
+  const tintHue = allNeutral ? 0 : circularMeanHue(chromaticHues);
+  const neutralRatio = colors.filter((color) => color.neutral).length / colors.length;
+  const tintSat = allNeutral ? 0 : clamp((6 + def.tint * 26) * (1 - neutralRatio * 0.5), 3, 34);
 
   let background: string, surface: string, border: string, muted: string, text: string, textMuted: string;
 
   if (isDark) {
     const bgL = 8 + def.tint * 3;
-    background = hsl(hue, tintSat, bgL);
-    surface = hsl(hue, tintSat, bgL + 4);
-    border = hsl(hue, tintSat * 0.8, bgL + 16);
-    muted = hsl(hue, tintSat * 0.6, bgL + 32);
-    text = hsl(hue, neutral ? 0 : 10, 96);
-    textMuted = hsl(hue, neutral ? 0 : 8, 68);
+    background = hsl(tintHue, tintSat, bgL);
+    surface = hsl(tintHue, tintSat, bgL + 4);
+    border = hsl(tintHue, tintSat * 0.8, bgL + 16);
+    muted = hsl(tintHue, tintSat * 0.6, bgL + 32);
+    text = hsl(tintHue, allNeutral ? 0 : 10, 96);
+    textMuted = hsl(tintHue, allNeutral ? 0 : 8, 68);
   } else {
-    background = hsl(hue, tintSat, 98);
-    surface = hsl(hue, tintSat * 0.5, 100);
-    border = hsl(hue, tintSat, 89);
-    muted = hsl(hue, tintSat, 55);
-    text = hsl(hue, neutral ? 0 : 14, 12);
-    textMuted = hsl(hue, neutral ? 0 : 10, 42);
+    background = hsl(tintHue, tintSat, 98);
+    surface = hsl(tintHue, tintSat * 0.5, 100);
+    border = hsl(tintHue, tintSat, 89);
+    muted = hsl(tintHue, tintSat, 55);
+    text = hsl(tintHue, allNeutral ? 0 : 14, 12);
+    textMuted = hsl(tintHue, allNeutral ? 0 : 10, 42);
   }
 
-  let accentSat: number;
-  let accentLight: number;
+  // Primary drives the accent unless it's neutral and a chromatic color was also picked — then
+  // that chromatic color gets to actually show up as the brand's interactive color.
+  const firstChromatic = colors.find((color) => !color.neutral);
+  const accentColor = primary.neutral && firstChromatic ? firstChromatic : primary;
+  const { sat: accentSat, light: accentLight } = accentTone(accentColor, isDark, def.saturationBoost);
+  const accent = hsl(accentColor.hue, accentSat, accentLight);
+  const accentHover = hsl(accentColor.hue, accentSat, isDark ? accentLight + 7 : accentLight - 7);
+  const accentActive = hsl(accentColor.hue, accentSat, isDark ? accentLight - 6 : accentLight + 6);
 
-  if (color.id === "white") {
-    accentSat = 0;
-    accentLight = 14;
-  } else if (color.id === "black") {
-    accentSat = 0;
-    accentLight = 94;
-  } else if (color.id === "gray") {
-    accentSat = 6;
-    accentLight = isDark ? 78 : 32;
-  } else {
-    accentSat = clamp(58 + def.saturationBoost * 100, 30, 92);
-    accentLight = isDark ? clamp(60 + def.saturationBoost * 20, 48, 72) : clamp(48 - def.saturationBoost * 12, 34, 58);
-  }
-
-  const accent = hsl(hue, accentSat, accentLight);
-  const accentHover = hsl(hue, accentSat, isDark ? accentLight + 7 : accentLight - 7);
-  const accentActive = hsl(hue, accentSat, isDark ? accentLight - 6 : accentLight + 6);
-  const secondary = hsl(hue + 26, clamp(accentSat - 18, 12, 70), isDark ? 30 : 88);
+  // Whatever colors are left (in the order the user picked them) become secondary and focus —
+  // so a 3rd/4th/5th color still visibly earns its own role instead of being averaged away.
+  const remaining = colors.filter((color) => color !== accentColor);
+  const secondaryColor = remaining[0] ?? accentColor;
+  const focusColor = remaining[1] ?? secondaryColor;
+  const secondary = softTone(secondaryColor, isDark);
+  const focus = remaining.length ? softTone(focusColor, isDark) : accent;
 
   const shadowRgb = isDark ? "0,0,0" : "16,16,20";
   const shadowByKeyword: Record<StyleDefinition["shadow"], { sm: string; lg: string }> = {
@@ -424,7 +474,7 @@ export function generateVisualIdentity(colorId: ConceptColorId, styleId: Concept
   const shadows = shadowByKeyword[def.shadow];
 
   return {
-    palette: { background, surface, border, muted, text, textMuted, accent, accentHover, accentActive, secondary },
+    palette: { background, surface, border, muted, text, textMuted, accent, accentHover, accentActive, secondary, focus },
     tokens: {
       radius: `${def.radius}px`,
       radiusSmall: `${def.radiusSmall}px`,
@@ -582,7 +632,7 @@ export function buildFallbackWebsiteConcept(input: WebsiteConceptInput): Website
   return {
     businessName: input.businessName,
     businessType: input.businessType,
-    colorId: input.colorId,
+    colorIds: input.colorIds,
     styleId: input.styleId,
     navigation: pages.map((page) => ({ label: page.name, pageId: page.id })),
     pages,

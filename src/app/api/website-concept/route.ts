@@ -141,7 +141,7 @@ export async function POST(request: Request) {
 
     // Visual identity (color + style) always comes from the wizard's own input, never from the
     // model — this guarantees a consistent, always-valid identity regardless of what the AI did.
-    const concept = { ...content, colorId: input.colorId, styleId: input.styleId };
+    const concept = { ...content, colorIds: input.colorIds, styleId: input.styleId };
 
     const generatedTypes = new Set(concept.pages.flatMap((page) => page.sections.map((section) => section.type)));
     const requiredTypes: ConceptSectionType[] = [

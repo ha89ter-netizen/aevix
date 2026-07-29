@@ -85,6 +85,9 @@ type AiMessage = {
 };
 
 type AnalysisResult = {
+  shortAnswer: string;
+  reasons: string[];
+  recommendedSolution: string;
   summary: string;
   problems: string[];
   recommendations: string[];
@@ -522,6 +525,13 @@ function getFlowNodeDescription(step: string) {
 
 function formatFallbackAnalysis(text: string): AnalysisResult {
   return {
+    shortAnswer: text,
+    reasons: [
+      "Ответ собран локально, без обращения к живому AI, поэтому опирается на общие паттерны малого бизнеса.",
+      "Судя по сообщению, часть обращений сейчас обрабатывается вручную.",
+      "Единая точка приёма заявок обычно снимает основную нагрузку с команды.",
+    ],
+    recommendedSolution: "Начните с AI-консультанта, который примет обращения в привычном канале и передаст команде только то, что действительно требует человека.",
     summary: text,
     problems: ["Повторяющиеся обращения занимают внимание команды."],
     recommendations: ["Собрать входящие заявки в один поток.", "Подключить AI-консультанта.", "Добавить напоминания и CRM-статусы."],
@@ -532,34 +542,41 @@ function formatFallbackAnalysis(text: string): AnalysisResult {
 
 function getQuickPromptFallback(message: string): AnalysisResult {
   const base = {
+    reasons: [
+      "Ответ дан по частому вопросу без обращения к живому AI — временный локальный режим.",
+      "Цены и сроки соответствуют актуальному прайсу AEVIX.",
+      "Точная конфигурация уточняется в переписке или калькуляторе.",
+    ],
+    recommendedSolution: "Опишите свой бизнес одним сообщением — соберём решение и точную цену именно под вашу задачу.",
     problems: ["Вопрос требует короткого разбора текущего процесса."],
     recommendations: ["Зафиксировать задачу и нужные каналы.", "Определить состав первой версии.", "Уточнить интеграции и роли команды."],
     flow: fallbackFlow,
     callToAction: "Обсудить конкретную конфигурацию можно через WhatsApp, Telegram или email.",
   };
+  const withAnswer = (text: string): AnalysisResult => ({ ...base, shortAnswer: text, summary: text });
 
   if (message === "Сколько это стоит?") {
-    return { ...base, summary: "Базовая стоимость начинается от 120 000 ₸ за AI-консультанта. Итоговый диапазон зависит от модулей, филиалов и интеграций; прозрачный расчёт доступен в калькуляторе ниже." };
+    return withAnswer("Базовая стоимость начинается от 120 000 ₸ за AI-консультанта. Итоговый диапазон зависит от модулей, филиалов и интеграций; прозрачный расчёт доступен в калькуляторе ниже.");
   }
   if (message === "Сколько занимает разработка?") {
-    return { ...base, summary: "Срок первой версии определяется после разбора задачи. Он зависит от количества сценариев, каналов и готовности интеграций." };
+    return withAnswer("Срок первой версии определяется после разбора задачи. Он зависит от количества сценариев, каналов и готовности интеграций.");
   }
   if (message === "Можно улучшить существующий сайт?") {
-    return { ...base, summary: "Да. Сначала AEVIX разбирает текущую структуру, путь клиента и технические ограничения, затем предлагает точечное улучшение или новую рабочую версию." };
+    return withAnswer("Да. Сначала AEVIX разбирает текущую структуру, путь клиента и технические ограничения, затем предлагает точечное улучшение или новую рабочую версию.");
   }
   if (message === "Как работает AI?") {
-    return { ...base, summary: "AI получает описание услуг и правил, понимает вопрос клиента, уточняет детали и передаёт результат в запись, CRM или сотруднику." };
+    return withAnswer("AI получает описание услуг и правил, понимает вопрос клиента, уточняет детали и передаёт результат в запись, CRM или сотруднику.");
   }
   if (message === "Покажи автоматизацию") {
-    return { ...base, summary: "Ниже на странице есть живая симуляция: сообщение клиента проходит через AI, расписание, запись, CRM, напоминание и подтверждение." };
+    return withAnswer("Ниже на странице есть живая симуляция: сообщение клиента проходит через AI, расписание, запись, CRM, напоминание и подтверждение.");
   }
   if (message === "Создай концепт сайта") {
-    return { ...base, summary: "Нажмите «Получить концепт сайта» слева: мастер соберёт бизнес-контекст, стиль, палитру и интерактивный preview." };
+    return withAnswer("Нажмите «Получить концепт сайта» слева: мастер соберёт бизнес-контекст, стиль, палитру и интерактивный preview.");
   }
   if (message === "У меня барбершоп") {
-    return { ...base, summary: "Для барбершопа обычно полезны AI-ответы, онлайн-запись, выбор мастера, подтверждения, напоминания и CRM-статусы." };
+    return withAnswer("Для барбершопа обычно полезны AI-ответы, онлайн-запись, выбор мастера, подтверждения, напоминания и CRM-статусы.");
   }
-  return { ...base, summary: "Для нескольких филиалов важно разделить расписания, роли и статусы по точкам, сохранив единый контроль для владельца. В калькуляторе предусмотрены отдельные коэффициенты масштаба." };
+  return withAnswer("Для нескольких филиалов важно разделить расписания, роли и статусы по точкам, сохранив единый контроль для владельца. В калькуляторе предусмотрены отдельные коэффициенты масштаба.");
 }
 
 function formatKzt(value: number) {
@@ -1613,14 +1630,16 @@ function AiConsultantScene() {
       const result = data.result;
       const text =
         data.analysis ||
-        [result?.summary, result?.callToAction].filter(Boolean).join("\n\n");
+        [result?.shortAnswer, result?.summary, result?.callToAction].filter(Boolean).join("\n\n");
       if (!text) throw new Error("AI-консультант не вернул ответ. Попробуйте переформулировать запрос.");
 
       setAnalysis(result ?? formatFallbackAnalysis(text));
-      pushAi("Разобрал ваш бизнес — вывод, что мешает, что поможет и карта решения ниже.");
+      setExpandedNode(0);
+      pushAi("Разобрал ваш бизнес — короткий ответ, причины и ваш процесс ниже.");
     } catch (requestError) {
       if (aiQuickPrompts.some((prompt) => prompt === message)) {
         setAnalysis(getQuickPromptFallback(message));
+        setExpandedNode(0);
         pushAi("OpenAI временно недоступен. Показываю проверенный локальный ответ AEVIX.");
         setError(null);
       } else {
@@ -1840,10 +1859,39 @@ function AiConsultantScene() {
                   </Button>
                 </div>
                 <div className="ai-analysis mt-4 grid gap-5">
-                  <section>
-                    <p className="ai-block-title">Краткий вывод</p>
-                    <p className="mt-2 text-base leading-7 text-ink/74">{analysis.summary}</p>
+                  <section className="ai-short-answer">
+                    <p className="ai-block-title ai-block-title-highlight">💡 Короткий ответ</p>
+                    <p className="mt-2 text-lg font-medium leading-8 text-ink">{analysis.shortAnswer}</p>
                   </section>
+
+                  {analysis.reasons.length ? (
+                    <section>
+                      <p className="ai-block-title">Почему именно так</p>
+                      <ul className="mt-2 grid gap-1.5">
+                        {analysis.reasons.map((item, index) => (
+                          <motion.li
+                            key={item}
+                            initial={{ opacity: 0, x: -8 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1], delay: 0.08 + index * 0.05 }}
+                            className="flex gap-2.5 text-sm leading-6 text-ink/68"
+                          >
+                            <span className="ai-dot" />
+                            {item}
+                          </motion.li>
+                        ))}
+                      </ul>
+                    </section>
+                  ) : null}
+
+                  <section>
+                    <p className="ai-block-title">Рекомендованное решение</p>
+                    <p className="mt-2 text-base leading-7 text-ink/74">{analysis.recommendedSolution}</p>
+                  </section>
+
+                  <p className="ai-report-divider">
+                    <span>Подробный разбор</span>
+                  </p>
 
                   {analysis.problems.length ? (
                     <section>
@@ -1924,24 +1972,42 @@ function AiConsultantScene() {
                   <div className="rounded-[1.5rem] border border-violet/10 bg-gradient-to-br from-white via-[#f8f4ff] to-[#eef1f7] p-4">
                     <div className="mb-4 flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-xs uppercase tracking-[0.22em] text-violet">Карта решения</p>
-                        <p className="mt-1 text-sm text-ink/52">Нажмите на узел, чтобы раскрыть этап.</p>
+                        <p className="text-xs uppercase tracking-[0.22em] text-violet">Ваш процесс</p>
+                        <p className="mt-1 text-sm text-ink/52">Это шаги решения, которое вы только что прочитали. Нажмите на шаг, чтобы раскрыть детали.</p>
                       </div>
                       <SlidersHorizontal className="h-5 w-5 text-violet" />
                     </div>
-                    <div className="aevix-flow-map group/map">
+                    <div className="aevix-flow-map group/map" role="list">
                       {flow.map((step, index) => {
                         const NodeIcon = flowNodeIcons[index % flowNodeIcons.length];
                         const isExpanded = expandedNode === index;
+                        const isFirst = index === 0;
+                        const isLast = index === flow.length - 1;
 
                         return (
-                          <div key={`${step}-${index}`} className="aevix-flow-item">
+                          <div key={`${step}-${index}`} className="aevix-flow-row" role="listitem">
+                            <div className="aevix-flow-rail" aria-hidden="true">
+                              <span className={cn("aevix-flow-marker", isFirst && "is-start", isLast && "is-end")}>
+                                <NodeIcon className="h-4 w-4" />
+                              </span>
+                              {!isLast ? (
+                                <motion.span
+                                  initial={{ scaleY: 0, opacity: 0 }}
+                                  animate={{ scaleY: 1, opacity: 1 }}
+                                  transition={{ delay: index * 0.08, duration: 0.34 }}
+                                  className={cn(
+                                    "aevix-flow-rail-line origin-top",
+                                    expandedNode === index || expandedNode === index + 1 ? "bg-violet/45" : "bg-ink/12",
+                                  )}
+                                />
+                              ) : null}
+                            </div>
                             <motion.button
                               type="button"
                               aria-label={`Раскрыть этап: ${step}`}
                               onClick={() => setExpandedNode((current) => (current === index ? null : index))}
-                              whileHover={{ y: -5, scale: 1.045 }}
-                              whileTap={{ scale: 0.97 }}
+                              whileHover={{ y: -3, scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
                               className={cn(
                                 "aevix-flow-node interactive-surface group/node w-full cursor-pointer rounded-[1.25rem] border bg-white/82 p-3 text-left shadow-[0_18px_42px_rgba(76,63,118,0.11)] transition duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/40",
                                 isExpanded
@@ -1950,27 +2016,15 @@ function AiConsultantScene() {
                                 expandedNode !== null && !isExpanded ? "opacity-62" : "opacity-100",
                               )}
                             >
-                              <span className="flex items-center gap-2">
-                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-violet/10 text-violet transition duration-300 group-hover/node:rotate-3 group-hover/node:scale-110">
-                                  <NodeIcon className="h-4 w-4" />
-                                </span>
+                              <span className="flex items-center justify-between gap-2">
                                 <span className="min-w-0">
-                                  <span className="block text-sm font-semibold leading-5 text-ink">{step}</span>
-                                  <span className="mt-1 block text-xs leading-5 text-ink/44">этап {index + 1}</span>
+                                  <span className="block text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-violet/70">
+                                    {isFirst ? "Точка входа" : isLast ? "Результат" : `Шаг ${index + 1}`}
+                                  </span>
+                                  <span className="mt-0.5 block text-sm font-semibold leading-5 text-ink">{step}</span>
                                 </span>
                               </span>
                             </motion.button>
-                            {index < flow.length - 1 ? (
-                              <motion.div
-                                initial={{ scaleX: 0, opacity: 0 }}
-                                animate={{ scaleX: 1, opacity: 1 }}
-                                transition={{ delay: index * 0.08, duration: 0.34 }}
-                                className={cn(
-                                  "aevix-flow-line origin-left",
-                                  expandedNode === index || expandedNode === index + 1 ? "bg-violet/45" : "bg-ink/12",
-                                )}
-                              />
-                            ) : null}
                           </div>
                         );
                       })}

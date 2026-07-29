@@ -15,6 +15,9 @@ const REQUEST_TIMEOUT_MS = 22_000;
 const requestBuckets = new Map<string, { count: number; resetAt: number }>();
 
 type BusinessAnalysis = {
+  shortAnswer: string;
+  reasons: string[];
+  recommendedSolution: string;
   summary: string;
   problems: string[];
   recommendations: string[];
@@ -40,9 +43,9 @@ type PersonalEstimate = {
   callToAction: string;
 };
 
-const SYSTEM_INSTRUCTIONS = `Ты — AI-консультант digital-студии AEVIX.
+const SYSTEM_INSTRUCTIONS = `Ты — AI-консультант digital-студии AEVIX. Ты ведёшь себя как живой консультант, а не как генератор отчётов.
 
-Твоя задача — анализировать описание малого бизнеса и простыми словами объяснять, какие процессы можно автоматизировать.
+Твоя задача — понять, что именно спрашивает или описывает пользователь, и СНАЧАЛА прямо ответить на это, а уже потом при необходимости развернуть полный разбор.
 
 Целевая аудитория:
 барбершопы, салоны красоты, парфюмерные и другие магазины, кофейни, рестораны и малый бизнес.
@@ -63,16 +66,33 @@ const SYSTEM_INSTRUCTIONS = `Ты — AI-консультант digital-студ
 - для каждой рекомендованной услуги коротко объясни, чем именно она поможет этому бизнесу;
 - если пользователь спрашивает про точную стоимость или расчёт — предложи открыть калькулятор на сайте для персонального расчёта.
 
-Правила ответа:
+Честность важнее продажи:
+- не рекомендуй услугу только потому, что она есть в прайсе;
+- если бизнесу на его текущем этапе что-то не нужно — прямо скажи об этом («CRM вам пока не нужна», «Telegram/WhatsApp достаточно», «сначала стоит наладить приток клиентов, а не автоматизацию» и т.п.);
+- если полноценная автоматизация не даст ощутимого эффекта прямо сейчас — так и скажи, вместо того чтобы предлагать максимум услуг;
+- цель — помочь пользователю принять верное решение, а не продать как можно больше.
+
+Персонализация обязательна:
+- используй конкретные детали, которые указал пользователь (откуда приходят клиенты, сколько сотрудников, какой канал уже используется, объём заявок и т.д.);
+- каждая причина в reasons и каждая рекомендация должны явно опираться на то, что написал пользователь, а не звучать как универсальный совет;
+- если пользователь упомянул конкретный канал (Instagram, WhatsApp и т.д.) — отвечай применительно именно к нему.
+
+Структура ответа (сначала ответ, затем отчёт):
+1. shortAnswer — прямой ответ на вопрос или ситуацию пользователя, 2–5 предложений; если уместно, начни с «Да.» или «Нет.»; должно быть понятно за 5 секунд, без долгих вступлений;
+2. reasons — 3–5 коротких причин, почему сделан именно такой вывод; каждая опирается на слова пользователя;
+3. recommendedSolution — одно ясно сформулированное рекомендованное решение (не список), объясняющее следующий практический шаг;
+4. summary — короткое описание ситуации бизнеса (1–2 предложения, не повторяй дословно shortAnswer);
+5. problems — 1–4 пункта: что мешает бизнесу сейчас;
+6. recommendations — 3–6 пунктов с конкретными решениями (у релевантных услуг указывай цену «от N ₸»); если в shortAnswer/recommendedSolution уже сказано, что услуга не нужна — не включай её сюда;
+7. flow — короткая карта процесса (4–7 шагов), отражающая именно этот бизнес, а не общий пример;
+8. callToAction — мягкое предложение обсудить проект через WhatsApp, Telegram или email.
+
+Общие правила:
 - отвечай только на русском;
 - не используй сложный технический жаргон;
 - не выдумывай статистику, клиентов, гарантии и результаты;
 - не обещай конкретный рост прибыли;
-- сначала кратко опиши проблему бизнеса;
-- затем предложи 3–6 подходящих решений (в поле recommendations), у релевантных услуг называй цену «от N ₸»;
-- объясни понятный практический эффект;
-- в конце предложи обсудить проект через WhatsApp, Telegram или email;
-- ответ должен быть полезным и занимать примерно 120–250 слов;
+- весь ответ должен быть полезным, а не рекламным текстом;
 - верни только JSON по схеме, без markdown и без пояснений вне JSON.`;
 
 const QUICK_SYSTEM_INSTRUCTIONS = `Ты — AI-консультант digital-студии AEVIX.
@@ -83,7 +103,8 @@ const QUICK_SYSTEM_INSTRUCTIONS = `Ты — AI-консультант digital-с
 
 Правила:
 - на первый проект действует скидка 10%. Если вопрос про цену, стоимость или скидки — обязательно назови её;
-- если передан контекст бизнеса (businessContext) — отвечай применительно именно к нему, не переспрашивай нишу заново;
+- если передан контекст бизнеса (businessContext) — отвечай применительно именно к нему, используй его детали, а не общие фразы, и не переспрашивай нишу заново;
+- если честный ответ — «не нужно» или «пока рано» — так и скажи, не предлагай услугу только потому, что она есть в прайсе;
 - если для точного ответа нужен расчёт — коротко предложи открыть калькулятор или получить бесплатную консультацию;
 - цену называй как «от N ₸», не выдумывай гарантии, сроки, статистику и результаты;
 - отвечай только на русском;
@@ -105,8 +126,23 @@ const ESTIMATE_SYSTEM_INSTRUCTIONS = `Ты — AI-консультант digital
 const BUSINESS_ANALYSIS_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["summary", "problems", "recommendations", "flow", "callToAction"],
+  required: ["shortAnswer", "reasons", "recommendedSolution", "summary", "problems", "recommendations", "flow", "callToAction"],
   properties: {
+    shortAnswer: {
+      type: "string",
+      description: "Прямой ответ на вопрос/ситуацию пользователя, 2-5 предложений. Должен быть понятен за 5 секунд.",
+    },
+    reasons: {
+      type: "array",
+      minItems: 3,
+      maxItems: 5,
+      items: { type: "string" },
+      description: "Короткие причины вывода, каждая опирается на то, что написал пользователь.",
+    },
+    recommendedSolution: {
+      type: "string",
+      description: "Одно ясно сформулированное рекомендованное решение — следующий практический шаг.",
+    },
     summary: {
       type: "string",
       description: "Краткое описание проблемы бизнеса простыми словами.",
@@ -232,17 +268,24 @@ function validateAnalysis(value: unknown): BusinessAnalysis | null {
 
   const candidate = value as Partial<BusinessAnalysis>;
 
+  if (typeof candidate.shortAnswer !== "string" || !candidate.shortAnswer.trim()) return null;
+  if (!isStringArray(candidate.reasons, 3, 5)) return null;
+  if (typeof candidate.recommendedSolution !== "string" || !candidate.recommendedSolution.trim()) return null;
   if (typeof candidate.summary !== "string" || !candidate.summary.trim()) return null;
   if (!isStringArray(candidate.problems, 1, 4)) return null;
   if (!isStringArray(candidate.recommendations, 3, 6)) return null;
   if (!isStringArray(candidate.flow, 4, 7)) return null;
   if (typeof candidate.callToAction !== "string" || !candidate.callToAction.trim()) return null;
 
+  const reasons = candidate.reasons as string[];
   const problems = candidate.problems as string[];
   const recommendations = candidate.recommendations as string[];
   const flow = candidate.flow as string[];
 
   return {
+    shortAnswer: candidate.shortAnswer.trim(),
+    reasons: reasons.map((item) => item.trim()),
+    recommendedSolution: candidate.recommendedSolution.trim(),
     summary: candidate.summary.trim(),
     problems: problems.map((item) => item.trim()),
     recommendations: recommendations.map((item) => item.trim()),
@@ -299,7 +342,8 @@ function validateEstimate(value: unknown): PersonalEstimate | null {
 
 function toReadableAnalysis(analysis: BusinessAnalysis) {
   return [
-    analysis.summary,
+    analysis.shortAnswer,
+    analysis.recommendedSolution,
     `Что можно улучшить: ${analysis.problems.join("; ")}.`,
     `Подходящие решения: ${analysis.recommendations.join("; ")}.`,
     analysis.callToAction,
@@ -502,7 +546,7 @@ export async function POST(request: Request) {
         model: "gpt-4.1-mini",
         instructions: SYSTEM_INSTRUCTIONS,
         input: trimmedMessage,
-        max_output_tokens: 900,
+        max_output_tokens: 1150,
         text: {
           format: {
             type: "json_schema",
