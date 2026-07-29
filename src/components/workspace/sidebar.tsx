@@ -2,22 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FolderPlus, X } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useCreateAndOpenProject } from "./use-create-project";
-import { primaryNavItems, secondaryNavItems } from "./nav-config";
+import { primaryNavItems } from "./nav-config";
 
 export function WorkspaceSidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => void }) {
   const pathname = usePathname();
-  const createAndOpen = useCreateAndOpenProject();
 
-  const isActive = (href: string) =>
-    href === "/app" ? pathname === "/app" : pathname === href || pathname.startsWith(`${href}/`);
-
-  const startNewProject = () => {
-    onClose();
-    createAndOpen({ name: "Новый проект", businessType: "", businessDescription: "" });
-  };
+  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <>
@@ -28,7 +20,7 @@ export function WorkspaceSidebar({ mobileOpen, onClose }: { mobileOpen: boolean;
       />
       <aside className={cn("workspace-sidebar", mobileOpen && "is-open")} aria-label="Навигация Workspace">
         <div className="workspace-sidebar-head">
-          <Link href="/app" className="workspace-brand" aria-label="AEVIX, дашборд">
+          <Link href="/app" className="workspace-brand" aria-label="AEVIX, дашборд" onClick={onClose}>
             <span className="workspace-brand-mark">AX</span>
             <span className="workspace-brand-name">AEVIX</span>
           </Link>
@@ -36,11 +28,6 @@ export function WorkspaceSidebar({ mobileOpen, onClose }: { mobileOpen: boolean;
             <X className="h-4 w-4" />
           </button>
         </div>
-
-        <button type="button" className="workspace-new-project" onClick={startNewProject}>
-          <FolderPlus className="h-[18px] w-[18px]" />
-          <span>Новый проект</span>
-        </button>
 
         <nav className="workspace-nav" aria-label="Основные разделы">
           {primaryNavItems.map((item) => {
@@ -64,27 +51,8 @@ export function WorkspaceSidebar({ mobileOpen, onClose }: { mobileOpen: boolean;
 
         <div className="workspace-nav-spacer" />
 
-        <nav className="workspace-nav workspace-nav-secondary" aria-label="Настройки и аккаунт">
-          {secondaryNavItems.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn("workspace-nav-item", active && "is-active")}
-                aria-current={active ? "page" : undefined}
-                title={item.label}
-                onClick={onClose}
-              >
-                <Icon className="h-[18px] w-[18px]" />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
-
-        <Link href="/" className="workspace-sidebar-exit">
+        <Link href="/" className="workspace-sidebar-exit" onClick={onClose}>
+          <ArrowLeft className="h-4 w-4" />
           На сайт AEVIX
         </Link>
       </aside>

@@ -1,4 +1,5 @@
 import type { Project } from "./projects";
+import { conceptColors, conceptStyles, type ConceptColorId, type ConceptStyleId } from "./website-concept";
 
 /**
  * The only place that touches localStorage for projects. Everything else goes through
@@ -17,25 +18,45 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+const knownStyleIds = new Set<string>(conceptStyles.map((style) => style.id));
+const knownColorIds = new Set<string>(conceptColors.map((color) => color.id));
+
 /**
- * Deliberately shallow: id/name/timestamps/favorite are checked strictly (a corrupt project
- * without these can't render safely), while analysis/design/pricing are only checked for
- * "null or object" — they're written exclusively by our own app (AI responses already validated
- * server-side, concepts already validated by website-concept.ts), so a full re-validation of
- * every nested field here would just duplicate that work for no real safety gain.
+ * Normalizing instead of strictly validating: id/name/timestamps are required (a project without
+ * them can't render safely), everything else falls back to a sane default. That way projects
+ * saved by an OLDER version of the app (before city/style/color preferences existed) load intact
+ * instead of being dropped — the "no data loss after refresh" rule extends across app updates.
+ * Nested analysis/design/pricing are only checked for "null or object" — they're written
+ * exclusively by our own app and already validated at their source.
  */
-function isPlausibleProject(value: unknown): value is Project {
-  if (!isRecord(value)) return false;
-  if (typeof value.id !== "string" || !value.id) return false;
-  if (typeof value.name !== "string") return false;
-  if (typeof value.businessType !== "string") return false;
-  if (typeof value.businessDescription !== "string") return false;
-  if (typeof value.favorite !== "boolean") return false;
-  if (typeof value.createdAt !== "number" || typeof value.updatedAt !== "number") return false;
-  if (value.analysis !== null && !isRecord(value.analysis)) return false;
-  if (value.design !== null && !isRecord(value.design)) return false;
-  if (value.pricing !== null && !isRecord(value.pricing)) return false;
-  return true;
+function normalizeProject(value: unknown): Project | null {
+  if (!isRecord(value)) return null;
+  if (typeof value.id !== "string" || !value.id) return null;
+  if (typeof value.name !== "string" || !value.name) return null;
+  if (typeof value.createdAt !== "number" || typeof value.updatedAt !== "number") return null;
+
+  const preferredStyleId =
+    typeof value.preferredStyleId === "string" && knownStyleIds.has(value.preferredStyleId)
+      ? (value.preferredStyleId as ConceptStyleId)
+      : null;
+  const preferredColorIds = Array.isArray(value.preferredColorIds)
+    ? (value.preferredColorIds.filter((id): id is ConceptColorId => typeof id === "string" && knownColorIds.has(id)))
+    : [];
+
+  return {
+    id: value.id,
+    name: value.name,
+    businessType: typeof value.businessType === "string" ? value.businessType : "",
+    businessDescription: typeof value.businessDescription === "string" ? value.businessDescription : "",
+    city: typeof value.city === "string" ? value.city : "",
+    preferredStyleId,
+    preferredColorIds,
+    createdAt: value.createdAt,
+    updatedAt: value.updatedAt,
+    analysis: isRecord(value.analysis) ? (value.analysis as Project["analysis"]) : null,
+    design: isRecord(value.design) ? (value.design as Project["design"]) : null,
+    pricing: isRecord(value.pricing) ? (value.pricing as Project["pricing"]) : null,
+  };
 }
 
 function parseEnvelope(raw: string): Project[] {
@@ -51,7 +72,7 @@ function parseEnvelope(raw: string): Project[] {
   // like corrupt data (dropped) rather than risk shape mismatches from a future format.
   if (parsed.version !== STORAGE_VERSION) return [];
 
-  return parsed.projects.filter(isPlausibleProject);
+  return parsed.projects.map(normalizeProject).filter((project): project is Project => project !== null);
 }
 
 export const projectRepository = {

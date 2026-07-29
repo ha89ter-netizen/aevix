@@ -8,6 +8,9 @@ import { test, expect, type Page, type Route } from "@playwright/test";
 
 const STORAGE_KEY = "aevix.projects";
 
+// Deliberately in the LEGACY stored shape (has `favorite`, lacks city/preferred* fields) — the
+// repository must normalize old data instead of dropping it, so seeding legacy projects doubles
+// as a migration test.
 function seededProject(overrides: Record<string, unknown> = {}) {
   const now = Date.now();
   return {
@@ -57,8 +60,27 @@ async function mockAnalysis(page: Page) {
   });
 }
 
+/**
+ * Creates a project through the real /app/new form and returns its URL. The controlled name
+ * input can swallow a .fill() that lands before hydration settles (React resets the DOM value
+ * on its first render) — the submit button enables only once React state actually has the name,
+ * so retry the fill until that happens.
+ */
+async function createProjectViaForm(page: Page, name: string) {
+  await page.goto("/app/new");
+  const field = page.getByPlaceholder("Например: Барбершоп FORMA");
+  const submit = page.getByRole("button", { name: "Создать проект" });
+  await expect(async () => {
+    await field.fill(name);
+    await expect(submit).toBeEnabled({ timeout: 500 });
+  }).toPass({ timeout: 15_000 });
+  await submit.click();
+  await page.waitForURL(/\/app\/projects\/.+/);
+  return page.url();
+}
+
 test.describe("project persistence", () => {
-  test("a seeded project survives a reload", async ({ page }) => {
+  test("a seeded legacy project survives a reload", async ({ page }) => {
     await seedStorage(page, [seededProject()]);
     await page.goto("/app/projects/seed-project");
     await expect(page.locator(".workspace-project-name")).toHaveText("Seed Project");
@@ -67,7 +89,7 @@ test.describe("project persistence", () => {
     await expect(page.locator(".workspace-project-name")).toHaveText("Seed Project");
   });
 
-  test("corrupted storage falls back to an empty state instead of crashing", async ({ page }) => {
+  test("corrupted storage falls back to the empty state instead of crashing", async ({ page }) => {
     await page.addInitScript(
       ([key]) => window.localStorage.setItem(key as string, "{not valid json"),
       [STORAGE_KEY],
@@ -97,52 +119,73 @@ test.describe("project persistence", () => {
   });
 });
 
-test.describe("project creation", () => {
-  test("New Project creates and opens a project with a renamable default name", async ({ page }) => {
+test.describe("navigation surface", () => {
+  test("/app redirects to the projects list and the sidebar has exactly the three real items", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop", "sidebar labels are a desktop-width check");
     await page.goto("/app");
-    await page.locator(".workspace-topbar").getByRole("button", { name: "Новый проект" }).click();
-    await page.waitForURL(/\/app\/projects\/.+/);
-    await expect(page.locator(".workspace-project-name")).toHaveText("Новый проект");
+    await page.waitForURL("**/app/projects");
 
-    await page.locator(".workspace-project-name").click();
-    await page.locator(".workspace-project-name-input").fill("Барбершоп на Абая");
-    await page.locator(".workspace-project-name-input").blur();
-    await expect(page.locator(".workspace-project-name")).toHaveText("Барбершоп на Абая");
+    const sidebar = page.locator(".workspace-sidebar");
+    await expect(sidebar.getByRole("link", { name: "Проекты" })).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "Создать проект" })).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "На сайт AEVIX" })).toBeVisible();
+    // Nothing else: brand + 2 nav items + exit = 4 links total.
+    await expect(sidebar.locator("a")).toHaveCount(4);
   });
 
-  test("creating from the current business does not duplicate on repeat visits", async ({ page }) => {
-    await mockAnalysis(page);
-    await page.goto("/");
-    const field = page.locator("#hero-business-input");
+  test("the projects page shows the local-storage notice", async ({ page }) => {
+    await page.goto("/app/projects");
+    await expect(page.getByText("Проекты пока хранятся только на этом устройстве.")).toBeVisible();
+  });
+});
+
+test.describe("project creation", () => {
+  test("the Create Project form creates, saves and opens the project", async ({ page }) => {
+    await page.goto("/app/new");
+    const field = page.getByPlaceholder("Например: Барбершоп FORMA");
     await expect(async () => {
-      await field.fill("·");
-      await expect(field).toHaveValue("·", { timeout: 400 });
-    }).toPass({ timeout: 8000 });
-    await field.fill("У меня барбершоп на 3 мастера, запись вручную");
-    await field.press("Enter");
-    await expect(page.locator(".hero-result")).toBeVisible();
+      await field.fill("Барбершоп на Абая");
+      await expect(page.getByRole("button", { name: "Создать проект" })).toBeEnabled({ timeout: 500 });
+    }).toPass({ timeout: 15_000 });
+    await page.getByRole("button", { name: "Барбершоп", exact: true }).click();
+    await page.getByPlaceholder("Например: Алматы").fill("Алматы");
+    await page.getByRole("button", { name: "Минимализм", exact: true }).click();
+    await page.getByRole("button", { name: "Чёрный", exact: true }).click();
+    await page.getByRole("button", { name: "Золотой", exact: true }).click();
+    await page.getByRole("button", { name: "Создать проект" }).click();
 
-    await page.getByRole("link", { name: "Workspace" }).first().click();
-    await page.waitForURL("**/app");
-    await page.getByRole("button", { name: /Создать проект/ }).click();
     await page.waitForURL(/\/app\/projects\/.+/);
+    await expect(page.locator(".workspace-project-name")).toHaveText("Барбершоп на Абая");
+    await expect(page.locator(".workspace-page-desc").first()).toContainText("Барбершоп · Алматы");
 
-    // Back on the Dashboard, the same business must not offer to create a second project.
-    await page.goto("/app");
-    await expect(page.getByRole("button", { name: /Создать проект/ })).toHaveCount(0);
+    // Visible on the dashboard with the collected fields, via a FULL page load (not client-side
+    // navigation) — proves the project was persisted, not just held in memory. Retried because
+    // the form's router.push can still be settling when this goto starts.
+    await expect(async () => {
+      await page.goto("/app/projects");
+    }).toPass({ timeout: 15_000 });
+    const card = page.locator(".workspace-project-card");
+    await expect(card).toHaveCount(1);
+    await expect(card.locator(".workspace-project-card-name")).toHaveText("Барбершоп на Абая");
+    await expect(card.locator(".workspace-project-card-type")).toContainText("Барбершоп · Алматы");
+    await expect(card.locator(".workspace-status-badge")).toHaveText("Новый");
+  });
+
+  test("submit is disabled until a business name is entered", async ({ page }) => {
+    await page.goto("/app/new");
+    const submit = page.getByRole("button", { name: "Создать проект" });
+    await expect(submit).toBeDisabled();
+    await expect(async () => {
+      await page.getByPlaceholder("Например: Барбершоп FORMA").fill("X");
+      await expect(submit).toBeEnabled({ timeout: 500 });
+    }).toPass({ timeout: 15_000 });
   });
 });
 
 test.describe("saving module state into a project", () => {
   test("an AI Consultant result is saved and shown on Overview without regenerating", async ({ page }) => {
-    // Created through the UI (not seeded via addInitScript) — addInitScript re-applies its seed
-    // on every navigation in the page, which would silently wipe out whatever gets saved before
-    // the test's second `page.goto`. A UI-created project has no such re-seeding involved.
     await mockAnalysis(page);
-    await page.goto("/app");
-    await page.locator(".workspace-topbar").getByRole("button", { name: "Новый проект" }).click();
-    await page.waitForURL(/\/app\/projects\/.+/);
-    const projectUrl = page.url();
+    const projectUrl = await createProjectViaForm(page, "AI Test Project");
 
     await page.goto(`${projectUrl}/ai-consultant`);
 
@@ -192,12 +235,7 @@ test.describe("saving module state into a project", () => {
   });
 
   test("pricing selections and calculated result persist across a reload", async ({ page }) => {
-    // Created through the UI, not seeded via addInitScript — see the note on the AI Consultant
-    // test above for why (addInitScript re-seeds on every navigation, wiping saved state).
-    await page.goto("/app");
-    await page.locator(".workspace-topbar").getByRole("button", { name: "Новый проект" }).click();
-    await page.waitForURL(/\/app\/projects\/.+/);
-    const projectUrl = page.url();
+    const projectUrl = await createProjectViaForm(page, "Pricing Test Project");
 
     await page.goto(`${projectUrl}/pricing`);
     await page.getByRole("button", { name: "Открыть калькулятор" }).click();
@@ -214,7 +252,25 @@ test.describe("saving module state into a project", () => {
   });
 });
 
-test.describe("project actions", () => {
+test.describe("project card actions", () => {
+  test("renaming through the three-dot menu updates immediately", async ({ page }) => {
+    // Created through the UI, not seeded — addInitScript re-applies its seed on every reload,
+    // which would silently undo the rename before the persistence assertion below.
+    await createProjectViaForm(page, "Old Name");
+    await page.goto("/app/projects");
+
+    await page.getByRole("button", { name: /Действия с проектом/ }).click();
+    await page.getByRole("menuitem", { name: "Переименовать" }).click();
+    const input = page.getByLabel("Новое название проекта");
+    await input.fill("New Name");
+    await input.press("Enter");
+
+    await expect(page.locator(".workspace-project-card-name")).toHaveText("New Name");
+
+    await page.reload();
+    await expect(page.locator(".workspace-project-card-name")).toHaveText("New Name");
+  });
+
   test("duplicating a project preserves nested data under a new id", async ({ page }) => {
     await seedStorage(page, [
       seededProject({
@@ -224,29 +280,44 @@ test.describe("project actions", () => {
       }),
     ]);
     await page.goto("/app/projects");
-    await expect(page.locator(".workspace-project-row")).toHaveCount(1);
+    await expect(page.locator(".workspace-project-card")).toHaveCount(1);
 
-    await page.locator('.workspace-project-row button[title="Дублировать"]').click();
-    await expect(page.locator(".workspace-project-row")).toHaveCount(2);
+    await page.getByRole("button", { name: /Действия с проектом/ }).click();
+    await page.getByRole("menuitem", { name: "Дублировать" }).click();
+    await expect(page.locator(".workspace-project-card")).toHaveCount(2);
     await expect(page.getByText("Dup Source (копия)")).toBeVisible();
 
     // The duplicate carries the nested analysis over.
-    await page.getByText("Dup Source (копия)").click();
+    await page
+      .locator(".workspace-project-card", { hasText: "Dup Source (копия)" })
+      .getByRole("link", { name: "Открыть" })
+      .click();
     await expect(page.getByText("Да.")).toBeVisible();
   });
 
   test("delete requires confirmation and removes the project", async ({ page }) => {
-    await seedStorage(page, [seededProject({ id: "to-delete", name: "To Delete" })]);
+    // Created through the UI, not seeded — addInitScript would re-seed the deleted project on
+    // reload and break the "stays gone after refresh" assertion.
+    await createProjectViaForm(page, "To Delete");
     await page.goto("/app/projects");
-    await expect(page.locator(".workspace-project-row")).toHaveCount(1);
+    await expect(page.locator(".workspace-project-card")).toHaveCount(1);
 
-    page.once("dialog", (dialog) => dialog.dismiss());
-    await page.locator('.workspace-project-row button[title="Удалить"]').click();
-    await expect(page.locator(".workspace-project-row")).toHaveCount(1); // dismissed — still there
+    await page.getByRole("button", { name: /Действия с проектом/ }).click();
+    await page.getByRole("menuitem", { name: "Удалить" }).click();
+    await expect(page.getByRole("alertdialog")).toBeVisible();
 
-    page.once("dialog", (dialog) => dialog.accept());
-    await page.locator('.workspace-project-row button[title="Удалить"]').click();
-    await expect(page.locator(".workspace-project-row")).toHaveCount(0);
+    // Cancel keeps the project.
+    await page.getByRole("button", { name: "Отмена" }).click();
+    await expect(page.locator(".workspace-project-card")).toHaveCount(1);
+
+    // Confirm removes it — and it stays gone after a reload.
+    await page.getByRole("button", { name: /Действия с проектом/ }).click();
+    await page.getByRole("menuitem", { name: "Удалить" }).click();
+    await page.getByRole("button", { name: "Удалить проект" }).click();
+    await expect(page.locator(".workspace-project-card")).toHaveCount(0);
+    await page.reload();
+    await expect(page.locator(".workspace-project-card")).toHaveCount(0);
+    await expect(page.locator(".workspace-empty-title")).toBeVisible();
   });
 });
 

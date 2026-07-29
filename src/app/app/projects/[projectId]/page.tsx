@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Bot, Check, Palette, Pencil, Wallet, Workflow } from "lucide-react";
-import { generateVisualIdentity } from "@/lib/website-concept";
+import { conceptStyles, generateVisualIdentity } from "@/lib/website-concept";
 import { useProjects, getProjectProgress } from "@/lib/projects";
 import { useCurrentProject } from "@/components/workspace/use-current-project";
 import { projectHref } from "@/components/workspace/project-nav";
@@ -18,6 +18,7 @@ export default function ProjectOverviewPage() {
 
   const progress = getProjectProgress(project);
   const identity = project.design ? generateVisualIdentity(project.design.colorIds, project.design.styleId) : null;
+  const preferredStyle = conceptStyles.find((item) => item.id === project.preferredStyleId) ?? null;
 
   const nextAction = !progress.hasAnalysis
     ? { label: "Запустить AI-анализ", href: projectHref(projectId, "ai-consultant") }
@@ -52,7 +53,9 @@ export default function ProjectOverviewPage() {
             </button>
           )}
           <p className="workspace-page-desc">
-            {project.businessType} · обновлён {formatProjectDate(project.updatedAt)}
+            {[project.businessType, project.city, `обновлён ${formatProjectDate(project.updatedAt)}`]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
         </div>
       </div>
@@ -99,6 +102,11 @@ export default function ProjectOverviewPage() {
                 <i style={{ background: identity.palette.background, borderColor: identity.palette.border }} />
               </span>
             </>
+          ) : project.preferredColorIds.length || preferredStyle ? (
+            <span className="workspace-card-desc">
+              Пожелания сохранены{preferredStyle ? ` — стиль «${preferredStyle.label}»` : ""}. Осталось собрать
+              концепцию.
+            </span>
           ) : (
             <span className="workspace-card-desc">Фирменные цвета не выбраны.</span>
           )}

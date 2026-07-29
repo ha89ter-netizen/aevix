@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AnalysisResult, EstimateForm, EstimateResult } from "@/components/site-experience";
-import type { WebsiteConcept } from "@/lib/website-concept";
+import type { ConceptColorId, ConceptStyleId, WebsiteConcept } from "@/lib/website-concept";
 import { projectRepository } from "./project-repository";
 
 /**
@@ -21,12 +21,16 @@ export type ProjectPricing = {
 export type Project = {
   id: string;
   name: string;
-  /** Free text — may come from the Design Studio wizard's ConceptBusinessType or from the
-   * Hero's detected business label, so it's a plain string rather than either union type. */
+  /** Free text — may come from the Create Project form's category or from the Hero's detected
+   * business label, so it's a plain string rather than either union type. */
   businessType: string;
-  /** The original free-text description that seeded this project (from BusinessProvider). */
+  /** The original free-text description that seeded this project. */
   businessDescription: string;
-  favorite: boolean;
+  city: string;
+  /** Style/color preferences captured at creation time. The Design Studio's concept carries its
+   * own final selection — these are the starting wishes, kept so they're never silently lost. */
+  preferredStyleId: ConceptStyleId | null;
+  preferredColorIds: ConceptColorId[];
   createdAt: number;
   updatedAt: number;
   analysis: AnalysisResult | null;
@@ -38,6 +42,9 @@ export type CreateProjectInput = {
   name: string;
   businessType: string;
   businessDescription: string;
+  city?: string;
+  preferredStyleId?: ConceptStyleId | null;
+  preferredColorIds?: ConceptColorId[];
 };
 
 /**
@@ -70,19 +77,32 @@ export function getProjectProgress(project: Project): ProjectProgress {
   };
 }
 
+export type ProjectStatus = {
+  id: "new" | "in-progress" | "complete";
+  label: string;
+};
+
+/** Derived, like progress: a stored status string could go stale, this one can't. */
+export function getProjectStatus(project: Project): ProjectStatus {
+  const progress = getProjectProgress(project);
+  if (progress.completedCount === 0) return { id: "new", label: "Новый" };
+  if (progress.completedCount < progress.totalCount) return { id: "in-progress", label: "В работе" };
+  return { id: "complete", label: "Готов" };
+}
+
+/** "saving" flashes briefly on every change, then settles on "saved" — the topbar indicator. */
+export type SaveState = "idle" | "saving" | "saved";
+
 type ProjectsContextValue = {
   projects: Project[];
-  /** Most recently touched first — what "Recent" filters/sorts by, no separate storage needed. */
-  recent: Project[];
-  favorites: Project[];
   /** False until the initial localStorage read completes — lets a consumer distinguish "still
-   * loading" from "genuinely no projects" if that distinction ever matters. */
+   * loading" from "genuinely no projects" (the empty state waits for this). */
   isLoaded: boolean;
+  saveState: SaveState;
   create: (input: CreateProjectInput) => Project;
   rename: (id: string, name: string) => void;
   duplicate: (id: string) => Project | null;
   remove: (id: string) => void;
-  toggleFavorite: (id: string) => void;
   getProject: (id: string) => Project | null;
   saveAnalysis: (id: string, analysis: AnalysisResult) => void;
   saveDesign: (id: string, design: WebsiteConcept) => void;
@@ -113,6 +133,7 @@ function touch<T extends { updatedAt: number }>(project: T): T {
 export function ProjectsProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
 
   useEffect(() => {
     setProjects(projectRepository.load());
@@ -120,20 +141,26 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Skip the very first run (before the load above has happened) so it can't stomp real stored
-  // data with the initial empty array.
+  // data with the initial empty array. The write itself is synchronous; the short "saving"
+  // window exists so the indicator visibly reacts to every change.
   useEffect(() => {
     if (!isLoaded) return;
+    setSaveState("saving");
     projectRepository.save(projects);
+    const timer = setTimeout(() => setSaveState("saved"), 350);
+    return () => clearTimeout(timer);
   }, [projects, isLoaded]);
 
   const create = useCallback((input: CreateProjectInput) => {
     const now = Date.now();
     const project: Project = {
       id: createId(),
-      name: input.name,
+      name: input.name.trim() || "Новый проект",
       businessType: input.businessType,
       businessDescription: input.businessDescription,
-      favorite: false,
+      city: input.city ?? "",
+      preferredStyleId: input.preferredStyleId ?? null,
+      preferredColorIds: input.preferredColorIds ?? [],
       createdAt: now,
       updatedAt: now,
       analysis: null,
@@ -155,7 +182,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
       const source = projects.find((project) => project.id === id);
       if (!source) return null;
       const now = Date.now();
-      const copy: Project = { ...source, id: createId(), name: `${source.name} (копия)`, favorite: false, createdAt: now, updatedAt: now };
+      const copy: Project = { ...source, id: createId(), name: `${source.name} (копия)`, createdAt: now, updatedAt: now };
       setProjects((current) => [copy, ...current]);
       return copy;
     },
@@ -164,12 +191,6 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
 
   const remove = useCallback((id: string) => {
     setProjects((current) => current.filter((project) => project.id !== id));
-  }, []);
-
-  const toggleFavorite = useCallback((id: string) => {
-    setProjects((current) =>
-      current.map((project) => (project.id === id ? touch({ ...project, favorite: !project.favorite }) : project)),
-    );
   }, []);
 
   const getProject = useCallback((id: string) => projects.find((project) => project.id === id) ?? null, [projects]);
@@ -186,24 +207,22 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
     setProjects((current) => current.map((project) => (project.id === id ? touch({ ...project, pricing }) : project)));
   }, []);
 
-  const value = useMemo<ProjectsContextValue>(() => {
-    const byRecency = [...projects].sort((a, b) => b.updatedAt - a.updatedAt);
-    return {
+  const value = useMemo<ProjectsContextValue>(
+    () => ({
       projects,
-      recent: byRecency.slice(0, 5),
-      favorites: projects.filter((project) => project.favorite),
       isLoaded,
+      saveState,
       create,
       rename,
       duplicate,
       remove,
-      toggleFavorite,
       getProject,
       saveAnalysis,
       saveDesign,
       savePricing,
-    };
-  }, [projects, isLoaded, create, rename, duplicate, remove, toggleFavorite, getProject, saveAnalysis, saveDesign, savePricing]);
+    }),
+    [projects, isLoaded, saveState, create, rename, duplicate, remove, getProject, saveAnalysis, saveDesign, savePricing],
+  );
 
   return <ProjectsContext.Provider value={value}>{children}</ProjectsContext.Provider>;
 }

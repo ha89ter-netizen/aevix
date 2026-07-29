@@ -2,19 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, FolderPlus, Menu, Search, Settings, UserCircle } from "lucide-react";
-import { useBusiness } from "@/lib/business-context";
+import { Check, CloudOff, FolderPlus, Loader2, Menu } from "lucide-react";
+import { useProjects } from "@/lib/projects";
 import { useCurrentProject } from "./use-current-project";
-import { useCreateAndOpenProject } from "./use-create-project";
 import { projectSectionLabel } from "./project-nav";
 import { workspacePageTitle } from "./nav-config";
 
 export function WorkspaceTopbar({ onOpenSidebar }: { onOpenSidebar: () => void }) {
   const pathname = usePathname();
-  const { status, profile } = useBusiness();
+  const { saveState } = useProjects();
   const { project, projectId } = useCurrentProject();
-  const createAndOpen = useCreateAndOpenProject();
-  const personalized = status === "ready" && profile;
 
   const title = project && projectId ? project.name : workspacePageTitle(pathname);
   const sectionLabel = project && projectId ? projectSectionLabel(projectId, pathname) : null;
@@ -32,36 +29,32 @@ export function WorkspaceTopbar({ onOpenSidebar }: { onOpenSidebar: () => void }
         </button>
         <h1 className="workspace-topbar-title">{title}</h1>
         {sectionLabel ? <span className="workspace-topbar-section">{sectionLabel}</span> : null}
-        {!project && personalized ? (
-          <Link href="/app" className="workspace-topbar-business" title="Текущий бизнес-контекст">
-            {profile.label}
-          </Link>
-        ) : null}
-      </div>
-
-      <div className="workspace-topbar-search">
-        <Search className="h-4 w-4" />
-        <input type="search" placeholder="Поиск по проектам и разделам" aria-label="Поиск" disabled />
       </div>
 
       <div className="workspace-topbar-right">
-        <button
-          type="button"
-          className="workspace-topbar-action"
-          aria-label="Новый проект"
-          onClick={() => createAndOpen({ name: "Новый проект", businessType: "", businessDescription: "" })}
-        >
+        {saveState !== "idle" ? (
+          <span
+            className="workspace-save-indicator"
+            title="Проекты пока хранятся только на этом устройстве."
+            role="status"
+          >
+            {saveState === "saving" ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <span>Сохранение…</span>
+              </>
+            ) : (
+              <>
+                <Check className="h-3.5 w-3.5" />
+                <span>Сохранено</span>
+                <CloudOff className="h-3.5 w-3.5 opacity-50" aria-hidden="true" />
+              </>
+            )}
+          </span>
+        ) : null}
+        <Link href="/app/new" className="workspace-topbar-action" aria-label="Создать проект">
           <FolderPlus className="h-4 w-4" />
-          <span>Новый проект</span>
-        </button>
-        <button type="button" className="workspace-icon-button" title="Уведомлений пока нет" aria-label="Уведомления">
-          <Bell className="h-[18px] w-[18px]" />
-        </button>
-        <Link href="/app/settings" className="workspace-icon-button" title="Настройки" aria-label="Настройки">
-          <Settings className="h-[18px] w-[18px]" />
-        </Link>
-        <Link href="/app/account" className="workspace-icon-button workspace-avatar" title="Аккаунт" aria-label="Аккаунт">
-          <UserCircle className="h-5 w-5" />
+          <span>Создать проект</span>
         </Link>
       </div>
     </header>

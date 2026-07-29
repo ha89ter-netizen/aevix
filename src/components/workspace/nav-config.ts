@@ -1,4 +1,4 @@
-import { FolderKanban, LayoutDashboard, Settings, UserCircle, type LucideIcon } from "lucide-react";
+import { FolderKanban, FolderPlus, type LucideIcon } from "lucide-react";
 import type { Route } from "next";
 
 export type WorkspaceNavItem = {
@@ -8,23 +8,17 @@ export type WorkspaceNavItem = {
 };
 
 /**
- * The global Workspace sidebar only points at places OUTSIDE any project — the AI Consultant,
- * Design Studio and Pricing calculator are no longer separate disconnected destinations here;
- * they live inside each project's own sub-navigation (see project-nav.ts) so a saved analysis,
- * design and price all stay attached to the business they belong to.
+ * The whole global sidebar. Deliberately tiny: only destinations that fully work exist here —
+ * anything not implemented yet (account, settings, notifications, …) simply isn't in the UI.
  */
 export const primaryNavItems: WorkspaceNavItem[] = [
-  { href: "/app", label: "Дашборд", icon: LayoutDashboard },
   { href: "/app/projects", label: "Проекты", icon: FolderKanban },
-  { href: "/app/settings", label: "Настройки", icon: Settings },
+  { href: "/app/new", label: "Создать проект", icon: FolderPlus },
 ];
 
-export const secondaryNavItems: WorkspaceNavItem[] = [{ href: "/app/account", label: "Аккаунт", icon: UserCircle }];
-
 export function workspacePageTitle(pathname: string): string {
-  const all = [...primaryNavItems, ...secondaryNavItems];
-  const exact = all.find((item) => item.href === pathname);
+  const exact = primaryNavItems.find((item) => item.href === pathname);
   if (exact) return exact.label;
-  const byPrefix = all.find((item) => item.href !== "/app" && pathname.startsWith(item.href));
-  return byPrefix?.label ?? "Workspace";
+  const byPrefix = primaryNavItems.find((item) => pathname.startsWith(`${item.href}/`));
+  return byPrefix?.label ?? "Проекты";
 }
