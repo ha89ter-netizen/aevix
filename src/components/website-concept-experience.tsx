@@ -24,18 +24,20 @@ import { PremiumModal } from "@/components/ui/premium-modal";
 import { ConceptSidebar } from "@/components/concept-sidebar";
 import { cn } from "@/lib/utils";
 import { conceptImagesFor, type ConceptImagery } from "@/lib/concept-images";
-import { conceptServicesFor, type ConceptServiceCatalog } from "@/lib/concept-services";
+import { businessKnowledgeFor, type BusinessKnowledge } from "@/lib/business-knowledge";
 import {
   buildFallbackWebsiteConcept,
   conceptBusinessTypes,
   conceptColors,
   conceptGoals,
+  conceptLayouts,
   conceptSectionOptions,
   conceptStyles,
   estimateConceptPrice,
   formatConceptPrice,
   generateVisualIdentity,
   MAX_CONCEPT_COLORS,
+  resolveConceptLayout,
   type ConceptColorId,
   type ConceptGoal,
   type ConceptSectionType,
@@ -110,7 +112,7 @@ const initialInput: WebsiteConceptInput = {
   colorIds: ["purple"],
   customColors: "",
   goals: ["Записывать клиентов", "Вызывать доверие"],
-  sections: ["services", "pricing", "about", "gallery", "booking", "contacts"],
+  sections: ["services", "pricing", "about", "gallery", "reviews", "booking", "contacts", "faq"],
   wishes: "",
 };
 
@@ -120,6 +122,9 @@ const demoConceptSeeds: Array<[string, string, string, ConceptStyleId, ConceptCo
   ["Кофейня", "ROAST", "Кофейня", "elegant", ["beige", "brown"]],
   ["Ресторан", "NORTH", "Ресторан", "minimal", ["navy"]],
   ["Парфюмерный магазин", "SILLAGE", "Парфюмерный магазин", "luxury", ["gold", "burgundy"]],
+  ["Отель", "AURA", "Другое", "luxury", ["navy", "gold"]],
+  ["Цветочная студия", "FLORA", "Другое", "soft", ["pink", "green"]],
+  ["Агентство недвижимости", "ATLAS", "Другое", "premium", ["blue", "gray"]],
   ["Строительная компания", "MONOLITH", "Другое", "brutalist", ["gray", "black"]],
   ["Стоматология", "DENTA", "Другое", "minimal", ["teal"]],
   ["Фитнес-клуб", "PULSE", "Другое", "tech", ["orange", "black"]],
@@ -137,40 +142,111 @@ function toggleKnown<T extends string>(items: T[], item: T) {
   return items.includes(item) ? items.filter((current) => current !== item) : [...items, item];
 }
 
+/** Rough RU→EN transliteration for deriving demo handles (@forma, hello@forma.kz) from any
+ * business name, Cyrillic included. Not linguistic fidelity — just a readable ASCII slug. */
+const TRANSLIT: Record<string, string> = {
+  а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh", з: "z", и: "i", й: "i",
+  к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f",
+  х: "h", ц: "ts", ч: "ch", ш: "sh", щ: "sch", ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya",
+  қ: "q", ғ: "g", ң: "n", ү: "u", ұ: "u", һ: "h", ө: "o", ә: "a", і: "i",
+};
+
+function businessSlug(name: string): string {
+  const slug = name
+    .toLowerCase()
+    .split("")
+    .map((char) => TRANSLIT[char] ?? char)
+    .join("")
+    .replace(/[^a-z0-9]/g, "");
+  return slug.slice(0, 20) || "brand";
+}
+
+function DemoChip({ label = "Демо-данные" }: { label?: string }) {
+  return <span className="concept-demo-chip">{label}</span>;
+}
+
+function ConceptStars({ count }: { count: number }) {
+  return (
+    <span className="concept-review-stars" aria-label={`${count} из 5`}>
+      {Array.from({ length: 5 }, (_, index) => (
+        <i key={index} className={cn(index < count && "is-filled")}>
+          ★
+        </i>
+      ))}
+    </span>
+  );
+}
+
 function ConceptSection({
   section,
+  isHomePage,
   onDemoAction,
   imagery,
-  services,
+  knowledge,
+  businessName,
 }: {
   section: WebsiteConceptSection;
+  isHomePage: boolean;
   onDemoAction: () => void;
   imagery: ConceptImagery;
-  services: ConceptServiceCatalog;
+  knowledge: BusinessKnowledge;
+  businessName: string;
 }) {
   if (section.type === "pricing") {
+    // The catalogue: products for product businesses (menu/rooms/каталог), the full service
+    // price list otherwise. The FULL list lives only here — home never repeats it.
+    const offers = knowledge.products.length ? knowledge.products : knowledge.services;
     return (
       <section className="concept-section concept-list-section">
         <div className="concept-section-heading">
-          <p>Услуги и цены</p>
+          <p>
+            {knowledge.products.length ? knowledge.productsPageName ?? "Каталог" : "Услуги и цены"} <DemoChip label="Демо-цены" />
+          </p>
           <h3>{section.title}</h3>
+          {section.text ? <span>{section.text}</span> : null}
         </div>
         <div className="concept-pricelist">
-          {services.items.map((service) => (
-            <div key={service.name} className="concept-pricelist-row">
-              <strong>{service.name}</strong>
+          {offers.map((offer) => (
+            <div key={offer.name} className="concept-pricelist-row">
+              <strong>{offer.name}</strong>
               <span className="concept-pricelist-dots" aria-hidden="true" />
-              <span className="concept-pricelist-price">{service.price}</span>
+              <span className="concept-pricelist-price">{offer.price}</span>
             </div>
           ))}
         </div>
-        <p className="concept-pricelist-note">{services.note}</p>
+        <p className="concept-pricelist-note">Средние демонстрационные цены — при наполнении сайта их заменят ваши.</p>
+      </section>
+    );
+  }
+
+  if (section.type === "services") {
+    // Home shows a 3-card teaser; inner pages show up to 6 — the exhaustive list with prices
+    // is the pricing section's job, so these cards never duplicate it.
+    const limit = isHomePage ? 3 : 6;
+    const cards = knowledge.services.slice(0, limit);
+    return (
+      <section className="concept-section concept-list-section">
+        <div className="concept-section-heading">
+          <p>{knowledge.servicesTitle}</p>
+          <h3>{section.title}</h3>
+          {section.text ? <span>{section.text}</span> : null}
+        </div>
+        <div className="concept-list-grid">
+          {cards.map((card, index) => (
+            <article key={card.name}>
+              <small>{String(index + 1).padStart(2, "0")}</small>
+              <strong>{card.name}</strong>
+              <span>{card.price}</span>
+            </article>
+          ))}
+        </div>
       </section>
     );
   }
 
   if (section.type === "gallery") {
-    const labels = section.items.length ? section.items : ["Пространство", "Детали", "Результат"];
+    const labels = section.items.length ? section.items : ["Пространство", "Процесс", "Детали", "Результат", "Команда", "Настроение"];
+    const frames = imagery.gallery.slice(0, Math.max(3, Math.min(6, imagery.gallery.length)));
     return (
       <section className="concept-section concept-gallery">
         <div className="concept-section-heading">
@@ -178,16 +254,16 @@ function ConceptSection({
           <h3>{section.title}</h3>
         </div>
         <div className="concept-gallery-grid">
-          {[0, 1, 2].map((index) => (
+          {frames.map((src, index) => (
             <div
-              key={index}
-              className={`concept-gallery-frame concept-gallery-frame-${index + 1}`}
+              key={src}
+              className={`concept-gallery-frame concept-gallery-frame-${(index % 6) + 1}`}
               style={{ background: imagery.gradient }}
             >
               {/* Decorative external mock imagery with a gradient fallback — plain img by design. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="concept-photo" src={imagery.gallery[index]} alt="" loading="lazy" />
-              <span>{labels[index] ?? labels[0]}</span>
+              <img className="concept-photo" src={src} alt="" loading="lazy" />
+              <span>{labels[index % labels.length]}</span>
             </div>
           ))}
         </div>
@@ -195,62 +271,176 @@ function ConceptSection({
     );
   }
 
-  if (section.type === "booking" || section.type === "contacts") {
+  if (section.type === "booking") {
     return (
       <section className="concept-section concept-action-section">
-        <p>{section.type === "booking" ? "Следующий шаг" : "Контакты"}</p>
+        <p>Следующий шаг</p>
         <h3>{section.title}</h3>
         <span>{section.text}</span>
-        {section.type === "booking" ? (
-          <div className="concept-mock-form" aria-label="Демонстрационная форма записи">
-            <span>Услуга</span><span>Дата и время</span><span>Имя и контакт</span>
-          </div>
-        ) : (
-          <div className="concept-contact-details">
-            <span>Часы работы: по расписанию</span>
-            <span>Адрес будет указан здесь</span>
-            <div aria-label="Место для карты">Карта и маршрут</div>
-          </div>
-        )}
-        <button type="button" onClick={onDemoAction}>{section.type === "booking" ? "Выбрать время" : "Связаться"}</button>
+        <div className="concept-mock-form" aria-label="Демонстрационная форма записи">
+          <span>Услуга</span><span>Дата и время</span><span>Имя и контакт</span>
+        </div>
+        <button type="button" onClick={onDemoAction}>{knowledge.ctas.final}</button>
       </section>
     );
   }
 
-  if (section.type === "about") {
+  if (section.type === "contacts") {
+    const slug = businessSlug(businessName);
     return (
-      <section className="concept-section concept-about">
-        <p>О бренде</p>
-        <h3>{section.title}</h3>
-        <div>
-          <span>{section.text}</span>
-          <ul>
-            {section.items.slice(0, 3).map((item) => <li key={item}>{item}</li>)}
-          </ul>
+      <section className="concept-section concept-contacts">
+        <div className="concept-section-heading">
+          <p>
+            Контакты <DemoChip />
+          </p>
+          <h3>{section.title}</h3>
+          {section.text ? <span>{section.text}</span> : null}
+        </div>
+        <div className="concept-contacts-grid">
+          <div className="concept-contacts-info">
+            <div className="concept-hours" aria-label="Часы работы (демо)">
+              {knowledge.contact.hours.map(([days, time]) => (
+                <div key={days} className="concept-hours-row">
+                  <span>{days}</span>
+                  <strong>{time}</strong>
+                </div>
+              ))}
+            </div>
+            <address>
+              <strong>{knowledge.contact.address}</strong>
+              <span>{knowledge.contact.phone}</span>
+              <span>hello@{slug}.kz</span>
+              <span>@{slug}</span>
+            </address>
+            <div className="concept-contact-buttons">
+              <button type="button" onClick={onDemoAction}>{knowledge.contact.messenger}</button>
+              <button type="button" onClick={onDemoAction}>Позвонить</button>
+              <button type="button" onClick={onDemoAction}>Instagram</button>
+            </div>
+          </div>
+          <button type="button" className="concept-map" onClick={onDemoAction} aria-label="Демонстрационная карта">
+            <span className="concept-map-grid" aria-hidden="true" />
+            <span className="concept-map-pin" aria-hidden="true" />
+            <span className="concept-map-caption">{knowledge.contact.address}</span>
+          </button>
         </div>
       </section>
     );
   }
 
-  const cards =
-    section.type === "services"
-      ? services.items.slice(0, 6).map((service) => ({ title: service.name, sub: service.price }))
-      : section.items.slice(0, 4).map((item) => ({ title: item, sub: "Понятный формат без лишних шагов" }));
+  if (section.type === "about") {
+    const about = knowledge.about;
+    const whyUs = section.items.length ? section.items : about.whyUs;
+    return (
+      <section className="concept-section concept-about-page">
+        <div className="concept-section-heading">
+          <p>О нас</p>
+          <h3>{section.title}</h3>
+        </div>
+        <div className="concept-about-story">
+          {about.story.map((paragraph) => (
+            <p key={paragraph.slice(0, 24)}>{paragraph}</p>
+          ))}
+        </div>
+        <blockquote className="concept-about-mission">{about.mission}</blockquote>
+        <div className="concept-about-media">
+          {imagery.about.map((src, index) => (
+            <figure key={src} className="concept-about-photo" style={{ background: imagery.gradient }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="concept-photo" src={src} alt="" loading="lazy" />
+              {index === 0 ? <figcaption>{about.atmosphere}</figcaption> : null}
+            </figure>
+          ))}
+        </div>
+        <div className="concept-about-values">
+          {about.values.map((value) => (
+            <article key={value.title}>
+              <strong>{value.title}</strong>
+              <span>{value.text}</span>
+            </article>
+          ))}
+        </div>
+        <div className="concept-about-columns">
+          <div className="concept-about-team" aria-label="Команда (демо)">
+            <p>
+              Команда <DemoChip label="Демо" />
+            </p>
+            {about.team.map((member) => (
+              <div key={member.role} className="concept-about-member">
+                <span aria-hidden="true">{member.name.slice(0, 1)}</span>
+                <div>
+                  <strong>{member.name}</strong>
+                  <small>{member.role}</small>
+                </div>
+              </div>
+            ))}
+          </div>
+          <ul className="concept-about-why">
+            {whyUs.slice(0, 4).map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+        <div className="concept-about-cta">
+          <strong>{about.mission}</strong>
+          <button type="button" onClick={onDemoAction}>{knowledge.ctas.final}</button>
+        </div>
+      </section>
+    );
+  }
 
+  if (section.type === "reviews") {
+    const { rating, count, entries } = knowledge.reviews;
+    return (
+      <section className="concept-section concept-reviews">
+        <div className="concept-section-heading">
+          <p>
+            Доверие <DemoChip label="Демонстрационные отзывы" />
+          </p>
+          <h3>{section.title}</h3>
+          {section.text ? <span>{section.text}</span> : null}
+        </div>
+        <div className="concept-reviews-summary">
+          <strong>{rating}</strong>
+          <div>
+            <ConceptStars count={5} />
+            <span>на основе {count} отзывов</span>
+          </div>
+        </div>
+        <div className="concept-reviews-grid">
+          {entries.map((review) => (
+            <article key={review.name + review.when} className="concept-review-card">
+              <header>
+                <span className="concept-review-avatar" aria-hidden="true">{review.name.slice(0, 1)}</span>
+                <div>
+                  <strong>{review.name}</strong>
+                  <small>{review.when}</small>
+                </div>
+                <ConceptStars count={review.stars} />
+              </header>
+              <p>{review.text}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  // faq
+  const entries = knowledge.faq;
   return (
-    <section className="concept-section concept-list-section">
+    <section className="concept-section concept-faq">
       <div className="concept-section-heading">
-        <p>{section.type === "reviews" ? "Доверие" : section.type === "faq" ? "Вопросы" : "Предложение"}</p>
+        <p>Вопросы</p>
         <h3>{section.title}</h3>
         {section.text ? <span>{section.text}</span> : null}
       </div>
-      <div className="concept-list-grid">
-        {cards.map((card, index) => (
-          <article key={card.title}>
-            <small>{String(index + 1).padStart(2, "0")}</small>
-            <strong>{card.title}</strong>
-            <span>{card.sub}</span>
-          </article>
+      <div className="concept-faq-list">
+        {entries.map((entry, index) => (
+          <details key={entry.q} className="concept-faq-item" open={index === 0}>
+            <summary>{entry.q}</summary>
+            <p>{entry.a}</p>
+          </details>
         ))}
       </div>
     </section>
@@ -304,7 +494,8 @@ function ConceptPreview({
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const imagery = conceptImagesFor(concept.businessType, concept.businessName);
-  const services = conceptServicesFor(concept.businessType);
+  const knowledge = businessKnowledgeFor(concept.businessType, concept.businessName);
+  const layout = resolveConceptLayout(concept);
   const identity = useMemo(() => generateVisualIdentity(concept.colorIds, concept.styleId), [concept.colorIds, concept.styleId]);
   const style = {
     "--concept-bg": identity.palette.background,
@@ -332,6 +523,9 @@ function ConceptPreview({
   const activePage = concept.pages.find((page) => page.id === activePageId) ?? concept.pages[0];
   const pageIndex = concept.pages.findIndex((page) => page.id === activePage.id);
   const nextPage = concept.pages[Math.min(pageIndex + 1, concept.pages.length - 1)];
+  // Every page opens on its own hero photo — the home hero never repeats on inner pages.
+  const heroSrc =
+    pageIndex <= 0 ? imagery.hero : imagery.pageHeroes[(pageIndex - 1) % imagery.pageHeroes.length] ?? imagery.hero;
   const isHomePage = activePage.id === concept.pages[0]?.id;
   const visibleNav = visiblePageIds
     ? concept.navigation.filter((item) => visiblePageIds.includes(item.pageId))
@@ -363,7 +557,7 @@ function ConceptPreview({
         className={cn("concept-device", `concept-device-${mode}`)}
         transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
       >
-        <div className="concept-site" style={style}>
+        <div className="concept-site" data-layout={layout} style={style}>
           <div className="concept-atmosphere" aria-hidden="true">
             <span className="concept-orb concept-orb-1" />
             <span className="concept-orb concept-orb-2" />
@@ -404,7 +598,7 @@ function ConceptPreview({
               <div className="concept-hero-visual" style={{ background: imagery.gradient }}>
                 {/* Decorative external mock imagery with a gradient fallback — plain img by design. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="concept-photo concept-hero-photo" src={imagery.hero} alt="" loading="lazy" />
+                <img key={heroSrc} className="concept-photo concept-hero-photo" src={heroSrc} alt="" loading="lazy" />
                 <div className="concept-hero-visual-caption">
                   <span>{concept.businessType}</span>
                   <strong>{concept.businessName}</strong>
@@ -418,7 +612,14 @@ function ConceptPreview({
                 const visible = !isHomePage || index < sectionCount;
                 return (
                   <div key={`${section.type}-${index}`} className={cn("concept-section-piece", visible && "is-visible")}>
-                    <ConceptSection section={section} onDemoAction={onDemoAction} imagery={imagery} services={services} />
+                    <ConceptSection
+                      section={section}
+                      isHomePage={isHomePage}
+                      onDemoAction={onDemoAction}
+                      imagery={imagery}
+                      knowledge={knowledge}
+                      businessName={concept.businessName}
+                    />
                   </div>
                 );
               })}
@@ -678,6 +879,14 @@ export function WebsiteConceptExperience({
     setConcept({ ...concept, styleId: next.id });
   };
 
+  const cycleLayout = () => {
+    if (!concept) return;
+    const current = resolveConceptLayout(concept);
+    const index = conceptLayouts.findIndex((layout) => layout.id === current);
+    const next = conceptLayouts[(index + 1) % conceptLayouts.length];
+    setConcept({ ...concept, layoutId: next.id });
+  };
+
   const saveBusinessName = (name: string) => {
     const cleaned = name.trim().slice(0, 80);
     if (!cleaned || !concept) return;
@@ -812,7 +1021,9 @@ export function WebsiteConceptExperience({
                     onPageChange={setActivePageId}
                     onCycleColor={cycleColor}
                     onCycleStyle={cycleStyle}
+                    onCycleLayout={cycleLayout}
                     styleLabel={conceptStyles.find((style) => style.id === concept.styleId)?.label ?? ""}
+                    layoutLabel={conceptLayouts.find((layout) => layout.id === resolveConceptLayout(concept))?.label ?? ""}
                     priceLabel={`от ${formatConceptPrice(estimateConceptPrice(concept).min)}`}
                     visiblePageIds={isSettled ? null : revealedPageIds}
                     priceReady={isSettled || priceVisible}
@@ -884,20 +1095,15 @@ export function WebsiteConceptExperience({
                   onClick={() => {
                     setInput(demo.input);
                     setPreviewMode("desktop");
-                    // Carry the descriptive label (e.g. "Стоматология") as the concept's
-                    // businessType so imagery, the service catalogue and the hero eyebrow match
-                    // the real niche, even when the wizard type is the generic "Другое".
-                    const base = buildFallbackWebsiteConcept(demo.input);
-                    applyNewConcept(
-                      {
-                        ...base,
-                        businessType: demo.label,
-                        pages: base.pages.map((page, index) =>
-                          index === 0 ? { ...page, hero: { ...page.hero, eyebrow: demo.label } } : page,
-                        ),
-                      },
-                      null,
-                    );
+                    // Generate with the descriptive label (e.g. "Стоматология") as the business
+                    // type, so the knowledge layer, imagery and page structure all match the
+                    // real niche even when the wizard type is the generic "Другое". The label is
+                    // free text at the concept level, so the cast is safe here.
+                    const base = buildFallbackWebsiteConcept({
+                      ...demo.input,
+                      businessType: demo.label as WebsiteConceptInput["businessType"],
+                    });
+                    applyNewConcept(base, null);
                   }}
                 >
                   <span>{String(index + 1).padStart(2, "0")}</span>

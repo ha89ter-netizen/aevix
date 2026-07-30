@@ -1,3 +1,5 @@
+import { businessKnowledgeFor } from "./business-knowledge";
+
 export const conceptBusinessTypes = [
   "Барбершоп",
   "Салон красоты",
@@ -89,11 +91,24 @@ export const conceptStyles = [
   { id: "bold", label: "Дерзкий" },
 ] as const;
 
+/**
+ * Layout variants — composition, not color. Each one changes the hero structure, navigation
+ * placement, gallery rhythm, card shapes and CTA placement (see the `data-layout` rules in
+ * globals.css), so two concepts in the same niche can be built on genuinely different
+ * templates instead of one universal template with different colors.
+ */
+export const conceptLayouts = [
+  { id: "classic", label: "Классический" },
+  { id: "editorial", label: "Журнальный" },
+  { id: "showcase", label: "Витрина" },
+] as const;
+
 export type ConceptBusinessType = (typeof conceptBusinessTypes)[number];
 export type ConceptGoal = (typeof conceptGoals)[number];
 export type ConceptSectionType = (typeof conceptSectionTypes)[number];
 export type ConceptColorId = (typeof conceptColors)[number]["id"];
 export type ConceptStyleId = (typeof conceptStyles)[number]["id"];
+export type ConceptLayoutId = (typeof conceptLayouts)[number]["id"];
 
 export const MAX_CONCEPT_COLORS = 5;
 
@@ -138,13 +153,16 @@ export type WebsiteConcept = {
   businessType: string;
   colorIds: ConceptColorId[];
   styleId: ConceptStyleId;
+  /** Optional for backward compatibility: concepts saved before layouts existed render with
+   * the seeded default (see resolveConceptLayout). */
+  layoutId?: ConceptLayoutId;
   navigation: Array<{ label: string; pageId: string }>;
   pages: WebsiteConceptPage[];
 };
 
 /** The AI only ever generates content (name/copy/structure) — visual identity (colorIds/styleId)
  * always comes from the wizard's own input, never from the model, so it's attached separately. */
-type WebsiteConceptContent = Omit<WebsiteConcept, "colorIds" | "styleId">;
+type WebsiteConceptContent = Omit<WebsiteConcept, "colorIds" | "styleId" | "layoutId">;
 
 const PAGE_ID = /^[a-z][a-z0-9-]{1,30}$/;
 const UNSAFE_GENERATED_CONTENT = /<\/?(?:script|style|iframe|object|embed|html|body|svg|form)|javascript:|data:text\/html|```|\b(?:eval|Function)\s*\(|=>|\b(?:import|export)\s+(?:default|from|const|function|class)/i;
@@ -226,7 +244,7 @@ export function validateWebsiteConcept(value: unknown): WebsiteConceptContent | 
 
   if (!businessName || !businessType) return null;
 
-  if (!Array.isArray(candidate.pages) || candidate.pages.length < 2 || candidate.pages.length > 3) return null;
+  if (!Array.isArray(candidate.pages) || candidate.pages.length < 2 || candidate.pages.length > 4) return null;
   const pages: WebsiteConceptPage[] = [];
   const pageIds = new Set<string>();
 
@@ -490,59 +508,27 @@ export function generateVisualIdentity(colorIds: ConceptColorId[], styleId: Conc
   };
 }
 
-function sectionContent(type: ConceptSectionType, input: WebsiteConceptInput): WebsiteConceptSection {
-  const name = input.businessName;
-  const content: Record<ConceptSectionType, WebsiteConceptSection> = {
-    services: {
-      type,
-      title: "Главное — без лишних шагов",
-      text: `Ключевые предложения ${name}, собранные так, чтобы посетитель быстро понял ценность.`,
-      items: ["Основное направление", "Персональный подход", "Понятный следующий шаг"],
-    },
-    pricing: {
-      type,
-      title: "Форматы и стоимость",
-      text: "Точный состав зависит от выбранной услуги и задачи клиента.",
-      items: ["Базовый формат", "Расширенный формат", "Индивидуальное решение"],
-    },
-    about: {
-      type,
-      title: `Почему выбирают ${name}`,
-      text: `${name} соединяет внимание к деталям, понятный сервис и спокойную коммуникацию.`,
-      items: ["Понятный процесс", "Внимание к деталям", "Прямая коммуникация"],
-    },
-    gallery: {
-      type,
-      title: "Атмосфера и детали",
-      text: "Визуальная подборка пространства, продукта и процесса.",
-      items: ["Пространство", "Детали", "Результат"],
-    },
-    reviews: {
-      type,
-      title: "Что ценят клиенты",
-      text: "Место для подтвержденных отзывов и живой обратной связи.",
-      items: ["Внимательное отношение", "Понятный сервис", "Качество деталей"],
-    },
-    booking: {
-      type,
-      title: "Выберите удобное время",
-      text: "Короткий путь от первого знакомства до записи.",
-      items: ["Выбрать услугу", "Указать время", "Получить подтверждение"],
-    },
-    contacts: {
-      type,
-      title: "Свяжитесь удобным способом",
-      text: "Контакты, адрес и понятный следующий шаг без лишних форм.",
-      items: ["WhatsApp", "Telegram", "Показать на карте"],
-    },
-    faq: {
-      type,
-      title: "Коротко о важном",
-      text: "Ответы на вопросы, которые возникают перед первым обращением.",
-      items: ["Как начать?", "Что входит в услугу?", "Как проходит оплата?"],
-    },
-  };
-  return content[type];
+// Same tiny string hash as concept-images: only needs to spread similar names apart so two
+// businesses in the same niche don't get identical layout/rating picks.
+function conceptSeed(input: string): number {
+  let hash = 0;
+  for (let index = 0; index < input.length; index += 1) {
+    hash = (hash * 31 + input.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+/**
+ * Resolves the effective layout for a concept: an explicitly stored layoutId wins; otherwise
+ * a seeded pick from the niche's recommended layouts, so older saved concepts (no layoutId)
+ * and AI responses (which never choose layout) still land on a niche-appropriate template —
+ * and two different businesses in the same niche land on different ones.
+ */
+export function resolveConceptLayout(concept: Pick<WebsiteConcept, "businessType" | "businessName" | "layoutId">): ConceptLayoutId {
+  if (concept.layoutId && conceptLayouts.some((layout) => layout.id === concept.layoutId)) return concept.layoutId;
+  const knowledge = businessKnowledgeFor(concept.businessType, concept.businessName);
+  const preferred = knowledge.layouts.length ? knowledge.layouts : conceptLayouts.map((layout) => layout.id);
+  return preferred[conceptSeed(concept.businessName || concept.businessType) % preferred.length];
 }
 
 /**
@@ -570,70 +556,174 @@ export function formatConceptPrice(value: number): string {
   return `${value.toLocaleString("ru-RU").replace(/ /g, " ")} ₸`;
 }
 
+/** Niches where the natural primary action is booking a time slot rather than sending a lead. */
+const BOOKING_KNOWLEDGE_IDS = new Set(["barbershop", "beauty", "dental", "fitness", "restaurant", "auto", "hotel"]);
+
+/**
+ * Knowledge-first local generator: loads the niche's knowledge (page structure, the
+ * products-vs-services split, About/FAQ/CTA content) and builds up to 4 distinct pages on top
+ * of it. Every section instance carries page-specific content — the same section type never
+ * repeats the same title/text on two pages, and the offer page shows the FULL catalogue while
+ * the home page only teases it.
+ */
 export function buildFallbackWebsiteConcept(input: WebsiteConceptInput): WebsiteConcept {
-  const primaryGoal = input.goals[0] ?? "Получать заявки";
-  const isBookingBusiness = ["Барбершоп", "Салон красоты", "Ресторан", "Кофейня"].includes(input.businessType);
-  const middlePage = input.businessType === "Ресторан" || input.businessType === "Кофейня"
-    ? { id: "menu", name: "Меню" }
-    : input.businessType === "Парфюмерный магазин" || input.businessType === "Магазин"
-      ? { id: "catalog", name: "Каталог" }
-      : input.businessType === "Барбершоп" || input.businessType === "Салон красоты"
-        ? { id: "services", name: "Услуги и мастера" }
-        : { id: "services", name: "Услуги" };
-  const finalPage = input.businessType === "Ресторан"
-    ? { id: "booking", name: "Бронирование и контакты" }
-    : input.businessType === "Барбершоп"
-      ? { id: "booking", name: "Запись и контакты" }
-      : input.businessType === "Салон красоты"
-        ? { id: "booking", name: "Запись" }
-        : input.businessType === "Парфюмерный магазин"
-          ? { id: "contacts", name: "О бренде и контакты" }
-          : { id: "contacts", name: "Контакты" };
+  const name = input.businessName;
+  const knowledge = businessKnowledgeFor(input.businessType, name);
+  const niche = knowledge.label === "Бизнес" ? input.businessType : knowledge.label;
+  const isBooking = BOOKING_KNOWLEDGE_IDS.has(knowledge.id) || input.goals.includes("Записывать клиентов");
+  const hasProducts = knowledge.products.length > 0;
+  const wants = (type: ConceptSectionType) => input.sections.includes(type);
+
+  const offerPage = hasProducts
+    ? { id: "menu", name: knowledge.productsPageName ?? "Каталог" }
+    : { id: "services", name: "Услуги" };
+  const finalPage = isBooking ? { id: "booking", name: "Запись и контакты" } : { id: "contacts", name: "Контакты" };
+
+  // Home teases; it never carries the full catalogue (that lives on the offer page only).
+  const homeSections: WebsiteConceptSection[] = [
+    {
+      type: "services",
+      title: hasProducts ? `${knowledge.servicesTitle}, который делает разницу` : "С чем мы работаем",
+      text: hasProducts
+        ? `${offerPage.name} — на отдельной странице. Здесь — то, что превращает ${niche.toLowerCase()} в сервис.`
+        : `Ключевые направления ${name} — детали и полный список на странице «Услуги».`,
+      items: (hasProducts ? knowledge.services : knowledge.services.slice(0, 6)).slice(0, 6).map((offer) => offer.name),
+    },
+  ];
+  if (wants("reviews")) {
+    homeSections.push({
+      type: "reviews",
+      title: "Что говорят гости",
+      text: `Демонстрационные отзывы — так будет выглядеть живой блок доверия на сайте ${name}.`,
+      items: [],
+    });
+  }
+
+  const offerSections: WebsiteConceptSection[] = [
+    {
+      type: "pricing",
+      title: hasProducts ? `${offerPage.name} и цены` : "Полный список услуг",
+      text: hasProducts
+        ? "Средние демонстрационные цены — реальные позиции заменят их при наполнении."
+        : "Прозрачный прайс без звёздочек: демонстрационные средние цены по региону.",
+      items: [],
+    },
+  ];
+  if (hasProducts) {
+    offerSections.push({
+      type: "services",
+      title: `Не только ${offerPage.name.toLowerCase()}`,
+      text: "Сервисы, которые делают визит удобным.",
+      items: knowledge.services.slice(0, 6).map((offer) => offer.name),
+    });
+  }
+  if (wants("gallery")) {
+    offerSections.push({
+      type: "gallery",
+      title: "Как это выглядит",
+      text: "Атмосфера, продукт и процесс — подборка демонстрационных кадров ниши.",
+      items: ["Пространство", "Процесс", "Детали", "Результат", "Команда", "Настроение"],
+    });
+  }
+
+  const aboutSections: WebsiteConceptSection[] = [
+    {
+      type: "about",
+      title: `История ${name}`,
+      text: knowledge.about.mission,
+      items: knowledge.about.whyUs,
+    },
+  ];
+  if (wants("gallery")) {
+    aboutSections.push({
+      type: "gallery",
+      title: "Атмосфера",
+      text: knowledge.about.atmosphere,
+      items: ["Пространство", "Люди", "Детали"],
+    });
+  }
+
+  const finalSections: WebsiteConceptSection[] = [];
+  if (isBooking) {
+    finalSections.push({
+      type: "booking",
+      title: "Выберите удобное время",
+      text: "Три шага от знакомства до подтверждённой записи — демонстрация сценария.",
+      items: ["Выбрать услугу", "Указать время", "Получить подтверждение"],
+    });
+  }
+  finalSections.push({
+    type: "contacts",
+    title: "Как нас найти",
+    text: "Часы работы, адрес и быстрые способы связи — демонстрационные данные концепта.",
+    items: [],
+  });
+  if (wants("faq")) {
+    finalSections.push({
+      type: "faq",
+      title: "Частые вопросы",
+      text: `Ответы, которые ${niche.toLowerCase()} даёт чаще всего — до первого звонка.`,
+      items: [],
+    });
+  }
 
   const pages: WebsiteConceptPage[] = [
     {
       id: "home",
       name: "Главная",
       hero: {
-        eyebrow: input.businessType,
-        title: `${input.businessName} — место, к которому хочется вернуться`,
-        subtitle: `Понятная подача, характер бренда и быстрый путь к действию: ${primaryGoal.toLowerCase()}.`,
-        primaryCta: isBookingBusiness ? "Записаться" : "Оставить заявку",
-        secondaryCta: middlePage.name,
+        eyebrow: niche,
+        title: `${name} — ${knowledge.about.mission.replace(/\.$/, "").toLowerCase()}`,
+        subtitle: knowledge.about.story[0].split(". ").slice(0, 1).join(". ") + ".",
+        primaryCta: knowledge.ctas.primary,
+        secondaryCta: offerPage.name,
       },
-      sections: [sectionContent("services", input), sectionContent("about", input)],
+      sections: homeSections,
     },
     {
-      ...middlePage,
+      ...offerPage,
       hero: {
-        eyebrow: middlePage.name,
-        title: `${middlePage.name} ${input.businessName}`,
-        subtitle: "Основные направления, понятная структура и детали выбора без лишней информации.",
-        primaryCta: isBookingBusiness ? "Выбрать услугу" : "Открыть каталог",
-        secondaryCta: "Узнать больше",
+        eyebrow: offerPage.name,
+        title: hasProducts ? `${offerPage.name} ${name}` : `Услуги ${name}`,
+        subtitle: hasProducts
+          ? "Полный ассортимент с демонстрационными ценами — структура будущего каталога."
+          : "Каждая услуга — с понятной ценой и без скрытых условий.",
+        primaryCta: knowledge.ctas.primary,
+        secondaryCta: "О нас",
       },
-      sections: [sectionContent("services", input), sectionContent("pricing", input), sectionContent("gallery", input)],
+      sections: offerSections,
+    },
+    {
+      id: "about",
+      name: "О нас",
+      hero: {
+        eyebrow: "О нас",
+        title: `Почему ${niche.toLowerCase()} ${name} выбирают`,
+        subtitle: knowledge.about.mission,
+        primaryCta: knowledge.ctas.final,
+        secondaryCta: finalPage.name,
+      },
+      sections: aboutSections,
     },
     {
       ...finalPage,
       hero: {
         eyebrow: finalPage.name,
-        title: isBookingBusiness ? "Выберите удобный следующий шаг" : `Свяжитесь с ${input.businessName}`,
-        subtitle: "Контакты, часы работы и демонстрационный сценарий обращения в одном месте.",
-        primaryCta: isBookingBusiness ? "Выбрать время" : "Связаться",
-        secondaryCta: "Посмотреть контакты",
+        title: isBooking ? "Запишитесь в пару кликов" : `Свяжитесь с ${name}`,
+        subtitle: "Контакты, часы работы и быстрый следующий шаг — в одном месте.",
+        primaryCta: knowledge.ctas.final,
+        secondaryCta: "Показать на карте",
       },
-      sections: isBookingBusiness
-        ? [sectionContent("booking", input), sectionContent("contacts", input), sectionContent("faq", input)]
-        : [sectionContent("about", input), sectionContent("contacts", input), sectionContent("faq", input)],
+      sections: finalSections,
     },
   ];
 
   return {
-    businessName: input.businessName,
+    businessName: name,
     businessType: input.businessType,
     colorIds: input.colorIds,
     styleId: input.styleId,
+    layoutId: resolveConceptLayout({ businessType: input.businessType, businessName: name }),
     navigation: pages.map((page) => ({ label: page.name, pageId: page.id })),
     pages,
   };
@@ -649,7 +739,7 @@ export const WEBSITE_CONCEPT_SCHEMA = {
     navigation: {
       type: "array",
       minItems: 2,
-      maxItems: 3,
+      maxItems: 4,
       items: {
         type: "object",
         additionalProperties: false,
@@ -663,7 +753,7 @@ export const WEBSITE_CONCEPT_SCHEMA = {
     pages: {
       type: "array",
       minItems: 2,
-      maxItems: 3,
+      maxItems: 4,
       items: {
         type: "object",
         additionalProperties: false,

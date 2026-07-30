@@ -2580,6 +2580,12 @@ body::before {
   .concept-orb {
     animation: none;
   }
+
+  .concept-photo,
+  .concept-hero-photo {
+    animation: none;
+    opacity: 1;
+  }
 }
 
 .concept-nav {
@@ -2683,7 +2689,6 @@ body::before {
 
 .concept-hero-copy > p,
 .concept-section-heading > p,
-.concept-about > p,
 .concept-action-section > p {
   color: var(--concept-accent);
   font-size: 0.72rem;
@@ -2795,7 +2800,6 @@ body::before {
 }
 
 .concept-section-heading h3,
-.concept-about h3,
 .concept-action-section h3 {
   max-width: 18ch;
   margin-top: 0.75rem;
@@ -2844,33 +2848,10 @@ body::before {
   line-height: 1.5;
 }
 
-.concept-about > div {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2rem;
-  margin-top: 2rem;
-}
-
-.concept-about > div > span {
-  color: color-mix(in srgb, var(--concept-text) 65%, transparent);
-  font-size: 1.15rem;
-  line-height: 1.7;
-}
-
-.concept-about ul {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.concept-about li {
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--concept-text) 10%, transparent);
-}
-
 .concept-gallery-grid {
   display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
-  grid-template-rows: 11rem 11rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 10.5rem;
   gap: 0.75rem;
   margin-top: 2.5rem;
 }
@@ -2900,8 +2881,14 @@ body::before {
   background: linear-gradient(0deg, rgba(0, 0, 0, 0.45), transparent 60%);
 }
 
-.concept-gallery-frame:first-child {
-  grid-row: 1 / 3;
+/* Varied rhythm: the first frame is tall, the fifth is wide — a composed grid rather than a
+   uniform thumbnail strip, whatever number of frames (3-6) actually renders. */
+.concept-gallery-frame-1 {
+  grid-row: span 2;
+}
+
+.concept-gallery-frame-5 {
+  grid-column: span 2;
 }
 
 .concept-action-section {
@@ -2920,8 +2907,7 @@ body::before {
   color: color-mix(in srgb, var(--concept-text) 58%, transparent);
 }
 
-.concept-mock-form,
-.concept-contact-details {
+.concept-mock-form {
   display: grid;
   max-width: 46rem;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2930,9 +2916,7 @@ body::before {
   text-align: left;
 }
 
-.concept-mock-form > span,
-.concept-contact-details > span,
-.concept-contact-details > div {
+.concept-mock-form > span {
   min-height: 3.6rem;
   padding: 0.9rem 1rem;
   border: var(--concept-border-width) solid var(--concept-border);
@@ -2940,15 +2924,6 @@ body::before {
   background: var(--concept-surface);
   color: color-mix(in srgb, var(--concept-text) 54%, transparent);
   font-size: 0.74rem;
-}
-
-.concept-contact-details > div {
-  display: grid;
-  grid-column: 1 / -1;
-  min-height: 9rem;
-  place-content: center;
-  background: color-mix(in srgb, var(--concept-accent) 12%, var(--concept-surface));
-  text-align: center;
 }
 
 .concept-action-section button {
@@ -2982,6 +2957,681 @@ body::before {
   background: var(--concept-text);
   color: var(--concept-bg);
   font-size: 0.78rem;
+}
+
+/* =========================================================================
+   CONCEPT SECTIONS v2 — knowledge-driven blocks: demo chips, reviews,
+   contacts with map mockup, the rich About page, FAQ.
+   ========================================================================= */
+
+.concept-demo-chip {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.14rem 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--concept-accent) 35%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--concept-accent) 10%, transparent);
+  color: var(--concept-accent);
+  font-size: 0.62rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* ---- Reviews ---- */
+
+.concept-reviews-summary {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  margin-top: 2.25rem;
+}
+
+.concept-reviews-summary > strong {
+  font-size: 3.4rem;
+  font-weight: var(--concept-heading-weight);
+  line-height: 1;
+  letter-spacing: var(--concept-letter-spacing);
+}
+
+.concept-reviews-summary > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.concept-reviews-summary span {
+  color: color-mix(in srgb, var(--concept-text) 55%, transparent);
+  font-size: 0.82rem;
+}
+
+.concept-review-stars {
+  display: inline-flex;
+  gap: 0.12rem;
+  color: color-mix(in srgb, var(--concept-text) 18%, transparent);
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.concept-review-stars i {
+  font-style: normal;
+}
+
+.concept-review-stars i.is-filled {
+  color: var(--concept-accent);
+}
+
+.concept-reviews-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 1.75rem;
+}
+
+.concept-review-card {
+  display: grid;
+  align-content: start;
+  gap: 0.8rem;
+  padding: 1.25rem;
+  border: var(--concept-border-width) solid var(--concept-border);
+  border-radius: var(--concept-radius);
+  background: var(--concept-surface);
+}
+
+.concept-review-card header {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.concept-review-card header > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.concept-review-card header strong {
+  display: block;
+  font-size: 0.9rem;
+}
+
+.concept-review-card header small {
+  color: color-mix(in srgb, var(--concept-text) 45%, transparent);
+  font-size: 0.72rem;
+}
+
+.concept-review-avatar,
+.concept-about-member > span {
+  display: flex;
+  height: 2.3rem;
+  width: 2.3rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--concept-accent) 16%, var(--concept-surface));
+  color: var(--concept-accent);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.concept-review-card p {
+  color: color-mix(in srgb, var(--concept-text) 64%, transparent);
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
+/* ---- Contacts ---- */
+
+.concept-contacts-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 1.5rem;
+  margin-top: 2.25rem;
+}
+
+.concept-contacts-info {
+  display: grid;
+  align-content: start;
+  gap: 1.25rem;
+}
+
+.concept-hours {
+  display: grid;
+  gap: 0.4rem;
+  padding: 1.1rem 1.25rem;
+  border: var(--concept-border-width) solid var(--concept-border);
+  border-radius: var(--concept-radius);
+  background: var(--concept-surface);
+}
+
+.concept-hours-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.86rem;
+}
+
+.concept-hours-row span {
+  color: color-mix(in srgb, var(--concept-text) 55%, transparent);
+}
+
+.concept-contacts-info address {
+  display: grid;
+  gap: 0.3rem;
+  font-style: normal;
+}
+
+.concept-contacts-info address strong {
+  font-size: 1.05rem;
+}
+
+.concept-contacts-info address span {
+  color: color-mix(in srgb, var(--concept-text) 58%, transparent);
+  font-size: 0.86rem;
+}
+
+.concept-contact-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.concept-contact-buttons button {
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  border: var(--concept-border-width) solid color-mix(in srgb, var(--concept-text) 16%, transparent);
+  border-radius: var(--concept-radius-sm);
+  background: var(--concept-surface);
+  color: var(--concept-text);
+  font-size: 0.76rem;
+  font-weight: 620;
+}
+
+.concept-contact-buttons button:first-child {
+  border-color: transparent;
+  background: var(--concept-accent);
+  color: var(--concept-bg);
+}
+
+.concept-map {
+  position: relative;
+  overflow: hidden;
+  min-height: 16rem;
+  border: var(--concept-border-width) solid var(--concept-border);
+  border-radius: var(--concept-radius);
+  background: color-mix(in srgb, var(--concept-accent) 7%, var(--concept-surface));
+  cursor: pointer;
+}
+
+.concept-map-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--concept-text) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--concept-text) 7%, transparent) 1px, transparent 1px);
+  background-size: 2.6rem 2.6rem;
+}
+
+.concept-map-grid::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(115deg, transparent 42%, color-mix(in srgb, var(--concept-accent) 14%, transparent) 42%, color-mix(in srgb, var(--concept-accent) 14%, transparent) 46%, transparent 46%),
+    linear-gradient(25deg, transparent 60%, color-mix(in srgb, var(--concept-text) 8%, transparent) 60%, color-mix(in srgb, var(--concept-text) 8%, transparent) 63%, transparent 63%);
+}
+
+.concept-map-pin {
+  position: absolute;
+  top: 42%;
+  left: 52%;
+  height: 1rem;
+  width: 1rem;
+  border-radius: 50% 50% 50% 0;
+  background: var(--concept-accent);
+  transform: rotate(-45deg);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--concept-accent) 50%, transparent);
+}
+
+.concept-map-pin::after {
+  content: "";
+  position: absolute;
+  inset: 0.28rem;
+  border-radius: 50%;
+  background: var(--concept-bg);
+}
+
+.concept-map-caption {
+  position: absolute;
+  right: 0.9rem;
+  bottom: 0.9rem;
+  left: 0.9rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--concept-radius-sm);
+  background: color-mix(in srgb, var(--concept-bg) 88%, transparent);
+  color: color-mix(in srgb, var(--concept-text) 70%, transparent);
+  font-size: 0.74rem;
+  text-align: left;
+  backdrop-filter: blur(6px);
+}
+
+/* ---- About page ---- */
+
+.concept-about-story {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-top: 2.25rem;
+}
+
+.concept-about-story p {
+  color: color-mix(in srgb, var(--concept-text) 66%, transparent);
+  font-size: 1.02rem;
+  line-height: 1.75;
+}
+
+.concept-about-mission {
+  max-width: 34ch;
+  margin-top: 2.5rem;
+  border-left: 3px solid var(--concept-accent);
+  padding-left: 1.4rem;
+  font-size: calc(1.7rem * var(--concept-heading-scale));
+  font-weight: var(--concept-heading-weight);
+  line-height: 1.25;
+  letter-spacing: var(--concept-letter-spacing);
+}
+
+.concept-about-media {
+  display: grid;
+  grid-template-columns: 1.25fr 0.75fr;
+  gap: 0.75rem;
+  margin-top: 2.5rem;
+}
+
+.concept-about-photo {
+  position: relative;
+  min-height: 15rem;
+  overflow: hidden;
+  border-radius: var(--concept-radius);
+}
+
+.concept-about-photo figcaption {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: 2;
+  padding: 1.1rem 1.2rem;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.6), transparent);
+  color: #fff;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.concept-about-values {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 2.25rem;
+}
+
+.concept-about-values article {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1.25rem;
+  border: var(--concept-border-width) solid var(--concept-border);
+  border-radius: var(--concept-radius);
+  background: var(--concept-surface);
+}
+
+.concept-about-values strong {
+  font-size: 1.02rem;
+}
+
+.concept-about-values span {
+  color: color-mix(in srgb, var(--concept-text) 56%, transparent);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.concept-about-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-top: 2.25rem;
+}
+
+.concept-about-team > p {
+  color: var(--concept-accent);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: var(--concept-letter-spacing);
+  text-transform: uppercase;
+}
+
+.concept-about-member {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+}
+
+.concept-about-member strong {
+  display: block;
+  font-size: 0.94rem;
+}
+
+.concept-about-member small {
+  color: color-mix(in srgb, var(--concept-text) 52%, transparent);
+  font-size: 0.76rem;
+}
+
+.concept-about-why {
+  display: grid;
+  align-content: start;
+  gap: 0.7rem;
+}
+
+.concept-about-why li {
+  position: relative;
+  padding-bottom: 0.7rem;
+  padding-left: 1.4rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--concept-text) 10%, transparent);
+  color: color-mix(in srgb, var(--concept-text) 74%, transparent);
+  font-size: 0.92rem;
+}
+
+.concept-about-why li::before {
+  content: "";
+  position: absolute;
+  top: 0.42em;
+  left: 0;
+  height: 0.5rem;
+  width: 0.5rem;
+  border-radius: 50%;
+  background: var(--concept-accent);
+}
+
+.concept-about-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-top: 3rem;
+  padding: 1.75rem 2rem;
+  border-radius: var(--concept-radius);
+  background: color-mix(in srgb, var(--concept-accent) 10%, var(--concept-surface));
+}
+
+.concept-about-cta strong {
+  max-width: 36ch;
+  font-size: 1.15rem;
+  font-weight: var(--concept-heading-weight);
+  line-height: 1.35;
+}
+
+.concept-about-cta button {
+  flex-shrink: 0;
+  min-height: 2.65rem;
+  padding: 0 1.2rem;
+  border-radius: var(--concept-radius);
+  background: var(--concept-text);
+  color: var(--concept-bg);
+  font-size: 0.78rem;
+  font-weight: var(--concept-heading-weight);
+}
+
+/* ---- FAQ ---- */
+
+.concept-faq-list {
+  display: grid;
+  max-width: 46rem;
+  gap: 0.6rem;
+  margin-top: 2.25rem;
+}
+
+.concept-faq-item {
+  border: var(--concept-border-width) solid var(--concept-border);
+  border-radius: var(--concept-radius-sm);
+  background: var(--concept-surface);
+}
+
+.concept-faq-item summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.2rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 620;
+  list-style: none;
+}
+
+.concept-faq-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.concept-faq-item summary::after {
+  content: "+";
+  flex-shrink: 0;
+  color: var(--concept-accent);
+  font-size: 1.2rem;
+  font-weight: 500;
+  line-height: 1;
+  transition: transform 200ms var(--ease-premium);
+}
+
+.concept-faq-item[open] summary::after {
+  transform: rotate(45deg);
+}
+
+.concept-faq-item p {
+  padding: 0 1.2rem 1.1rem;
+  color: color-mix(in srgb, var(--concept-text) 60%, transparent);
+  font-size: 0.86rem;
+  line-height: 1.65;
+}
+
+/* =========================================================================
+   CONCEPT LAYOUTS — composition variants (see conceptLayouts). "classic"
+   is the base look above; "editorial" and "showcase" restructure the hero,
+   navigation, gallery, cards and CTA placement on top of it.
+   ========================================================================= */
+
+/* ---- Editorial: magazine rhythm — stacked oversized hero type, centered
+   navigation, full-width image band, divider-based cards. ---- */
+
+.concept-site[data-layout="editorial"] .concept-nav {
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+  padding: 1.4rem 3.5rem 1.1rem;
+}
+
+.concept-site[data-layout="editorial"] .concept-nav > strong {
+  font-size: 1.15rem;
+  letter-spacing: 0.2em;
+}
+
+.concept-site[data-layout="editorial"] .concept-hero {
+  grid-template-columns: 1fr;
+  gap: 2.5rem;
+  min-height: 0;
+  padding-top: calc(4rem * var(--concept-spacing));
+  text-align: left;
+}
+
+.concept-site[data-layout="editorial"] .concept-hero-copy h2 {
+  max-width: 18ch;
+  font-size: calc(4.6rem * var(--concept-heading-scale));
+  line-height: 1.02;
+}
+
+.concept-site[data-layout="editorial"] .concept-hero-visual {
+  min-height: 21rem;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.concept-site[data-layout="editorial"] .concept-section-heading h3 {
+  max-width: 24ch;
+  font-size: calc(3rem * var(--concept-heading-scale));
+}
+
+.concept-site[data-layout="editorial"] .concept-section {
+  border-top-width: 2px;
+}
+
+.concept-site[data-layout="editorial"] .concept-list-grid {
+  gap: 0;
+}
+
+.concept-site[data-layout="editorial"] .concept-list-grid article {
+  min-height: 10rem;
+  border: none;
+  border-top: 1px solid color-mix(in srgb, var(--concept-text) 14%, transparent);
+  border-radius: 0;
+  background: transparent;
+  padding: 1.35rem 1.35rem 1.35rem 0;
+}
+
+.concept-site[data-layout="editorial"] .concept-pricelist {
+  display: block;
+  max-width: none;
+  column-count: 2;
+  column-gap: 3.5rem;
+}
+
+.concept-site[data-layout="editorial"] .concept-pricelist-row {
+  break-inside: avoid;
+}
+
+.concept-site[data-layout="editorial"] .concept-gallery-frame,
+.concept-site[data-layout="editorial"] .concept-review-card,
+.concept-site[data-layout="editorial"] .concept-about-photo {
+  border-radius: 0;
+}
+
+.concept-site[data-layout="editorial"] .concept-about-cta {
+  border-radius: 0;
+  border-top: 2px solid var(--concept-text);
+  border-bottom: 2px solid var(--concept-text);
+  background: transparent;
+  padding-inline: 0;
+}
+
+/* ---- Showcase: immersive — full-bleed hero image with overlay copy, the
+   navigation floats on top, gallery becomes a snap strip, elevated cards. ---- */
+
+.concept-site[data-layout="showcase"] {
+  --showcase-nav-text: #fff;
+}
+
+.concept-site[data-layout="showcase"] .concept-nav {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 5;
+  border-bottom: none;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.42), transparent);
+  color: var(--showcase-nav-text);
+}
+
+.concept-site[data-layout="showcase"] .concept-nav > nav {
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+}
+
+.concept-site[data-layout="showcase"] .concept-nav > nav button {
+  color: inherit;
+}
+
+.concept-site[data-layout="showcase"] .concept-nav > nav button[aria-current="page"] {
+  background: rgba(255, 255, 255, 0.92);
+  color: #14151a;
+}
+
+.concept-site[data-layout="showcase"] .concept-nav > button {
+  background: rgba(255, 255, 255, 0.92);
+  color: #14151a;
+}
+
+.concept-site[data-layout="showcase"] .concept-hero {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: 42rem;
+  align-items: flex-end;
+  padding-top: calc(8rem * var(--concept-spacing));
+}
+
+.concept-site[data-layout="showcase"] .concept-hero-copy {
+  position: relative;
+  z-index: 2;
+  max-width: 44rem;
+  color: #fff;
+}
+
+.concept-site[data-layout="showcase"] .concept-hero-copy > p {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.concept-site[data-layout="showcase"] .concept-hero-copy > span {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.concept-site[data-layout="showcase"] .concept-hero-copy button:last-child {
+  border-color: rgba(255, 255, 255, 0.45);
+  color: #fff;
+}
+
+.concept-site[data-layout="showcase"] .concept-hero-visual {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  min-height: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.concept-site[data-layout="showcase"] .concept-hero-visual::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(200deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.62));
+}
+
+.concept-site[data-layout="showcase"] .concept-hero-visual-caption {
+  display: none;
+}
+
+.concept-site[data-layout="showcase"] .concept-gallery-grid {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.75rem;
+  scroll-snap-type: x mandatory;
+}
+
+.concept-site[data-layout="showcase"] .concept-gallery-frame {
+  flex: 0 0 clamp(15rem, 38cqw, 22rem);
+  min-height: 14rem;
+  scroll-snap-align: start;
+}
+
+.concept-site[data-layout="showcase"] .concept-list-grid article,
+.concept-site[data-layout="showcase"] .concept-review-card {
+  border-color: transparent;
+  box-shadow: var(--concept-shadow-sm);
+}
+
+.concept-site[data-layout="showcase"] .concept-about-cta {
+  box-shadow: var(--concept-shadow-lg);
+  background: var(--concept-surface);
 }
 
 @container (max-width: 680px) {
@@ -3030,25 +3680,26 @@ body::before {
   }
 
   .concept-section-heading h3,
-  .concept-about h3,
   .concept-action-section h3 {
     font-size: 2rem;
   }
 
   .concept-list-grid,
-  .concept-about > div,
-  .concept-mock-form,
-  .concept-contact-details {
+  .concept-mock-form {
     grid-template-columns: 1fr;
   }
 
   .concept-gallery-grid {
     grid-template-columns: 1fr;
-    grid-template-rows: repeat(3, 10rem);
+    grid-auto-rows: 10rem;
   }
 
-  .concept-gallery-frame:first-child {
+  .concept-gallery-frame-1 {
     grid-row: auto;
+  }
+
+  .concept-gallery-frame-5 {
+    grid-column: auto;
   }
 
   .concept-footer {
@@ -3066,6 +3717,47 @@ body::before {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@container (max-width: 680px) {
+  .concept-reviews-grid,
+  .concept-contacts-grid,
+  .concept-about-story,
+  .concept-about-media,
+  .concept-about-values,
+  .concept-about-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .concept-about-cta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .concept-reviews-summary > strong {
+    font-size: 2.6rem;
+  }
+
+  .concept-site[data-layout="editorial"] .concept-pricelist {
+    column-count: 1;
+  }
+
+  .concept-site[data-layout="editorial"] .concept-hero-copy h2 {
+    font-size: 2.9rem;
+  }
+
+  .concept-site[data-layout="editorial"] .concept-nav {
+    padding: 1.1rem 1.25rem 0.9rem;
+  }
+
+  .concept-site[data-layout="showcase"] .concept-hero {
+    min-height: 30rem;
+    padding-top: 6rem;
+  }
+
+  .concept-site[data-layout="showcase"] .concept-gallery-frame {
+    flex-basis: 78cqw;
   }
 }
 

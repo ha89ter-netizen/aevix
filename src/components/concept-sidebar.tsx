@@ -2,6 +2,7 @@
 
 import {
   ArrowLeft,
+  LayoutTemplate,
   Maximize2,
   MessageCircle,
   Minimize2,
@@ -33,7 +34,9 @@ export type ConceptSidebarProps = {
   onPageChange: (id: string) => void;
   onCycleColor: () => void;
   onCycleStyle: () => void;
+  onCycleLayout: () => void;
   styleLabel: string;
+  layoutLabel: string;
   priceLabel: string;
   /** Undefined/null = every page is available (fully built). While building, the exact set of
    * page ids already revealed in the live preview. */
@@ -55,7 +58,9 @@ export function ConceptSidebar({
   onPageChange,
   onCycleColor,
   onCycleStyle,
+  onCycleLayout,
   styleLabel,
+  layoutLabel,
   priceLabel,
   visiblePageIds,
   priceReady,
@@ -116,6 +121,9 @@ export function ConceptSidebar({
             </button>
             <button type="button" className="concept-sidebar-item" onClick={onCycleStyle} disabled={isBuilding}>
               <Sparkles className="h-4 w-4" /> {styleLabel}
+            </button>
+            <button type="button" className="concept-sidebar-item" onClick={onCycleLayout} disabled={isBuilding} title="Сменить макет">
+              <LayoutTemplate className="h-4 w-4" /> {layoutLabel}
             </button>
           </nav>
         </div>

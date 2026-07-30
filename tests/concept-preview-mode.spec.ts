@@ -59,6 +59,28 @@ async function enterPreview(page: Page) {
   );
 }
 
+/**
+ * Waits until the stage's scrollable height stops changing. A generated concept keeps settling
+ * for a beat after it appears (photos decoding, the reveal's final pieces committing), and any
+ * scroll assertion made against a still-moving `scrollHeight` is chasing a target — the "am I
+ * at the bottom?" check would read as false purely because the bottom moved. Measuring from a
+ * settled layout removes that race at its source instead of hiding it behind a longer timeout.
+ */
+async function waitForStableScrollHeight(page: Page) {
+  const stage = page.locator(STAGE);
+  await expect
+    .poll(
+      async () => {
+        const first = await stage.evaluate((el) => el.scrollHeight);
+        await page.waitForTimeout(250);
+        const second = await stage.evaluate((el) => el.scrollHeight);
+        return first === second;
+      },
+      { timeout: 15_000 },
+    )
+    .toBe(true);
+}
+
 test.describe("concept preview mode", () => {
   test("preview hides every editor panel", async ({ page }) => {
     await openConceptExample(page);
@@ -114,6 +136,8 @@ test.describe("concept preview mode", () => {
 
     const stage = page.locator(STAGE);
     const scrollTop = () => stage.evaluate((el) => Math.round(el.scrollTop));
+
+    await waitForStableScrollHeight(page);
 
     // Preview focuses the stage in an effect; wait for that before sending keys, otherwise
     // they land on the body and the stage never scrolls.
