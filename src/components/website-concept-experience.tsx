@@ -25,6 +25,7 @@ import { ConceptSidebar } from "@/components/concept-sidebar";
 import { cn } from "@/lib/utils";
 import { conceptImagesFor, type ConceptImagery } from "@/lib/concept-images";
 import { businessKnowledgeFor, type BusinessKnowledge } from "@/lib/business-knowledge";
+import { motionTransition } from "@/lib/motion";
 import {
   buildFallbackWebsiteConcept,
   conceptBusinessTypes,
@@ -555,7 +556,7 @@ function ConceptPreview({
       <motion.div
         layout
         className={cn("concept-device", `concept-device-${mode}`)}
-        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+        transition={motionTransition.slow}
       >
         <div className="concept-site" data-layout={layout} style={style}>
           <div className="concept-atmosphere" aria-hidden="true">
@@ -573,7 +574,7 @@ function ConceptPreview({
                     layout
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    transition={{ duration: 0.2 }}
+                    transition={motionTransition.base}
                     aria-current={item.pageId === activePage.id ? "page" : undefined}
                     onClick={() => onPageChange(item.pageId)}
                   >
@@ -584,7 +585,7 @@ function ConceptPreview({
             </nav>
             <button type="button" onClick={onDemoAction}>Связаться</button>
           </header>
-          <motion.main key={activePage.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }}>
+          <motion.main key={activePage.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={motionTransition.slow}>
             <section className={cn("concept-hero concept-preview-piece", heroVisible && "is-visible")}>
               <div className="concept-hero-copy">
                 <p>{activePage.hero.eyebrow}</p>
@@ -939,7 +940,7 @@ export function WebsiteConceptExperience({
         }
       >
         {concept || isGenerating ? (
-          <div ref={panelRef} className="flex min-h-0 flex-1 flex-col bg-[#f7f8f9]">
+          <div ref={panelRef} className="concept-panel flex min-h-0 flex-1 flex-col bg-[#f7f8f9]">
             <div className="concept-topbar" hidden={isPreview}>
               <div className="concept-topbar-identity min-w-0">
                 {concept ? (

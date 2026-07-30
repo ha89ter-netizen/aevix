@@ -61,6 +61,7 @@ import {
   type HeroBusinessProfile,
 } from "@/lib/hero-analysis";
 import { ANALYSIS_SEQUENCE, useBusiness } from "@/lib/business-context";
+import { motionTransition } from "@/lib/motion";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -765,10 +766,23 @@ function usePremiumMotion() {
       }
     });
 
+    // Writing to documentElement invalidates style for the whole document, so it is coalesced
+    // to at most one write per frame. Previously it ran on every pointermove event — and nothing
+    // in CSS read the result, so it was pure cost; the ambient glow below now consumes it.
+    let cursorFrame = 0;
+    let pendingCursor: { x: number; y: number } | null = null;
+    const flushCursor = () => {
+      cursorFrame = 0;
+      if (!pendingCursor) return;
+      document.documentElement.style.setProperty("--cursor-x", `${pendingCursor.x}px`);
+      document.documentElement.style.setProperty("--cursor-y", `${pendingCursor.y}px`);
+      pendingCursor = null;
+    };
+
     const onPointerMove = (event: PointerEvent) => {
       if (!finePointer || reduceMotion) return;
-      document.documentElement.style.setProperty("--cursor-x", `${event.clientX}px`);
-      document.documentElement.style.setProperty("--cursor-y", `${event.clientY}px`);
+      pendingCursor = { x: event.clientX, y: event.clientY };
+      if (!cursorFrame) cursorFrame = requestAnimationFrame(flushCursor);
 
       const target = event.target instanceof HTMLElement ? event.target : null;
       const surface = target?.closest<HTMLElement>(
@@ -799,6 +813,7 @@ function usePremiumMotion() {
 
     return () => {
       cancelAnimationFrame(frame);
+      if (cursorFrame) cancelAnimationFrame(cursorFrame);
       window.removeEventListener("pointermove", onPointerMove);
       activeMagneticControl?.style.removeProperty("--magnetic-x");
       activeMagneticControl?.style.removeProperty("--magnetic-y");
@@ -934,7 +949,7 @@ function TopNav() {
       <motion.header
         initial={{ opacity: 0, y: -18 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, ease: "easeOut" }}
+        transition={motionTransition.ambient}
         className="site-header fixed inset-x-0 top-0 z-40 px-4 pt-4 sm:px-6"
       >
         <nav className="site-nav mx-auto flex max-w-[74rem] items-center justify-between rounded-full border border-ink/10 bg-porcelain/72 px-3 py-2 shadow-[0_14px_44px_rgba(9,8,7,0.08)] backdrop-blur-2xl">
@@ -1124,7 +1139,7 @@ function HeroAnalysisResult({
     <motion.div
       initial={{ opacity: 0, y: 18, filter: "blur(6px)" }}
       animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      transition={motionTransition.slower}
       className="hero-result glass-panel relative mx-auto w-full max-w-xl overflow-hidden p-5 md:p-6"
       role="status"
       aria-live="polite"
@@ -1169,7 +1184,7 @@ function HeroAnalysisResult({
             key={tile.label}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1], delay: 0.1 + index * 0.05 }}
+            transition={{ ...motionTransition.slow, delay: 0.1 + index * 0.05 }}
             className="hero-metric rounded-2xl border border-ink/8 bg-white/64 px-3 py-2.5"
           >
             <p className="price-display text-xl font-semibold leading-none text-ink">
@@ -1194,7 +1209,7 @@ function HeroAnalysisResult({
             key={phase}
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1], delay: 0.16 + index * 0.06 }}
+            transition={{ ...motionTransition.slow, delay: 0.16 + index * 0.06 }}
             className="hero-roadmap-step"
           >
             <span className="hero-roadmap-dot">{index + 1}</span>
@@ -1373,7 +1388,7 @@ export function HeroAnalyzer() {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                      transition={motionTransition.slower}
                     >
                       {placeholderText}
                     </motion.span>
@@ -1777,7 +1792,7 @@ export function AiConsultantScene({
               <motion.div
                 className="h-full rounded-full bg-violet"
                 animate={{ width: `${progress}%` }}
-                transition={{ duration: 0.35, ease: "easeOut" }}
+                transition={motionTransition.slow}
               />
             </div>
             <div className="grid gap-3">
@@ -1841,7 +1856,7 @@ export function AiConsultantScene({
                 data-mid={message.id}
                 initial={{ opacity: 0, y: 12, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
+                transition={motionTransition.slow}
                 className={cn(
                   "max-w-[94%] shrink-0 whitespace-pre-line break-words rounded-3xl px-4 py-3 text-sm leading-relaxed shadow-[0_14px_38px_rgba(9,8,7,0.06)]",
                   message.role === "user"
@@ -1857,7 +1872,7 @@ export function AiConsultantScene({
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                transition={motionTransition.slow}
                 className="aevix-thinking-pill flex w-fit shrink-0 items-center gap-2 rounded-full border border-violet/14 bg-violet/8 px-4 py-3 text-xs font-medium text-ink/62"
               >
                 <span className="flex items-center gap-1">
@@ -1874,7 +1889,7 @@ export function AiConsultantScene({
               <motion.article
                 initial={{ opacity: 0, y: 18, scale: 0.98, filter: "blur(4px)" }}
                 animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-                transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
+                transition={motionTransition.slower}
                 className="shrink-0 overflow-hidden rounded-[1.75rem] border border-ink/7 bg-white/86 p-4 text-ink shadow-[0_22px_60px_rgba(76,63,118,0.12)]"
               >
                 <div className="flex flex-col gap-3 border-b border-ink/7 pb-4 sm:flex-row sm:items-start sm:justify-between">
@@ -1906,7 +1921,7 @@ export function AiConsultantScene({
                             key={item}
                             initial={{ opacity: 0, x: -8 }}
                             animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1], delay: 0.08 + index * 0.05 }}
+                            transition={{ ...motionTransition.slow, delay: 0.08 + index * 0.05 }}
                             className="flex gap-2.5 text-sm leading-6 text-ink/68"
                           >
                             <span className="ai-dot" />
@@ -1935,7 +1950,7 @@ export function AiConsultantScene({
                             key={item}
                             initial={{ opacity: 0, x: -8 }}
                             animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1], delay: 0.16 + index * 0.05 }}
+                            transition={{ ...motionTransition.slow, delay: 0.16 + index * 0.05 }}
                             className="flex gap-2.5 text-sm leading-6 text-ink/68"
                           >
                             <span className="ai-dot" />
@@ -1955,7 +1970,7 @@ export function AiConsultantScene({
                             key={item}
                             initial={{ opacity: 0, x: -8 }}
                             animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1], delay: 0.2 + index * 0.05 }}
+                            transition={{ ...motionTransition.slow, delay: 0.2 + index * 0.05 }}
                             className="flex gap-2.5 text-sm leading-6 text-ink/68"
                           >
                             <Check className="mt-0.5 h-4 w-4 shrink-0 text-violet" />
@@ -2027,7 +2042,7 @@ export function AiConsultantScene({
                                 <motion.span
                                   initial={{ scaleY: 0, opacity: 0 }}
                                   animate={{ scaleY: 1, opacity: 1 }}
-                                  transition={{ delay: index * 0.08, duration: 0.34 }}
+                                  transition={{ ...motionTransition.slow, delay: index * 0.08 }}
                                   className={cn(
                                     "aevix-flow-rail-line origin-top",
                                     expandedNode === index || expandedNode === index + 1 ? "bg-violet/45" : "bg-ink/12",
@@ -2195,18 +2210,24 @@ function useEcosystemQuality(): "high" | "low" {
   return quality;
 }
 
-/** A separate signal from quality: this decides which of the two hand-authored fixed
- * compositions (and which camera rig) the 3D scene uses — a real breakpoint, not the
- * fine-pointer heuristic quality relies on, since a touch tablet at a wide viewport should still
- * get the desktop layout. */
+/** A separate signal from quality: this decides which of the three fixed compositions (and which
+ * camera rig) the 3D scene uses — a real breakpoint, not the fine-pointer heuristic quality
+ * relies on, since a touch tablet at a wide viewport should still get the wide layout. Each
+ * band has its own ellipse and sphere scale in composition.ts, because a phone is not a small
+ * desktop: there the binding constraint is label width, not available height. */
 function useEcosystemDevice(): EcosystemDevice {
   const [device, setDevice] = useState<EcosystemDevice>("desktop");
   useEffect(() => {
-    const query = window.matchMedia("(max-width: 767px)");
-    const update = () => setDevice(query.matches ? "mobile" : "desktop");
+    const phone = window.matchMedia("(max-width: 599px)");
+    const tablet = window.matchMedia("(min-width: 600px) and (max-width: 1023px)");
+    const update = () => setDevice(phone.matches ? "mobile" : tablet.matches ? "tablet" : "desktop");
     update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
+    phone.addEventListener("change", update);
+    tablet.addEventListener("change", update);
+    return () => {
+      phone.removeEventListener("change", update);
+      tablet.removeEventListener("change", update);
+    };
   }, []);
   return device;
 }
@@ -3000,7 +3021,7 @@ function ResultsScene() {
             key={profile.category}
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.44, ease: [0.22, 1, 0.36, 1] }}
+            transition={motionTransition.slower}
             className="hero-personal-case mb-6 rounded-[2rem] border border-violet/18 bg-gradient-to-br from-white via-[#f8f4ff] to-[#eef1f7] p-6"
           >
             <div className="mb-4 flex items-center gap-2 text-sm font-medium uppercase tracking-[0.18em] text-violet">
@@ -3516,7 +3537,19 @@ function AppShell({ children }: { children: ReactNode }) {
   const { status, content } = useBusiness();
   const accent = status === "ready" && content ? content.accent : null;
   const style = accent
-    ? ({ "--accent-r": accent.r, "--accent-g": accent.g, "--accent-b": accent.b } as CSSProperties)
+    ? ({
+        "--accent-r": accent.r,
+        "--accent-g": accent.g,
+        "--accent-b": accent.b,
+        // Ambient tones ride along with the accent so the whole room lights differently per
+        // business, not just the interactive colour.
+        "--mood-a-r": content!.mood.a.r,
+        "--mood-a-g": content!.mood.a.g,
+        "--mood-a-b": content!.mood.a.b,
+        "--mood-b-r": content!.mood.b.r,
+        "--mood-b-g": content!.mood.b.g,
+        "--mood-b-b": content!.mood.b.b,
+      } as CSSProperties)
     : undefined;
 
   // One-shot accent sweep at the moment the interface re-themes, tying the rebuild together.

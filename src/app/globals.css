@@ -15,6 +15,35 @@
   --accent-r: 118;
   --accent-g: 89;
   --accent-b: 247;
+  /* Motion scale — mirrored exactly in src/lib/motion.ts so CSS, Framer Motion and GSAP can
+     never drift apart. Five semantic speeds replace the fifteen ad-hoc durations this file
+     used to carry. */
+  /* Ambient tones, overridden per recognised business (see BusinessMood). Defaults match the
+     original hard-coded orb colours exactly, so an unrecognised visitor sees no change. */
+  --mood-a-r: 129;
+  --mood-a-g: 176;
+  --mood-a-b: 255;
+  --mood-b-r: 255;
+  --mood-b-g: 197;
+  --mood-b-b: 163;
+
+  /* Corner radii. The file previously mixed px and rem for the same concept (0.85rem next to
+     14px, 1.1rem next to 18px), which made "the same" corner subtly different between
+     neighbouring components. One unit, one scale. */
+  --radius-xs: 8px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-pill: 999px;
+
+  --motion-fast: 180ms;
+  --motion-base: 220ms;
+  --motion-slow: 320ms;
+  --motion-slower: 480ms;
+  --motion-ambient: 700ms;
+
   --ease-premium: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-soft: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -69,7 +98,7 @@ body {
     transparent 62%
   );
   opacity: 0;
-  animation: app-rebuild-flash 950ms var(--ease-premium) forwards;
+  animation: app-rebuild-flash var(--motion-ambient) var(--ease-premium) forwards;
 }
 
 @keyframes app-rebuild-flash {
@@ -96,10 +125,10 @@ body {
 .nav-persona-chip svg,
 .hero-recommend-badge {
   transition:
-    color 600ms var(--ease-premium),
-    fill 600ms var(--ease-premium),
-    background-color 600ms var(--ease-premium),
-    border-color 600ms var(--ease-premium);
+    color var(--motion-ambient) var(--ease-premium),
+    fill var(--motion-ambient) var(--ease-premium),
+    background-color var(--motion-ambient) var(--ease-premium),
+    border-color var(--motion-ambient) var(--ease-premium);
 }
 
 .aevix-atmosphere {
@@ -110,10 +139,42 @@ body {
   pointer-events: none;
 }
 
+/* A soft light that follows the pointer, tinted by the current business accent. This is what
+   --cursor-x/--cursor-y were always being computed for — the values were written on every
+   pointer move but no rule consumed them, so the work was being done and thrown away. One
+   compositor-friendly layer (no blur filter, no per-frame JS beyond the coalesced variable
+   write) turns that into the hero's depth cue. */
+.aevix-atmosphere::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    36rem 36rem at var(--cursor-x) var(--cursor-y),
+    rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.07),
+    transparent 68%
+  );
+  opacity: 0;
+  transition: opacity var(--motion-ambient) var(--ease-soft);
+}
+
+/* Only where a real cursor exists, and never against the user's motion preference. */
+@media (hover: hover) and (pointer: fine) {
+  .aevix-atmosphere::after {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aevix-atmosphere::after {
+    display: none;
+  }
+}
+
 .aevix-orb {
   position: absolute;
   border-radius: 50%;
   will-change: transform;
+  transition: background var(--motion-ambient) var(--ease-soft);
 }
 
 .aevix-orb-1 {
@@ -131,7 +192,7 @@ body {
   right: -14%;
   width: 40rem;
   height: 40rem;
-  background: radial-gradient(circle, rgba(129, 176, 255, 0.14), rgba(129, 176, 255, 0) 70%);
+  background: radial-gradient(circle, rgb(var(--mood-a-r) var(--mood-a-g) var(--mood-a-b) / 0.14), rgb(var(--mood-a-r) var(--mood-a-g) var(--mood-a-b) / 0) 70%);
   filter: blur(10px);
   animation: aevix-orb-float-b 44s var(--ease-soft) infinite;
 }
@@ -141,7 +202,7 @@ body {
   left: 26%;
   width: 50rem;
   height: 50rem;
-  background: radial-gradient(circle, rgba(255, 197, 163, 0.1), rgba(255, 197, 163, 0) 72%);
+  background: radial-gradient(circle, rgb(var(--mood-b-r) var(--mood-b-g) var(--mood-b-b) / 0.1), rgb(var(--mood-b-r) var(--mood-b-g) var(--mood-b-b) / 0) 72%);
   filter: blur(10px);
   animation: aevix-orb-float-c 50s var(--ease-soft) infinite;
 }
@@ -192,7 +253,7 @@ body::before {
 
 .glass-panel {
   border: 1px solid var(--line);
-  border-radius: 8px !important;
+  border-radius: var(--radius-xs) !important;
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(247, 248, 249, 0.72));
   box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(18px);
@@ -200,13 +261,13 @@ body::before {
 
 .dark-glass {
   border: 1px solid rgba(255, 255, 255, 0.11);
-  border-radius: 8px !important;
+  border-radius: var(--radius-xs) !important;
   background: linear-gradient(150deg, rgba(31, 33, 36, 0.98), rgba(16, 17, 19, 0.99));
   box-shadow: 0 30px 90px rgba(15, 18, 22, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .aevix-ai-panel {
-  border-radius: 8px !important;
+  border-radius: var(--radius-xs) !important;
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.93), rgba(239, 242, 248, 0.82));
   box-shadow: 0 36px 110px rgba(60, 68, 84, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }
@@ -270,7 +331,7 @@ body::before {
   align-items: center;
   gap: 0.4rem;
   border: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.18);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.94);
   padding: 0.45rem 0.75rem;
   box-shadow: 0 14px 36px rgba(72, 61, 108, 0.15);
@@ -285,13 +346,13 @@ body::before {
 }
 
 .aevix-ai-scroll::-webkit-scrollbar-track {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.38);
 }
 
 .aevix-ai-scroll::-webkit-scrollbar-thumb {
   border: 1px solid rgba(255, 255, 255, 0.62);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.38);
 }
 
@@ -325,7 +386,7 @@ body::before {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.1);
   color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
 }
@@ -343,8 +404,8 @@ body::before {
   width: 2px;
   flex: 1;
   min-height: 1.1rem;
-  border-radius: 999px;
-  transition: background 240ms var(--ease-premium), opacity 240ms var(--ease-premium);
+  border-radius: var(--radius-pill);
+  transition: background var(--motion-base) var(--ease-premium), opacity var(--motion-base) var(--ease-premium);
 }
 
 .aevix-flow-row:not(:last-child) {
@@ -363,11 +424,11 @@ body::before {
 .aevix-ai-action,
 .aevix-icon-action {
   transition:
-    transform 220ms var(--ease-premium),
-    box-shadow 220ms var(--ease-premium),
-    border-color 220ms var(--ease-premium),
-    background 220ms var(--ease-premium),
-    color 220ms var(--ease-premium);
+    transform var(--motion-base) var(--ease-premium),
+    box-shadow var(--motion-base) var(--ease-premium),
+    border-color var(--motion-base) var(--ease-premium),
+    background var(--motion-base) var(--ease-premium),
+    color var(--motion-base) var(--ease-premium);
 }
 
 .aevix-ai-action:hover,
@@ -470,10 +531,10 @@ body::before {
 .faq-item {
   overflow: hidden;
   border: 1px solid rgba(17, 20, 24, 0.09);
-  border-radius: 1.25rem;
+  border-radius: var(--radius-xl);
   background: rgba(255, 255, 255, 0.6);
-  transition: border-color 260ms var(--ease-premium), background 260ms var(--ease-premium),
-    box-shadow 260ms var(--ease-premium);
+  transition: border-color var(--motion-slow) var(--ease-premium), background var(--motion-slow) var(--ease-premium),
+    box-shadow var(--motion-slow) var(--ease-premium);
 }
 
 .faq-item.is-open {
@@ -497,13 +558,13 @@ body::before {
 
 .faq-chevron {
   color: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.9);
-  transition: transform 320ms var(--ease-premium);
+  transition: transform var(--motion-slow) var(--ease-premium);
 }
 
 .faq-answer {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 360ms var(--ease-premium);
+  transition: grid-template-rows var(--motion-slower) var(--ease-premium);
 }
 
 .faq-item.is-open .faq-answer {
@@ -518,7 +579,7 @@ body::before {
   font-size: 0.98rem;
   line-height: 1.6;
   opacity: 0;
-  transition: opacity 320ms var(--ease-premium), padding 360ms var(--ease-premium);
+  transition: opacity var(--motion-slow) var(--ease-premium), padding var(--motion-slower) var(--ease-premium);
 }
 
 .faq-item.is-open .faq-answer > p {
@@ -545,7 +606,7 @@ body::before {
 
 .contact-form-card {
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 1.5rem;
+  border-radius: var(--radius-2xl);
   background: rgba(255, 255, 255, 0.05);
   padding: 1.5rem;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
@@ -582,15 +643,15 @@ body::before {
 .lead-input {
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 0.85rem;
+  border-radius: var(--radius-md);
   background: rgba(9, 8, 7, 0.28);
   padding: 0.7rem 0.85rem;
   color: #fffaf2;
   font-family: inherit;
   font-size: 0.95rem;
   outline: none;
-  transition: border-color 200ms var(--ease-premium), box-shadow 200ms var(--ease-premium),
-    background 200ms var(--ease-premium);
+  transition: border-color var(--motion-base) var(--ease-premium), box-shadow var(--motion-base) var(--ease-premium),
+    background var(--motion-base) var(--ease-premium);
 }
 
 .lead-input::placeholder {
@@ -650,7 +711,7 @@ body::before {
   width: 3rem;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.2);
   color: #fffaf2;
   margin-bottom: 0.9rem;
@@ -659,13 +720,13 @@ body::before {
 .contact-sent-again {
   margin-top: 1.1rem;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.06);
   padding: 0.5rem 1rem;
   color: rgba(255, 250, 242, 0.8);
   font-size: 0.8rem;
   font-weight: 600;
-  transition: background 200ms var(--ease-premium);
+  transition: background var(--motion-base) var(--ease-premium);
 }
 
 .contact-sent-again:hover {
@@ -690,7 +751,7 @@ body::before {
   width: 3.25rem;
   align-items: center;
   justify-content: center;
-  border-radius: 1rem;
+  border-radius: var(--radius-md);
   background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.12);
   color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
   margin-bottom: 1rem;
@@ -723,11 +784,11 @@ body::before {
   align-items: center;
   gap: 0.9rem;
   border: 1px solid rgba(17, 20, 24, 0.1);
-  border-radius: 1.1rem;
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.7);
   padding: 0.85rem 1rem;
-  transition: transform 220ms var(--ease-premium), border-color 220ms var(--ease-premium),
-    box-shadow 220ms var(--ease-premium), background 220ms var(--ease-premium);
+  transition: transform var(--motion-base) var(--ease-premium), border-color var(--motion-base) var(--ease-premium),
+    box-shadow var(--motion-base) var(--ease-premium), background var(--motion-base) var(--ease-premium);
 }
 
 .consult-option:hover {
@@ -751,7 +812,7 @@ body::before {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 0.85rem;
+  border-radius: var(--radius-md);
   color: #fff;
 }
 
@@ -794,7 +855,7 @@ body::before {
   width: 2.6rem;
   align-items: center;
   justify-content: center;
-  border-radius: 0.85rem;
+  border-radius: var(--radius-md);
   background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.1);
   color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
 }
@@ -803,15 +864,15 @@ body::before {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid rgba(17, 20, 24, 0.1);
   background: rgba(255, 255, 255, 0.7);
   padding: 0.35rem 0.7rem;
   color: rgba(9, 8, 7, 0.62);
   font-size: 0.74rem;
   font-weight: 600;
-  transition: color 200ms var(--ease-premium), border-color 200ms var(--ease-premium),
-    background 200ms var(--ease-premium);
+  transition: color var(--motion-base) var(--ease-premium), border-color var(--motion-base) var(--ease-premium),
+    background var(--motion-base) var(--ease-premium);
 }
 
 .capability-demo:hover {
@@ -837,7 +898,7 @@ body::before {
 /* The answer-first block: always the first thing read, so it gets its own visual weight
    instead of looking like just another report section. */
 .ai-short-answer {
-  border-radius: 1.15rem;
+  border-radius: var(--radius-lg);
   border: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.16);
   background: linear-gradient(135deg, rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.08), transparent 70%);
   padding: 1.1rem 1.2rem;
@@ -875,7 +936,7 @@ body::before {
   height: 0.35rem;
   width: 0.35rem;
   flex-shrink: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
 }
 
@@ -883,14 +944,14 @@ body::before {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.26);
   background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.09);
   padding: 0.3rem 0.7rem;
   color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
   font-size: 0.74rem;
   font-weight: 600;
-  transition: background 200ms var(--ease-premium), transform 200ms var(--ease-premium);
+  transition: background var(--motion-base) var(--ease-premium), transform var(--motion-base) var(--ease-premium);
 }
 
 .ai-calc-link:hover {
@@ -902,11 +963,11 @@ body::before {
   display: flex;
   align-items: center;
   gap: 0.8rem;
-  border-radius: 1rem;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(17, 20, 24, 0.07);
   background: rgba(255, 255, 255, 0.6);
   padding: 0.65rem 0.85rem;
-  transition: border-color 200ms var(--ease-premium), background 200ms var(--ease-premium);
+  transition: border-color var(--motion-base) var(--ease-premium), background var(--motion-base) var(--ease-premium);
 }
 
 .ai-service-row:hover {
@@ -921,7 +982,7 @@ body::before {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 0.7rem;
+  border-radius: var(--radius-md);
   background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.1);
   color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
 }
@@ -945,7 +1006,7 @@ body::before {
 
 .site-nav-link {
   position: relative;
-  transition: color 220ms var(--ease-premium), transform 220ms var(--ease-premium);
+  transition: color var(--motion-base) var(--ease-premium), transform var(--motion-base) var(--ease-premium);
 }
 
 .site-nav-link::after {
@@ -958,7 +1019,7 @@ body::before {
   background: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
   opacity: 0;
   transform: scaleX(0.35);
-  transition: opacity 220ms var(--ease-premium), transform 220ms var(--ease-premium);
+  transition: opacity var(--motion-base) var(--ease-premium), transform var(--motion-base) var(--ease-premium);
 }
 
 .site-nav-link:hover::after,
@@ -1020,13 +1081,13 @@ body::before {
   align-items: flex-end;
   gap: 0.6rem;
   border: 1px solid rgba(17, 20, 24, 0.12);
-  border-radius: 1.25rem;
+  border-radius: var(--radius-xl);
   background: rgba(255, 255, 255, 0.72);
   padding: 0.65rem 0.7rem 0.65rem 1rem;
   box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(18px);
-  transition: border-color 260ms var(--ease-premium), box-shadow 260ms var(--ease-premium),
-    background 260ms var(--ease-premium);
+  transition: border-color var(--motion-slow) var(--ease-premium), box-shadow var(--motion-slow) var(--ease-premium),
+    background var(--motion-slow) var(--ease-premium);
 }
 
 .hero-field.is-focused {
@@ -1093,7 +1154,7 @@ body::before {
   padding-left: 0.15rem;
   color: rgba(9, 8, 7, 0.46);
   font-size: 0.8rem;
-  transition: color 220ms var(--ease-premium);
+  transition: color var(--motion-base) var(--ease-premium);
 }
 
 .hero-input-hint.is-error {
@@ -1119,7 +1180,7 @@ body::before {
 }
 
 .hero-result {
-  border-radius: 1.5rem !important;
+  border-radius: var(--radius-2xl) !important;
 }
 
 .hero-loading-mark {
@@ -1135,11 +1196,11 @@ body::before {
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  border-radius: 1rem;
+  border-radius: var(--radius-md);
   padding: 0.6rem 0.8rem;
   font-size: 0.9rem;
   font-weight: 550;
-  transition: background 320ms var(--ease-premium), color 320ms var(--ease-premium);
+  transition: background var(--motion-slow) var(--ease-premium), color var(--motion-slow) var(--ease-premium);
 }
 
 .hero-sequence-step.is-todo {
@@ -1162,14 +1223,14 @@ body::before {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid rgba(17, 20, 24, 0.12);
   background: rgba(255, 255, 255, 0.7);
   font-size: 0.72rem;
   font-weight: 650;
   color: rgba(9, 8, 7, 0.5);
-  transition: background 320ms var(--ease-premium), border-color 320ms var(--ease-premium),
-    color 320ms var(--ease-premium);
+  transition: background var(--motion-slow) var(--ease-premium), border-color var(--motion-slow) var(--ease-premium),
+    color var(--motion-slow) var(--ease-premium);
 }
 
 .hero-sequence-step.is-active .hero-sequence-dot {
@@ -1192,7 +1253,7 @@ body::before {
 .hero-confidence {
   display: inline-flex;
   align-items: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.26);
   background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.1);
   padding: 0.3rem 0.55rem;
@@ -1200,12 +1261,12 @@ body::before {
   font-size: 0.72rem;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
-  transition: color 600ms var(--ease-premium), background-color 600ms var(--ease-premium),
-    border-color 600ms var(--ease-premium);
+  transition: color var(--motion-ambient) var(--ease-premium), background-color var(--motion-ambient) var(--ease-premium),
+    border-color var(--motion-ambient) var(--ease-premium);
 }
 
 .hero-confidence-hint {
-  border-radius: 0.85rem;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(180, 130, 40, 0.24);
   background: rgba(251, 243, 224, 0.7);
   padding: 0.5rem 0.75rem;
@@ -1229,14 +1290,14 @@ body::before {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid rgba(17, 20, 24, 0.09);
   background: rgba(255, 255, 255, 0.7);
   padding: 0.35rem 0.7rem 0.35rem 0.35rem;
   color: rgba(9, 8, 7, 0.72);
   font-size: 0.78rem;
   font-weight: 550;
-  transition: border-color 600ms var(--ease-premium), background-color 600ms var(--ease-premium);
+  transition: border-color var(--motion-ambient) var(--ease-premium), background-color var(--motion-ambient) var(--ease-premium);
 }
 
 .hero-roadmap-dot {
@@ -1246,19 +1307,19 @@ body::before {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.14);
   color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
   font-size: 0.64rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  transition: color 600ms var(--ease-premium), background-color 600ms var(--ease-premium);
+  transition: color var(--motion-ambient) var(--ease-premium), background-color var(--motion-ambient) var(--ease-premium);
 }
 
 .hero-recommend-badge {
   display: inline-flex;
   align-items: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.28);
   background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.12);
   padding: 0.25rem 0.6rem;
@@ -1275,7 +1336,7 @@ body::before {
 
 /* ---- Navigation Center ---- */
 .nav-persona-chip {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.22);
   background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.08);
   padding: 0.3rem 0.7rem;
@@ -1319,12 +1380,12 @@ body::before {
   justify-content: space-between;
   gap: 1rem;
   width: 100%;
-  border-radius: 1.25rem;
+  border-radius: var(--radius-xl);
   border: 1px solid rgba(17, 20, 24, 0.1);
   background: rgba(255, 255, 255, 0.66);
   padding: 0.95rem 1.1rem;
   text-align: left;
-  transition: border-color 240ms var(--ease-premium), background 240ms var(--ease-premium);
+  transition: border-color var(--motion-base) var(--ease-premium), background var(--motion-base) var(--ease-premium);
 }
 
 .nav-center-status.is-idle:hover {
@@ -1344,7 +1405,7 @@ body::before {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 0.9rem;
+  border-radius: var(--radius-md);
   background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.12);
   color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
 }
@@ -1368,14 +1429,14 @@ body::before {
   flex-shrink: 0;
   align-items: center;
   gap: 0.35rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid rgba(17, 20, 24, 0.12);
   background: rgba(255, 255, 255, 0.8);
   padding: 0.4rem 0.7rem;
   color: rgba(9, 8, 7, 0.6);
   font-size: 0.74rem;
   font-weight: 600;
-  transition: color 200ms var(--ease-premium), border-color 200ms var(--ease-premium);
+  transition: color var(--motion-base) var(--ease-premium), border-color var(--motion-base) var(--ease-premium);
 }
 
 .nav-center-reset:hover {
@@ -1399,13 +1460,13 @@ body::before {
   position: relative;
   display: grid;
   gap: 0.15rem;
-  border-radius: 1.1rem;
+  border-radius: var(--radius-lg);
   border: 1px solid rgba(17, 20, 24, 0.09);
   background: rgba(255, 255, 255, 0.62);
   padding: 0.9rem 1rem;
   text-align: left;
-  transition: transform 240ms var(--ease-premium), border-color 240ms var(--ease-premium),
-    background 240ms var(--ease-premium), box-shadow 240ms var(--ease-premium);
+  transition: transform var(--motion-base) var(--ease-premium), border-color var(--motion-base) var(--ease-premium),
+    background var(--motion-base) var(--ease-premium), box-shadow var(--motion-base) var(--ease-premium);
 }
 
 .nav-center-card:hover {
@@ -1473,7 +1534,7 @@ body::before {
 .aevix-loading-dots > span {
   width: 0.25rem;
   height: 0.25rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: currentColor;
   animation: loading-dot 1s ease-in-out infinite;
 }
@@ -1553,7 +1614,7 @@ body::before {
   gap: 2rem;
   padding: 1.5rem;
   border: 1px solid rgba(17, 20, 24, 0.09);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(238, 241, 246, 0.84));
   box-shadow: 0 22px 60px rgba(18, 22, 27, 0.09);
 }
@@ -1676,11 +1737,11 @@ body::before {
   justify-content: center;
   gap: 0.5rem;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   color: rgba(9, 8, 7, 0.44);
   font-size: 0.78rem;
   font-weight: 600;
-  transition: 220ms var(--ease-premium);
+  transition: var(--motion-base) var(--ease-premium);
 }
 
 .concept-progress button span {
@@ -1689,7 +1750,7 @@ body::before {
   height: 1.5rem;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(9, 8, 7, 0.06);
 }
 
@@ -1715,7 +1776,7 @@ body::before {
 .concept-step-grid {
   display: grid;
   gap: 1.25rem;
-  animation: concept-reveal 260ms ease-out;
+  animation: concept-reveal var(--motion-slow) ease-out;
 }
 
 .concept-field {
@@ -1734,11 +1795,11 @@ body::before {
 .concept-topbar input {
   width: 100%;
   border: 1px solid rgba(17, 20, 24, 0.1);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   background: rgba(255, 255, 255, 0.88);
   color: #090807;
   outline: none;
-  transition: border-color 180ms var(--ease-premium), box-shadow 180ms var(--ease-premium);
+  transition: border-color var(--motion-fast) var(--ease-premium), box-shadow var(--motion-fast) var(--ease-premium);
 }
 
 .concept-field input,
@@ -1777,13 +1838,13 @@ body::before {
   gap: 0.6rem;
   padding: 0.8rem 1rem;
   border: 1px solid rgba(17, 20, 24, 0.09);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   background: rgba(255, 255, 255, 0.64);
   color: rgba(9, 8, 7, 0.68);
   font-size: 0.9rem;
   font-weight: 550;
   text-align: left;
-  transition: transform 220ms var(--ease-premium), border-color 220ms var(--ease-premium), background 220ms var(--ease-premium), box-shadow 220ms var(--ease-premium);
+  transition: transform var(--motion-base) var(--ease-premium), border-color var(--motion-base) var(--ease-premium), background var(--motion-base) var(--ease-premium), box-shadow var(--motion-base) var(--ease-premium);
 }
 
 .concept-choice-grid button:hover {
@@ -1811,10 +1872,10 @@ body::before {
   gap: 0.45rem;
   padding: 0.75rem 0.4rem;
   border: 1px solid rgba(17, 20, 24, 0.09);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.64);
   text-align: center;
-  transition: transform 220ms var(--ease-premium), border-color 220ms var(--ease-premium), box-shadow 220ms var(--ease-premium);
+  transition: transform var(--motion-base) var(--ease-premium), border-color var(--motion-base) var(--ease-premium), box-shadow var(--motion-base) var(--ease-premium);
 }
 
 .concept-color-grid > button:hover {
@@ -1859,7 +1920,7 @@ body::before {
   width: 1.05rem;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1.5px solid #fff;
   background: #7257e8;
   color: #fff;
@@ -1891,7 +1952,7 @@ body::before {
 
 .concept-color-count {
   flex-shrink: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(114, 87, 232, 0.1);
   padding: 0.2rem 0.6rem;
   color: #7257e8;
@@ -1946,7 +2007,7 @@ body::before {
   align-items: center;
   justify-content: center;
   border: 1px solid rgba(114, 87, 232, 0.2);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   background: rgba(114, 87, 232, 0.08);
   color: #7257e8;
   box-shadow: 0 20px 55px rgba(114, 87, 232, 0.14);
@@ -1958,7 +2019,7 @@ body::before {
   inset: -10px;
   content: "";
   border: 1px solid rgba(114, 87, 232, 0.16);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   animation: concept-mark-ring 2.6s var(--ease-soft) infinite;
 }
 
@@ -2001,6 +2062,11 @@ body::before {
    cramped toolbar row. Desktop: sidebar is a permanent flex child. Mobile: sidebar becomes an
    off-canvas drawer, shown only through CSS (visibility, not JS media-query state), which also
    keeps it out of the tab order for free while closed. */
+/* Positioning context for the floating pipeline status. */
+.concept-panel {
+  position: relative;
+}
+
 .concept-workspace-shell {
   display: flex;
   min-height: 0;
@@ -2057,13 +2123,13 @@ body::before {
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  border-radius: 0.65rem;
+  border-radius: var(--radius-sm);
   padding: 0.55rem 0.6rem;
   color: rgba(9, 8, 7, 0.66);
   font-size: 0.86rem;
   font-weight: 550;
   text-align: left;
-  transition: background 160ms var(--ease-premium), color 160ms var(--ease-premium);
+  transition: background var(--motion-fast) var(--ease-premium), color var(--motion-fast) var(--ease-premium);
 }
 
 .concept-sidebar-item:hover {
@@ -2091,7 +2157,7 @@ body::before {
   display: block;
   height: 0.85rem;
   width: 60%;
-  border-radius: 0.3rem;
+  border-radius: var(--radius-xs);
   background: rgba(17, 20, 24, 0.07);
   animation: concept-pipeline-pulse 1.4s ease-in-out infinite;
 }
@@ -2101,7 +2167,7 @@ body::before {
   flex-direction: column;
   gap: 0.15rem;
   margin-top: 0.25rem;
-  border-radius: 0.75rem;
+  border-radius: var(--radius-md);
   background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.07);
   padding: 0.7rem 0.85rem;
 }
@@ -2152,7 +2218,7 @@ body::before {
     visibility: hidden;
     transform: translateX(-100%);
     box-shadow: 0 24px 60px rgba(17, 20, 24, 0.22);
-    transition: transform 260ms var(--ease-premium), visibility 260ms;
+    transition: transform var(--motion-slow) var(--ease-premium), visibility var(--motion-slow);
   }
 
   .concept-sidebar.is-open {
@@ -2203,10 +2269,10 @@ body::before {
     width: 2.35rem;
     flex: 0 0 auto;
     place-content: center;
-    border-radius: 0.65rem;
+    border-radius: var(--radius-sm);
     border: 1px solid rgba(17, 20, 24, 0.1);
     color: rgba(9, 8, 7, 0.7);
-    transition: background 160ms var(--ease-premium);
+    transition: background var(--motion-fast) var(--ease-premium);
   }
 
   .concept-hamburger:hover {
@@ -2239,10 +2305,10 @@ body::before {
   height: 2.35rem;
   width: 2.35rem;
   place-content: center;
-  border-radius: 0.65rem;
+  border-radius: var(--radius-sm);
   border: 1px solid rgba(17, 20, 24, 0.1);
   color: rgba(9, 8, 7, 0.7);
-  transition: background 160ms var(--ease-premium);
+  transition: background var(--motion-fast) var(--ease-premium);
 }
 
 .concept-topbar-refresh:hover {
@@ -2331,12 +2397,12 @@ body::before {
   gap: 0.45rem;
   padding: 0 0.75rem;
   border: 1px solid rgba(17, 20, 24, 0.09);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: #fff;
   color: rgba(9, 8, 7, 0.62);
   font-size: 0.75rem;
   font-weight: 600;
-  transition: 200ms var(--ease-premium);
+  transition: var(--motion-base) var(--ease-premium);
 }
 
 .concept-mode-switch button:hover,
@@ -2350,7 +2416,7 @@ body::before {
   display: flex;
   padding: 0.2rem;
   border: 1px solid rgba(17, 20, 24, 0.08);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: #eef1f4;
 }
 
@@ -2434,7 +2500,7 @@ body::before {
   display: flex;
   gap: 0.5rem;
   opacity: 1;
-  transition: opacity 320ms var(--ease-premium), transform 320ms var(--ease-premium);
+  transition: opacity var(--motion-slow) var(--ease-premium), transform var(--motion-slow) var(--ease-premium);
 }
 
 .concept-preview-exit.is-idle {
@@ -2452,7 +2518,7 @@ body::before {
   align-items: center;
   gap: 0.4rem;
   border: 1px solid rgba(17, 20, 24, 0.1);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.92);
   padding: 0.5rem 0.9rem;
   color: rgba(9, 8, 7, 0.68);
@@ -2460,7 +2526,7 @@ body::before {
   font-weight: 650;
   box-shadow: 0 14px 40px rgba(18, 22, 27, 0.16);
   backdrop-filter: blur(14px);
-  transition: transform 220ms var(--ease-premium), color 220ms var(--ease-premium), box-shadow 220ms var(--ease-premium);
+  transition: transform var(--motion-base) var(--ease-premium), color var(--motion-base) var(--ease-premium), box-shadow var(--motion-base) var(--ease-premium);
 }
 
 .concept-preview-exit button:last-child {
@@ -2482,7 +2548,7 @@ body::before {
 
 .concept-preview-stage::-webkit-scrollbar-thumb {
   border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.28);
 }
 
@@ -2492,7 +2558,7 @@ body::before {
   overflow: hidden;
   margin: 0 auto;
   border: 1px solid rgba(17, 20, 24, 0.12);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   background: #fff;
   box-shadow: 0 28px 80px rgba(18, 22, 27, 0.16);
 }
@@ -2624,7 +2690,7 @@ body::before {
   color: var(--concept-bg);
   font-size: 0.75rem;
   font-weight: var(--concept-heading-weight);
-  transition: transform 240ms var(--ease-premium), box-shadow 240ms var(--ease-premium), background 240ms var(--ease-premium), color 240ms var(--ease-premium);
+  transition: transform var(--motion-base) var(--ease-premium), box-shadow var(--motion-base) var(--ease-premium), background var(--motion-base) var(--ease-premium), color var(--motion-base) var(--ease-premium);
 }
 
 .concept-nav > nav button {
@@ -2635,7 +2701,7 @@ body::before {
   color: color-mix(in srgb, var(--concept-text) 66%, transparent);
   font-size: 0.8rem;
   font-weight: var(--concept-body-weight);
-  transition: color 220ms var(--ease-premium), background 220ms var(--ease-premium), box-shadow 220ms var(--ease-premium);
+  transition: color var(--motion-base) var(--ease-premium), background var(--motion-base) var(--ease-premium), box-shadow var(--motion-base) var(--ease-premium);
 }
 
 .concept-nav > nav button:hover {
@@ -2675,7 +2741,7 @@ body::before {
 .concept-list-grid article,
 .concept-hero-visual > div,
 .concept-gallery-frame {
-  transition: transform 260ms var(--ease-premium), border-color 260ms var(--ease-premium), box-shadow 260ms var(--ease-premium);
+  transition: transform var(--motion-slow) var(--ease-premium), border-color var(--motion-slow) var(--ease-premium), box-shadow var(--motion-slow) var(--ease-premium);
 }
 
 .concept-hero {
@@ -2743,11 +2809,11 @@ body::before {
   width: 100%;
   object-fit: cover;
   opacity: 0;
-  animation: concept-photo-in 900ms var(--ease-premium) forwards;
+  animation: concept-photo-in var(--motion-ambient) var(--ease-premium) forwards;
 }
 
 .concept-hero-photo {
-  animation: concept-photo-in 900ms var(--ease-premium) forwards, concept-kenburns 14s ease-in-out 900ms infinite alternate;
+  animation: concept-photo-in var(--motion-ambient) var(--ease-premium) forwards, concept-kenburns 14s ease-in-out var(--motion-ambient) infinite alternate;
 }
 
 @keyframes concept-photo-in {
@@ -2937,7 +3003,7 @@ body::before {
   bottom: 5.3rem;
   max-width: min(28rem, calc(100% - 2.5rem));
   border: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.18);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   background: rgba(255, 255, 255, 0.96);
   padding: 0.85rem 1rem;
   box-shadow: 0 20px 52px rgba(65, 54, 105, 0.18);
@@ -2945,7 +3011,7 @@ body::before {
   font-size: 0.78rem;
   line-height: 1.5;
   backdrop-filter: blur(14px);
-  animation: concept-reveal 260ms ease-out both;
+  animation: concept-reveal var(--motion-slow) ease-out both;
 }
 
 .concept-footer {
@@ -2969,7 +3035,7 @@ body::before {
   margin-left: 0.5rem;
   padding: 0.14rem 0.5rem;
   border: 1px solid color-mix(in srgb, var(--concept-accent) 35%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--concept-accent) 10%, transparent);
   color: var(--concept-accent);
   font-size: 0.62rem;
@@ -3419,7 +3485,7 @@ body::before {
   font-size: 1.2rem;
   font-weight: 500;
   line-height: 1;
-  transition: transform 200ms var(--ease-premium);
+  transition: transform var(--motion-base) var(--ease-premium);
 }
 
 .concept-faq-item[open] summary::after {
@@ -3777,12 +3843,12 @@ body::before {
   min-height: 2rem;
   flex: 0 0 auto;
   border: 1px solid rgba(17, 20, 24, 0.08);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.66);
   padding: 0.4rem 0.7rem;
   color: rgba(9, 8, 7, 0.58);
   font-size: 0.7rem;
-  transition: border-color 220ms var(--ease-premium), background 220ms var(--ease-premium), color 220ms var(--ease-premium), transform 220ms var(--ease-premium);
+  transition: border-color var(--motion-base) var(--ease-premium), background var(--motion-base) var(--ease-premium), color var(--motion-base) var(--ease-premium), transform var(--motion-base) var(--ease-premium);
 }
 
 .ai-quick-prompts button:hover {
@@ -3798,7 +3864,7 @@ body::before {
   gap: 0.35rem;
   padding: 0.35rem;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.68);
   box-shadow: var(--shadow-soft);
 }
@@ -3806,12 +3872,12 @@ body::before {
 .before-after-switch button,
 .automation-tabs button {
   min-height: 2.65rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0.6rem 1rem;
   color: rgba(9, 8, 7, 0.52);
   font-size: 0.78rem;
   font-weight: 650;
-  transition: background 240ms var(--ease-premium), color 240ms var(--ease-premium), box-shadow 240ms var(--ease-premium), transform 240ms var(--ease-premium);
+  transition: background var(--motion-base) var(--ease-premium), color var(--motion-base) var(--ease-premium), box-shadow var(--motion-base) var(--ease-premium), transform var(--motion-base) var(--ease-premium);
 }
 
 .before-after-switch button[aria-pressed="true"],
@@ -3907,7 +3973,7 @@ body::before {
   transform-origin: 0 50%;
   transform: rotate(var(--angle));
   background: linear-gradient(90deg, rgba(9, 8, 7, 0.22), rgba(9, 8, 7, 0.03));
-  transition: background 700ms var(--ease-premium), opacity 700ms var(--ease-premium);
+  transition: background var(--motion-ambient) var(--ease-premium), opacity var(--motion-ambient) var(--ease-premium);
 }
 
 .ecosystem-wrap.is-after .ecosystem-spoke {
@@ -3930,7 +3996,7 @@ body::before {
   box-shadow: 0 20px 45px rgba(17, 20, 24, 0.14);
   text-align: center;
   animation: ecosystem-core-breathe 5s ease-in-out infinite;
-  transition: background 800ms var(--ease-premium), box-shadow 800ms var(--ease-premium), border-color 800ms var(--ease-premium);
+  transition: background var(--motion-ambient) var(--ease-premium), box-shadow var(--motion-ambient) var(--ease-premium), border-color var(--motion-ambient) var(--ease-premium);
   /* Purely decorative — its square hit-box corners reach close enough to the satellite orbs
      at some angles to steal their clicks otherwise, since it sits at a higher z-index. */
   pointer-events: none;
@@ -3996,7 +4062,7 @@ body::before {
   background: radial-gradient(circle at 35% 30%, #fff, rgba(198, 202, 210, 0.6));
   color: rgba(9, 8, 7, 0.5);
   box-shadow: 0 12px 26px rgba(17, 20, 24, 0.12);
-  transition: background 700ms var(--ease-premium), color 700ms var(--ease-premium), box-shadow 700ms var(--ease-premium), border-color 700ms var(--ease-premium), transform 240ms var(--ease-premium);
+  transition: background var(--motion-ambient) var(--ease-premium), color var(--motion-ambient) var(--ease-premium), box-shadow var(--motion-ambient) var(--ease-premium), border-color var(--motion-ambient) var(--ease-premium), transform var(--motion-base) var(--ease-premium);
 }
 
 .ecosystem-node:hover .ecosystem-node-dot,
@@ -4039,7 +4105,7 @@ body::before {
   gap: 0.6rem;
   padding: 1.5rem;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   background: rgba(255, 255, 255, 0.68);
   box-shadow: var(--shadow-soft);
 }
@@ -4182,7 +4248,7 @@ body::before {
   left: 5.5rem;
   top: 1rem;
   width: min(19rem, 72vw);
-  border-radius: 1.25rem;
+  border-radius: var(--radius-xl);
   border: 1px solid rgba(255, 255, 255, 0.5);
   background: rgba(255, 255, 255, 0.72);
   padding: 1.1rem 1.25rem;
@@ -4291,14 +4357,18 @@ body::before {
   gap: 0.15rem;
   transform: translateY(2.6rem);
   padding: 0.4rem 0.75rem;
-  border-radius: 0.85rem;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(255, 255, 255, 0.5);
   background: rgba(255, 255, 255, 0.68);
   backdrop-filter: blur(10px);
   box-shadow: 0 10px 26px rgba(17, 20, 24, 0.1);
+  max-width: 11rem;
   text-align: center;
-  white-space: nowrap;
-  transition: opacity 500ms var(--ease-premium), transform 200ms var(--ease-premium);
+  /* Deliberately NOT nowrap: an unwrapped title grew to ~236px, which on a phone canvas is wider
+     than the gap between two neighbouring nodes — the single biggest cause of label collisions.
+     Wrapping trades a little height (cheap, nodes are vertically separated) for width (scarce). */
+  text-wrap: balance;
+  transition: opacity var(--motion-slower) var(--ease-premium), transform var(--motion-base) var(--ease-premium);
 }
 
 .ecosystem-node-label-tag:hover {
@@ -4323,9 +4393,28 @@ body::before {
   line-height: 1.3;
 }
 
-@media (max-width: 767px) {
+/* On a phone the canvas is ~358px wide and two neighbouring labels are only ~110px apart, so the
+   tag becomes title-only and compact. Everything the caption said is still one tap away in the
+   detail panel. */
+@media (max-width: 599px) {
+  .ecosystem-node-label-tag {
+    max-width: 5.6rem;
+    padding: 0.28rem 0.5rem;
+    border-radius: var(--radius-sm);
+    transform: translateY(1.85rem);
+  }
+
+  .ecosystem-node-label-tag:hover {
+    transform: translateY(1.85rem) scale(1.04);
+  }
+
   .ecosystem-node-label-title {
-    font-size: 0.9rem;
+    font-size: 0.68rem;
+    line-height: 1.25;
+  }
+
+  .ecosystem-node-label-caption {
+    display: none;
   }
 }
 
@@ -4357,7 +4446,7 @@ body::before {
   backdrop-filter: blur(10px);
   box-shadow: 0 12px 28px rgba(17, 20, 24, 0.1);
   pointer-events: auto;
-  transition: background 200ms var(--ease-premium), transform 200ms var(--ease-premium);
+  transition: background var(--motion-base) var(--ease-premium), transform var(--motion-base) var(--ease-premium);
 }
 
 .ecosystem-arrow:hover {
@@ -4376,6 +4465,19 @@ body::before {
   align-items: center;
   gap: 0.85rem;
   transform: translateX(-50%);
+}
+
+/* On a phone the ring reaches much closer to the bottom of the canvas, so an overlaid dial
+   landed on top of the two lower node labels. Below 600px it drops out of the overlay and sits
+   in normal flow under the scene — same control, no collision, and it gains room for its
+   readout instead of competing for the same pixels. */
+@media (max-width: 599px) {
+  .ecosystem-dial-group {
+    position: static;
+    justify-content: center;
+    margin-top: 0.5rem;
+    transform: none;
+  }
 }
 
 .ecosystem-dial {
@@ -4464,7 +4566,7 @@ body::before {
 
 /* --- "Узнавание проблемы" — a compact tag row, deliberately not a card grid. */
 .recognition-tag {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid rgba(9, 8, 7, 0.1);
   background: rgba(255, 255, 255, 0.6);
   padding: 0.6rem 1.1rem;
@@ -4517,7 +4619,7 @@ body::before {
 
 /* --- "Процесс подключения" — five fixed, numbered steps. */
 .onboarding-step {
-  border-radius: 1.5rem;
+  border-radius: var(--radius-2xl);
   border: 1px solid rgba(9, 8, 7, 0.08);
   background: rgba(255, 255, 255, 0.56);
   padding: 1.5rem 1.25rem;
@@ -4557,7 +4659,7 @@ body::before {
   margin-top: 1.75rem;
   overflow-x: auto;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   background: rgba(255, 255, 255, 0.48);
 }
 
@@ -4592,7 +4694,7 @@ body::before {
   top: 50%;
   z-index: 2;
   width: 1.2rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: #fff;
   padding: 0.2rem;
   color: #7257e8;
@@ -4601,7 +4703,7 @@ body::before {
 .automation-demo {
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   background: rgba(255, 255, 255, 0.72);
   box-shadow: 0 30px 90px rgba(55, 62, 78, 0.12);
 }
@@ -4624,7 +4726,7 @@ body::before {
 }
 
 .automation-customer span {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: #17181b;
   padding: 0.45rem 0.7rem;
   color: #fff;
@@ -4652,7 +4754,7 @@ body::before {
   padding: 0.75rem;
   color: rgba(9, 8, 7, 0.3);
   text-align: center;
-  transition: color 300ms var(--ease-premium), transform 300ms var(--ease-premium);
+  transition: color var(--motion-slow) var(--ease-premium), transform var(--motion-slow) var(--ease-premium);
 }
 
 .automation-step > span {
@@ -4663,10 +4765,10 @@ body::before {
   align-items: center;
   justify-content: center;
   border: 1px solid rgba(17, 20, 24, 0.1);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: #fff;
   font-size: 0.72rem;
-  transition: background 300ms var(--ease-premium), border-color 300ms var(--ease-premium), box-shadow 300ms var(--ease-premium);
+  transition: background var(--motion-slow) var(--ease-premium), border-color var(--motion-slow) var(--ease-premium), box-shadow var(--motion-slow) var(--ease-premium);
 }
 
 .automation-step strong {
@@ -4720,7 +4822,7 @@ body::before {
   color: #26734a;
   font-size: 0.8rem;
   opacity: 0;
-  transition: max-height 360ms var(--ease-premium), padding 360ms var(--ease-premium), opacity 300ms var(--ease-premium), border-color 300ms var(--ease-premium);
+  transition: max-height var(--motion-slower) var(--ease-premium), padding var(--motion-slower) var(--ease-premium), opacity var(--motion-slow) var(--ease-premium), border-color var(--motion-slow) var(--ease-premium);
 }
 
 .automation-success.is-visible {
@@ -4733,7 +4835,7 @@ body::before {
 .roadmap {
   position: relative;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   background: rgba(255, 255, 255, 0.7);
   padding: 1.25rem;
   box-shadow: var(--shadow-soft);
@@ -4771,7 +4873,7 @@ body::before {
   padding: 0.65rem 0.25rem;
   color: rgba(9, 8, 7, 0.38);
   font-size: 0.7rem;
-  transition: color 240ms var(--ease-premium), transform 240ms var(--ease-premium);
+  transition: color var(--motion-base) var(--ease-premium), transform var(--motion-base) var(--ease-premium);
 }
 
 .roadmap-stages button > span {
@@ -4854,11 +4956,11 @@ body::before {
   align-content: space-between;
   justify-items: start;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   background: linear-gradient(145deg, #fff, #eef1f5);
   padding: 1rem;
   text-align: left;
-  transition: transform 280ms var(--ease-premium), border-color 280ms var(--ease-premium), box-shadow 280ms var(--ease-premium);
+  transition: transform var(--motion-slow) var(--ease-premium), border-color var(--motion-slow) var(--ease-premium), box-shadow var(--motion-slow) var(--ease-premium);
 }
 
 .concept-examples-grid button:hover {
@@ -4889,16 +4991,30 @@ body::before {
    pipeline is a different length for every business, so a rail of N boxes would either be wrong
    or need to be built generically enough to lose meaning. One line, changing as each real stage
    completes, stays true to whatever pipeline this specific concept actually has. */
+/* Floats over the workspace instead of sitting in the column flow. As an in-flow band it added
+   ~40px of chrome while building and removed it when the concept settled, which grew the preview
+   stage mid-reveal — a visible jump exactly when the user is watching the result appear (and a
+   measurable layout shift: the stage's scrollable range moved by ~100px). Overlaying costs
+   nothing visually and makes the reveal dimensionally stable from first paint. */
 .concept-pipeline-status {
+  position: absolute;
+  z-index: 30;
+  top: 0.75rem;
+  left: 50%;
   display: flex;
   align-items: center;
   gap: 0.55rem;
-  padding: 0.6rem 1rem;
-  border-bottom: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.76);
-  color: rgba(9, 8, 7, 0.58);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  padding: 0.5rem 0.95rem;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 30px rgba(9, 8, 7, 0.1);
+  color: rgba(9, 8, 7, 0.62);
   font-size: 0.8rem;
   font-weight: 550;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  backdrop-filter: blur(10px);
 }
 
 .concept-pipeline-dot {
@@ -4919,7 +5035,7 @@ body::before {
   opacity: 0;
   transform: translateY(12px);
   filter: blur(3px);
-  transition: opacity 460ms var(--ease-premium), transform 460ms var(--ease-premium), filter 460ms var(--ease-premium);
+  transition: opacity var(--motion-slower) var(--ease-premium), transform var(--motion-slower) var(--ease-premium), filter var(--motion-slower) var(--ease-premium);
 }
 
 .concept-preview-piece.is-visible {
@@ -4932,7 +5048,7 @@ body::before {
 .concept-section-piece {
   opacity: 0;
   transform: translateY(10px);
-  transition: opacity 380ms var(--ease-premium), transform 380ms var(--ease-premium);
+  transition: opacity var(--motion-slower) var(--ease-premium), transform var(--motion-slower) var(--ease-premium);
 }
 
 .concept-section-piece.is-visible {
@@ -4997,7 +5113,7 @@ body::before {
 .premium-footer nav button {
   color: rgba(9, 8, 7, 0.65);
   font-size: 0.82rem;
-  transition: color 200ms var(--ease-premium), transform 200ms var(--ease-premium);
+  transition: color var(--motion-base) var(--ease-premium), transform var(--motion-base) var(--ease-premium);
 }
 
 .premium-footer a:hover,
@@ -5086,7 +5202,7 @@ body::before {
 .founder-note,
 .contact-scene .glass-panel,
 .contact-scene .dark-glass {
-  border-radius: 8px !important;
+  border-radius: var(--radius-xs) !important;
 }
 
 :where(
@@ -5102,10 +5218,10 @@ body::before {
   position: relative;
   isolation: isolate;
   transition:
-    transform 360ms var(--ease-premium),
-    box-shadow 360ms var(--ease-premium),
-    border-color 300ms var(--ease-premium),
-    opacity 320ms var(--ease-premium);
+    transform var(--motion-slower) var(--ease-premium),
+    box-shadow var(--motion-slower) var(--ease-premium),
+    border-color var(--motion-slow) var(--ease-premium),
+    opacity var(--motion-slow) var(--ease-premium);
 }
 
 :where(
@@ -5129,7 +5245,7 @@ body::before {
   content: "";
   opacity: 0;
   pointer-events: none;
-  transition: opacity 360ms var(--ease-premium);
+  transition: opacity var(--motion-slower) var(--ease-premium);
 }
 
 :where(
@@ -5140,7 +5256,7 @@ body::before {
   .pricing-scene article,
   .pricing-compact-cta
 ) svg {
-  transition: transform 320ms var(--ease-premium), color 260ms var(--ease-premium);
+  transition: transform var(--motion-slow) var(--ease-premium), color var(--motion-slow) var(--ease-premium);
 }
 
 .aevix-button {
@@ -5154,7 +5270,7 @@ body::before {
 .aevix-button svg,
 .concept-mode-switch button svg,
 .aevix-icon-action svg {
-  transition: transform 280ms var(--ease-premium);
+  transition: transform var(--motion-slow) var(--ease-premium);
 }
 
 :where(
@@ -5166,11 +5282,11 @@ body::before {
   .aevix-icon-action
 ) {
   transition:
-    transform 280ms var(--ease-premium),
-    box-shadow 280ms var(--ease-premium),
-    border-color 240ms var(--ease-premium),
-    background-color 240ms var(--ease-premium),
-    color 240ms var(--ease-premium);
+    transform var(--motion-slow) var(--ease-premium),
+    box-shadow var(--motion-slow) var(--ease-premium),
+    border-color var(--motion-base) var(--ease-premium),
+    background-color var(--motion-base) var(--ease-premium),
+    color var(--motion-base) var(--ease-premium);
 }
 
 @media (min-width: 768px) and (hover: hover) and (pointer: fine) {
@@ -5730,7 +5846,7 @@ textarea {
   background: rgba(250, 250, 248, 0.98);
   padding: 1.1rem 0.9rem;
   transform: translateX(-100%);
-  transition: transform 320ms var(--ease-premium);
+  transition: transform var(--motion-slow) var(--ease-premium);
 }
 
 .workspace-sidebar.is-open {
@@ -5745,7 +5861,7 @@ textarea {
   background: rgba(9, 8, 7, 0.34);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 280ms var(--ease-premium);
+  transition: opacity var(--motion-slow) var(--ease-premium);
 }
 
 .workspace-sidebar-backdrop.is-open {
@@ -5764,7 +5880,7 @@ textarea {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0.3rem;
 }
 
@@ -5775,7 +5891,7 @@ textarea {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: #111214;
   color: #fafaf8;
   font-size: 0.68rem;
@@ -5795,9 +5911,9 @@ textarea {
   width: 2rem;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   color: rgba(9, 8, 7, 0.5);
-  transition: background 200ms var(--ease-premium), color 200ms var(--ease-premium);
+  transition: background var(--motion-base) var(--ease-premium), color var(--motion-base) var(--ease-premium);
 }
 
 .workspace-sidebar-close:hover {
@@ -5819,12 +5935,12 @@ textarea {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 0.6rem 0.7rem;
   color: rgba(9, 8, 7, 0.62);
   font-size: 0.87rem;
   font-weight: 560;
-  transition: background 200ms var(--ease-premium), color 200ms var(--ease-premium), transform 200ms var(--ease-premium);
+  transition: background var(--motion-base) var(--ease-premium), color var(--motion-base) var(--ease-premium), transform var(--motion-base) var(--ease-premium);
 }
 
 .workspace-nav-item:hover {
@@ -5855,7 +5971,7 @@ textarea {
   color: rgba(9, 8, 7, 0.4);
   font-size: 0.78rem;
   font-weight: 550;
-  transition: color 200ms var(--ease-premium);
+  transition: color var(--motion-base) var(--ease-premium);
 }
 
 .workspace-sidebar-exit:hover {
@@ -5900,7 +6016,7 @@ textarea {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--line);
   background: #fff;
   color: rgba(9, 8, 7, 0.6);
@@ -5927,13 +6043,13 @@ textarea {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: #111214;
   padding: 0.55rem 1rem;
   color: #fafaf8;
   font-size: 0.8rem;
   font-weight: 620;
-  transition: transform 200ms var(--ease-premium), box-shadow 200ms var(--ease-premium);
+  transition: transform var(--motion-base) var(--ease-premium), box-shadow var(--motion-base) var(--ease-premium);
 }
 
 .workspace-topbar-action:hover {
@@ -5948,9 +6064,9 @@ textarea {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   color: rgba(9, 8, 7, 0.56);
-  transition: background 200ms var(--ease-premium), color 200ms var(--ease-premium);
+  transition: background var(--motion-base) var(--ease-premium), color var(--motion-base) var(--ease-premium);
 }
 
 .workspace-icon-button:hover {
@@ -5963,7 +6079,7 @@ textarea {
   flex-shrink: 0;
   align-items: center;
   gap: 0.4rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0.35rem 0.7rem;
   color: rgba(9, 8, 7, 0.5);
   font-size: 0.76rem;
@@ -6029,12 +6145,12 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--line);
   background: #fff;
   padding: 1.25rem;
   text-align: left;
-  transition: transform 220ms var(--ease-premium), box-shadow 220ms var(--ease-premium), border-color 220ms var(--ease-premium);
+  transition: transform var(--motion-base) var(--ease-premium), box-shadow var(--motion-base) var(--ease-premium), border-color var(--motion-base) var(--ease-premium);
 }
 
 a.workspace-card,
@@ -6055,7 +6171,7 @@ button.workspace-card:hover {
   width: 2.5rem;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.1);
   color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
 }
@@ -6088,7 +6204,7 @@ button.workspace-card:hover {
   display: grid;
   justify-items: center;
   gap: 0.75rem;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   border: 1px dashed var(--line);
   background: rgba(255, 255, 255, 0.6);
   padding: 3rem 1.5rem;
@@ -6101,7 +6217,7 @@ button.workspace-card:hover {
   width: 3rem;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.1);
   color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
 }
@@ -6182,7 +6298,7 @@ button.workspace-card:hover {
     padding: 0.65rem;
   }
 
-  .workspace-topbar-action span {
+  .workspace-topbar .workspace-topbar-action span {
     display: none;
   }
 }
@@ -6198,7 +6314,10 @@ button.workspace-card:hover {
     max-width: 9rem;
   }
 
-  .workspace-topbar-action span {
+  /* Scoped to the topbar: the same class is reused for full-width CTAs (the projects empty
+     state, page headers), where hiding the label left a primary action showing nothing but a
+     "+" icon. Only the compact toolbar button should collapse to an icon. */
+  .workspace-topbar .workspace-topbar-action span {
     display: none;
   }
 
@@ -6228,12 +6347,12 @@ button.workspace-card:hover {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0.45rem 0.9rem;
   color: rgba(9, 8, 7, 0.52);
   font-size: 0.84rem;
   font-weight: 600;
-  transition: background 200ms var(--ease-premium), color 200ms var(--ease-premium);
+  transition: background var(--motion-base) var(--ease-premium), color var(--motion-base) var(--ease-premium);
 }
 
 .workspace-tab:hover {
@@ -6246,7 +6365,7 @@ button.workspace-card:hover {
 }
 
 .workspace-tab span {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.18);
   padding: 0.05rem 0.4rem;
   font-size: 0.7rem;
@@ -6283,14 +6402,14 @@ button.workspace-card:hover {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   padding: 0.15rem 0.3rem;
   margin-left: -0.3rem;
   color: #111214;
   font-size: 1.4rem;
   font-weight: 680;
   letter-spacing: -0.02em;
-  transition: background 180ms var(--ease-premium);
+  transition: background var(--motion-fast) var(--ease-premium);
 }
 
 .workspace-project-name:hover {
@@ -6298,7 +6417,7 @@ button.workspace-card:hover {
 }
 
 .workspace-project-name-input {
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   border: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.4);
   padding: 0.15rem 0.5rem;
   margin-left: -0.5rem;
@@ -6315,13 +6434,13 @@ button.workspace-card:hover {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   border: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.22);
   background: linear-gradient(135deg, rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.08), transparent 70%);
   padding: 1rem 1.15rem;
   text-align: left;
   color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
-  transition: transform 200ms var(--ease-premium), border-color 200ms var(--ease-premium);
+  transition: transform var(--motion-base) var(--ease-premium), border-color var(--motion-base) var(--ease-premium);
 }
 
 .workspace-next-action:hover {
@@ -6379,7 +6498,7 @@ button.workspace-card:hover {
   display: flex;
   align-items: center;
   gap: 0.9rem;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--line);
   background: #fff;
   padding: 0.9rem 1.1rem;
@@ -6395,7 +6514,7 @@ button.workspace-card:hover {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.12);
   color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
   font-size: 0.78rem;
@@ -6434,11 +6553,11 @@ button.workspace-card:hover {
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--line);
   background: #fff;
   padding: 1.1rem 1.15rem;
-  transition: border-color 200ms var(--ease-premium), box-shadow 200ms var(--ease-premium);
+  transition: border-color var(--motion-base) var(--ease-premium), box-shadow var(--motion-base) var(--ease-premium);
 }
 
 .workspace-project-card:hover {
@@ -6457,7 +6576,7 @@ button.workspace-card:hover {
 }
 
 .workspace-status-badge {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0.2rem 0.6rem;
   font-size: 0.7rem;
   font-weight: 650;
@@ -6490,7 +6609,7 @@ button.workspace-card:hover {
   z-index: 30;
   min-width: 11.5rem;
   display: grid;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--line);
   background: #fff;
   box-shadow: 0 18px 40px rgba(9, 8, 7, 0.14);
@@ -6501,13 +6620,13 @@ button.workspace-card:hover {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   padding: 0.55rem 0.7rem;
   color: #111214;
   font-size: 0.84rem;
   font-weight: 560;
   text-align: left;
-  transition: background 150ms var(--ease-premium);
+  transition: background var(--motion-fast) var(--ease-premium);
 }
 
 .workspace-project-menu-list button:hover {
@@ -6533,7 +6652,7 @@ button.workspace-card:hover {
 }
 
 .workspace-project-card-rename {
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   border: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.4);
   padding: 0.2rem 0.5rem;
   color: #111214;
@@ -6576,13 +6695,13 @@ button.workspace-card:hover {
   align-items: center;
   justify-content: center;
   margin-top: 0.5rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.3);
   padding: 0.5rem;
   color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
   font-size: 0.84rem;
   font-weight: 620;
-  transition: background 200ms var(--ease-premium), border-color 200ms var(--ease-premium);
+  transition: background var(--motion-base) var(--ease-premium), border-color var(--motion-base) var(--ease-premium);
 }
 
 .workspace-project-card-open:hover {
@@ -6617,7 +6736,7 @@ button.workspace-card:hover {
 
 .workspace-confirm {
   width: min(26rem, 100%);
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   background: #fff;
   box-shadow: 0 30px 70px rgba(9, 8, 7, 0.25);
   padding: 1.5rem;
@@ -6645,13 +6764,13 @@ button.workspace-card:hover {
 }
 
 .workspace-confirm-cancel {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--line);
   padding: 0.55rem 1.1rem;
   color: #111214;
   font-size: 0.84rem;
   font-weight: 600;
-  transition: background 200ms var(--ease-premium);
+  transition: background var(--motion-base) var(--ease-premium);
 }
 
 .workspace-confirm-cancel:hover {
@@ -6659,13 +6778,13 @@ button.workspace-card:hover {
 }
 
 .workspace-confirm-delete {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: #b91c1c;
   padding: 0.55rem 1.1rem;
   color: #fff;
   font-size: 0.84rem;
   font-weight: 620;
-  transition: background 200ms var(--ease-premium);
+  transition: background var(--motion-base) var(--ease-premium);
 }
 
 .workspace-confirm-delete:hover {
@@ -6701,14 +6820,14 @@ button.workspace-card:hover {
 .workspace-field input,
 .workspace-field textarea {
   width: 100%;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--line);
   background: #fff;
   padding: 0.7rem 0.9rem;
   color: #111214;
   font-size: 0.9rem;
   outline: none;
-  transition: border-color 200ms var(--ease-premium), box-shadow 200ms var(--ease-premium);
+  transition: border-color var(--motion-base) var(--ease-premium), box-shadow var(--motion-base) var(--ease-premium);
 }
 
 .workspace-field textarea {
@@ -6729,14 +6848,14 @@ button.workspace-card:hover {
 }
 
 .workspace-chip {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--line);
   background: #fff;
   padding: 0.45rem 0.9rem;
   color: rgba(9, 8, 7, 0.62);
   font-size: 0.82rem;
   font-weight: 580;
-  transition: border-color 180ms var(--ease-premium), background 180ms var(--ease-premium), color 180ms var(--ease-premium);
+  transition: border-color var(--motion-fast) var(--ease-premium), background var(--motion-fast) var(--ease-premium), color var(--motion-fast) var(--ease-premium);
 }
 
 .workspace-chip:hover {
@@ -6764,7 +6883,7 @@ button.workspace-card:hover {
   justify-content: center;
   border-radius: 50%;
   border: 2px solid transparent;
-  transition: border-color 180ms var(--ease-premium), transform 180ms var(--ease-premium);
+  transition: border-color var(--motion-fast) var(--ease-premium), transform var(--motion-fast) var(--ease-premium);
 }
 
 .workspace-swatch i {
@@ -6794,13 +6913,13 @@ button.workspace-card:hover {
   align-items: center;
   justify-content: center;
   gap: 0.55rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: #111214;
   padding: 0.85rem 1.5rem;
   color: #fafaf8;
   font-size: 0.92rem;
   font-weight: 640;
-  transition: transform 200ms var(--ease-premium), box-shadow 200ms var(--ease-premium), opacity 200ms var(--ease-premium);
+  transition: transform var(--motion-base) var(--ease-premium), box-shadow var(--motion-base) var(--ease-premium), opacity var(--motion-base) var(--ease-premium);
 }
 
 .workspace-create-submit:hover:not(:disabled) {

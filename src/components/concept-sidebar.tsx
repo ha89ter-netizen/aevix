@@ -14,6 +14,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { WebsiteConcept } from "@/lib/website-concept";
+import { motionTransition } from "@/lib/motion";
 
 /**
  * The concept generator's workspace sidebar — replaces the old toolbar's crammed row of page
@@ -96,7 +97,7 @@ export function ConceptSidebar({
                   layout
                   initial={{ opacity: 0, y: -6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+                  transition={motionTransition.base}
                   className="concept-sidebar-item"
                   aria-current={item.pageId === activePageId ? "page" : undefined}
                   onClick={() => onPageChange(item.pageId)}

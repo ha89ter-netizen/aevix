@@ -4,6 +4,7 @@ import { Html } from "@react-three/drei";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
 import type { ComponentType } from "react";
+import { motionTransition } from "@/lib/motion";
 
 /**
  * The info card for a focused node. Rendered via drei's <Html> as a child of that node's own
@@ -43,7 +44,7 @@ export function EcosystemDetailPanel({
           initial={{ opacity: 0, scale: 0.85, y: 8 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.9 }}
-          transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+          transition={motionTransition.slow}
           style={{ pointerEvents: "auto" }}
         >
           <button type="button" className="ecosystem-3d-panel-close" onClick={onClose} aria-label="Закрыть">

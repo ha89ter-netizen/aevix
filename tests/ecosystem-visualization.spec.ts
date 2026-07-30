@@ -85,7 +85,7 @@ const AFTER_TITLES = [
 ];
 
 test.describe("ecosystem visualisation (reduced motion → CSS fallback)", () => {
-  test.use({ reducedMotion: "reduce" });
+  test.use({ contextOptions: { reducedMotion: "reduce" } });
 
   test("renders five persistent, labelled nodes arranged in a circle around the core", async ({ page }) => {
     await gotoEcosystem(page);

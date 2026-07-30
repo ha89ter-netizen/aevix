@@ -46,9 +46,20 @@ export type BusinessFaq = { q: string; a: string };
  */
 export type AccentRgb = { r: number; g: number; b: number };
 
+/**
+ * The two ambient tones behind the interface. The accent already morphed site-wide, but the
+ * atmosphere orbs behind it were hard-coded blue and peach, so the background never actually
+ * responded to the business — a coffee shop and a dental clinic sat on identical ambient light.
+ * These are deliberately low-saturation: they read as the room's lighting changing, not as a
+ * theme swap, which is the difference between "context-aware" and "gimmick".
+ */
+export type BusinessMood = { a: AccentRgb; b: AccentRgb };
+
 /** Everything the site personalises once a business is recognised. */
 export type BusinessContent = {
   accent: AccentRgb;
+  /** Ambient background tones — see BusinessMood. */
+  mood: BusinessMood;
   metrics: BusinessMetrics;
   /** Ordered implementation roadmap phases shown in the hero control centre. */
   roadmap: string[];
@@ -241,6 +252,7 @@ export function detectBusiness(input: string): HeroBusinessProfile {
 export const businessContent: Record<HeroBusinessCategory, BusinessContent> = {
   barbershop: {
     accent: { r: 109, g: 94, b: 214 },
+    mood: { a: { r: 92, g: 84, b: 138 }, b: { r: 120, g: 126, b: 148 } },
     metrics: { automationScore: 82, hoursSavedPerWeek: 9, revenueUpliftPct: 14, priority: "Высокий" },
     roadmap: ["AI-консультант", "Онлайн-запись", "CRM", "Напоминания", "Отзывы"],
     caseBefore: "Клиенты пишут в разные чаты, администратор вручную сверяет свободные окна мастеров.",
@@ -257,6 +269,7 @@ export const businessContent: Record<HeroBusinessCategory, BusinessContent> = {
   },
   beauty: {
     accent: { r: 166, g: 91, b: 141 },
+    mood: { a: { r: 206, g: 142, b: 178 }, b: { r: 240, g: 198, b: 190 } },
     metrics: { automationScore: 85, hoursSavedPerWeek: 11, revenueUpliftPct: 16, priority: "Высокий" },
     roadmap: ["AI-консультант", "Запись по мастерам", "CRM", "Напоминания", "Возврат клиентов"],
     caseBefore: "Администратор вручную ведёт запись по услугам и мастерам в нескольких чатах.",
@@ -273,6 +286,7 @@ export const businessContent: Record<HeroBusinessCategory, BusinessContent> = {
   },
   food: {
     accent: { r: 157, g: 105, b: 61 },
+    mood: { a: { r: 208, g: 150, b: 96 }, b: { r: 196, g: 118, b: 86 } },
     metrics: { automationScore: 78, hoursSavedPerWeek: 12, revenueUpliftPct: 12, priority: "Высокий" },
     roadmap: ["AI-консультант", "Приём заказов", "Бронь / доставка", "CRM", "Отзывы"],
     caseBefore: "Гости спрашивают меню, бронь, доставку и акции в разных каналах — команда отвечает вручную.",
@@ -289,6 +303,7 @@ export const businessContent: Record<HeroBusinessCategory, BusinessContent> = {
   },
   ecommerce: {
     accent: { r: 72, g: 114, b: 199 },
+    mood: { a: { r: 120, g: 152, b: 232 }, b: { r: 156, g: 140, b: 236 } },
     metrics: { automationScore: 80, hoursSavedPerWeek: 10, revenueUpliftPct: 18, priority: "Высокий" },
     roadmap: ["AI-консультант", "Каталог и заказы", "CRM", "Корзина", "Повторные продажи"],
     caseBefore: "Покупатели уточняют наличие, цену и доставку в переписке — менеджер отвечает вручную.",
@@ -305,6 +320,7 @@ export const businessContent: Record<HeroBusinessCategory, BusinessContent> = {
   },
   dental: {
     accent: { r: 48, g: 127, b: 134 },
+    mood: { a: { r: 96, g: 178, b: 186 }, b: { r: 150, g: 200, b: 226 } },
     metrics: { automationScore: 76, hoursSavedPerWeek: 8, revenueUpliftPct: 11, priority: "Средний" },
     roadmap: ["AI-консультант", "Онлайн-запись", "CRM", "Напоминания", "Отзывы"],
     caseBefore: "Администратор вручную записывает пациентов и отвечает на частые вопросы по услугам.",
@@ -321,6 +337,7 @@ export const businessContent: Record<HeroBusinessCategory, BusinessContent> = {
   },
   auto: {
     accent: { r: 96, g: 112, b: 148 },
+    mood: { a: { r: 122, g: 136, b: 152 }, b: { r: 214, g: 148, b: 96 } },
     metrics: { automationScore: 74, hoursSavedPerWeek: 8, revenueUpliftPct: 10, priority: "Средний" },
     roadmap: ["AI-консультант", "Приём заявок", "CRM", "Напоминания о ТО", "Отзывы"],
     caseBefore: "Заявки на услуги приходят в разные каналы, приёмщик вручную согласует время и цену.",
@@ -337,6 +354,7 @@ export const businessContent: Record<HeroBusinessCategory, BusinessContent> = {
   },
   generic: {
     accent: { r: 118, g: 89, b: 247 },
+    mood: { a: { r: 129, g: 176, b: 255 }, b: { r: 255, g: 197, b: 163 } },
     metrics: { automationScore: 72, hoursSavedPerWeek: 7, revenueUpliftPct: 10, priority: "Средний" },
     roadmap: ["AI-консультант", "Поток заявок", "CRM", "Напоминания", "Отзывы"],
     caseBefore: "Обращения приходят в разные каналы, команда держит статусы и ответы в голове.",

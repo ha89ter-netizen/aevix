@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { motionTransition } from "@/lib/motion";
 
 type PremiumModalProps = {
   open: boolean;
@@ -126,7 +127,7 @@ export function PremiumModal({
             initial={{ opacity: 0, y: 26, scale: 0.985 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 18, scale: 0.99 }}
-            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            transition={motionTransition.slow}
             className={cn(
               "relative flex max-h-[94svh] w-full flex-col overflow-hidden border border-ink/10 bg-[#f7f8f9] shadow-[0_36px_120px_rgba(18,22,27,0.24)] md:rounded-lg",
               expanded ? "h-[100svh] max-h-[100svh] md:h-[96svh] md:max-h-[96svh] md:max-w-[98vw]" : "h-[100svh] max-h-[100svh] md:h-auto md:max-w-5xl",

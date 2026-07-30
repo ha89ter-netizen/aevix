@@ -7,6 +7,7 @@ import type { EcosystemSphereHandle } from "./EcosystemSphere";
 import type { EcosystemConnectionHandle } from "./EcosystemConnections";
 import type { Vec3 } from "./types";
 import { AFTER_CORE_COLOR, AFTER_NODE_COLOR, BEFORE_CORE_COLOR, BEFORE_NODE_COLOR } from "./utils";
+import { easeGsap } from "@/lib/motion";
 
 /**
  * All GSAP orchestration for the scene lives here, scoped in a single gsap.context() reverted on
@@ -89,7 +90,7 @@ export function useEcosystemTimeline() {
     position: Vec3,
     target: Vec3,
     duration: number,
-    ease = "power3.inOut",
+    ease: string = easeGsap.inOut,
     timeline?: gsap.core.Timeline,
     at?: number | string,
   ) => {
@@ -115,22 +116,22 @@ export function useEcosystemTimeline() {
     ctxRef.current?.add(() => tl);
 
     // 1. Camera pulls back to see the whole system.
-    moveCamera(overview.position, overview.target, 0.55, "power2.out", tl, 0);
+    moveCamera(overview.position, overview.target, 0.55, easeGsap.soft, tl, 0);
 
     // 2. A short, controlled speed-up then settle (rotationBoost only nudges idle rotation speed
     //    in EcosystemScene's per-frame loop — it never teleports anything).
-    tl.to(shared.rotationBoost, { value: 1, duration: 0.6, ease: "power2.out" }, 0.1);
-    tl.to(shared.rotationBoost, { value: 0, duration: 1.4, ease: "power2.inOut" }, 0.7);
+    tl.to(shared.rotationBoost, { value: 1, duration: 0.6, ease: easeGsap.soft }, 0.1);
+    tl.to(shared.rotationBoost, { value: 0, duration: 1.4, ease: easeGsap.inOut }, 0.7);
 
     // 3. Connections + node colours lerp across the whole transform.
-    tl.to(shared.afterness, { value: toAfter ? 1 : 0, duration: 2, ease: "power2.inOut" }, 0.15);
+    tl.to(shared.afterness, { value: toAfter ? 1 : 0, duration: 2, ease: easeGsap.inOut }, 0.15);
 
     // 4. Node slots reorganise onto their new fixed composition.
     slotGroupsRef.current.forEach((group, i) => {
       if (!group) return;
       const dest = toAfter ? slotPositions[i]?.after : slotPositions[i]?.before;
       if (!dest) return;
-      tl.to(group.position, { x: dest[0], y: dest[1], z: dest[2], duration: 1.6, ease: "power2.inOut" }, 0.2);
+      tl.to(group.position, { x: dest[0], y: dest[1], z: dest[2], duration: 1.6, ease: easeGsap.inOut }, 0.2);
     });
 
     // 5. Core ignites: colour + glow + rim intensity.
@@ -138,7 +139,7 @@ export function useEcosystemTimeline() {
     if (core) {
       const targetColor = toAfter ? AFTER_CORE_COLOR : BEFORE_CORE_COLOR;
       tl.to(core.baseMaterial.color, colorTo(targetColor), 0.3);
-      tl.to(core.glowMaterial, { opacity: toAfter ? 0.6 : 0.2, duration: 1.5, ease: "power2.inOut" }, 0.4);
+      tl.to(core.glowMaterial, { opacity: toAfter ? 0.6 : 0.2, duration: 1.5, ease: easeGsap.inOut }, 0.4);
       tl.to(core.glowMaterial.color, colorTo(targetColor), 0.4);
       if (core.rimMaterial) {
         tl.to(core.rimMaterial.uniforms.uIntensity, { value: toAfter ? 1.35 : 0.4, duration: 1.5 }, 0.4);
@@ -185,5 +186,5 @@ export function useEcosystemTimeline() {
 
 function colorTo(hex: number) {
   const color = new THREE.Color(hex);
-  return { r: color.r, g: color.g, b: color.b, duration: 1.5, ease: "power2.inOut" as const };
+  return { r: color.r, g: color.g, b: color.b, duration: 1.5, ease: easeGsap.inOut };
 }

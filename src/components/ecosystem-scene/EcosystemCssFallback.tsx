@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { EcosystemMode, EcosystemProcessData } from "./types";
+import { motionTransition } from "@/lib/motion";
 
 /**
  * The original flat-CSS orb visualization (spokes + core + satellite divs via
@@ -117,7 +118,7 @@ function EcosystemCssDetail({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.28 }}
+      transition={motionTransition.slow}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -129,7 +130,7 @@ function EcosystemCssDetail({
         <motion.div
           initial={{ opacity: 0, scale: 0.55, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
+          transition={motionTransition.slow}
           className={cn("ecosystem-detail-orb", mode === "after" && "is-after")}
         >
           <span className="ecosystem-node-dot">
@@ -141,7 +142,7 @@ function EcosystemCssDetail({
           className="ecosystem-detail-copy"
           initial={{ opacity: 0, x: 24 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.12, duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ ...motionTransition.slow, delay: 0.12 }}
         >
           <p className="ecosystem-detail-eyebrow">{mode === "before" ? "Что мешает" : "Что меняет AEVIX"}</p>
           <h3>{label}</h3>

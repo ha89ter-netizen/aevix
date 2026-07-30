@@ -10,29 +10,31 @@ import { EcosystemConnections, type EcosystemConnectionHandle } from "./Ecosyste
 import { EcosystemDetailPanel } from "./EcosystemDetailPanel";
 import { EcosystemLabel } from "./EcosystemLabel";
 import { useEcosystemTimeline } from "./useEcosystemTimeline";
+import { ecosystemComposition, ecosystemPosition, ecosystemPositions, type EcosystemDevice } from "./composition";
 import type { EcosystemMode, EcosystemProcessData, Vec3 } from "./types";
+import { duration as motionDuration, easeGsap } from "@/lib/motion";
 
-export type EcosystemDevice = "desktop" | "mobile";
+export type { EcosystemDevice };
 
-const OVERVIEW: Record<EcosystemDevice, { position: Vec3; target: Vec3 }> = {
-  desktop: { position: [0, 0.5, 8.2], target: [0, 0, 0] },
-  mobile: { position: [0, 0.6, 9.6], target: [0, 0, 0] },
-};
+/** The radii EcosystemSphere actually builds its geometry at. Composition scales are expressed in
+ * world units, so they are divided by these to become group scale factors. */
+const DESIGN_CORE_RADIUS = 1.15;
+const DESIGN_SATELLITE_RADIUS = 0.62;
 
-/** Deterministic, hand-tuned functions of a node's own fixed position — never randomness, never
- * elapsed time. This is what the spec calls "the camera position/trajectory at focus" per node,
- * computed instead of hand-authoring 10 more constants. */
+/** Deterministic, hand-tuned function of a node's own fixed position — never randomness, never
+ * elapsed time. The camera settles a composition-defined distance in front of the node, pulled
+ * slightly toward the centre so the ring stays in frame instead of swinging fully off-screen. */
 function focusCameraFor(device: EcosystemDevice, position: Vec3): { position: Vec3; target: Vec3 } {
   const [x, y, z] = position;
+  const { focusDistance } = ecosystemComposition(device);
   if (device === "mobile") {
-    return { position: [x, 0.2, z + 4.2], target: [x, y, z] };
+    return { position: [x * 0.5, y * 0.5, z + focusDistance], target: [x, y, z] };
   }
-  return { position: [x * 0.4, y * 0.4 + 0.35, z + 3.6], target: [x, y, z] };
+  return { position: [x * 0.4, y * 0.4 + 0.25, z + focusDistance], target: [x, y, z] };
 }
 
-function positionFor(node: EcosystemProcessData, device: EcosystemDevice, mode: EcosystemMode): Vec3 {
-  const set = device === "mobile" ? node.mobilePosition : node.desktopPosition;
-  return mode === "before" ? set.before : set.after;
+function positionFor(index: number, device: EcosystemDevice, mode: EcosystemMode): Vec3 {
+  return ecosystemPosition(index, device, mode);
 }
 
 /** Tiny, deterministic per-node sway — a few percent of a unit, applied to an inner "jitter"
@@ -81,7 +83,11 @@ function SatelliteMesh({
   const [hovered, setHovered] = useState(false);
   useCursor(hovered);
 
-  const initialPosition = useMemo(() => positionFor(node, device, mode), [node, device, mode]);
+  const initialPosition = useMemo(() => positionFor(index, device, mode), [index, device, mode]);
+  const { satelliteScale } = ecosystemComposition(device);
+  // The hit area tracks the visible sphere so it stays comfortably larger than it on every
+  // device, rather than staying desktop-sized while the sphere shrinks on a phone.
+  const hitRadius = satelliteScale * 1.85;
 
   useFrame(({ clock }) => {
     if (jitterRef.current) applyJitter(jitterRef.current, clock.getElapsedTime(), index);
@@ -115,13 +121,13 @@ function SatelliteMesh({
       >
         {/* Hit-area deliberately larger than the visible sphere and anchored to the stable slot
             (never the jittering inner group) — always easy to hit, never a moving target. */}
-        <sphereGeometry args={[1.15, 12, 10]} />
+        <sphereGeometry args={[hitRadius, 12, 10]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
       <EcosystemLabel title={label} caption={caption} dimmed={isAnyActive && !isActive} onClick={() => onSelect(isActive ? null : node.id)} />
 
-      <group ref={jitterRef}>
+      <group ref={jitterRef} scale={satelliteScale / DESIGN_SATELLITE_RADIUS}>
         <EcosystemSphere
           ref={(handle) => {
             sphereRef.current = handle;
@@ -150,16 +156,20 @@ function CoreMesh({
   quality,
   registerCore,
   sharedAfterness,
+  scale,
 }: {
   quality: "high" | "low";
   registerCore: (handle: EcosystemSphereHandle | null) => void;
   sharedAfterness: { value: number };
+  scale: number;
 }) {
   const sphereRef = useRef<EcosystemSphereHandle | null>(null);
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
     const breathe = 1 + Math.sin(t * (0.5 + sharedAfterness.value * 0.4)) * (0.04 + sharedAfterness.value * 0.05);
-    sphereRef.current?.group.scale.setScalar(breathe);
+    // Breathing multiplies the composition's own scale instead of replacing it, so the core keeps
+    // its device-correct dominance while it pulses.
+    sphereRef.current?.group.scale.setScalar(breathe * scale);
   });
   return (
     <EcosystemSphere
@@ -202,7 +212,8 @@ function SceneContents({
   const rootGroupRef = useRef<THREE.Group>(null!);
   const pointer = useThree((state) => state.pointer);
 
-  const overview = OVERVIEW[device];
+  const composition = ecosystemComposition(device);
+  const overview = composition.camera;
 
   // Camera never starts anywhere but the overview — the first focus (if any) still eases in.
   useEffect(() => {
@@ -219,13 +230,12 @@ function SceneContents({
   useEffect(() => {
     if (prevMode.current !== mode) {
       const focusIndex = processes.findIndex((node) => node.id === activeId);
-      const focusReturn =
-        focusIndex >= 0 ? focusCameraFor(device, positionFor(processes[focusIndex], device, mode)) : null;
+      const focusReturn = focusIndex >= 0 ? focusCameraFor(device, positionFor(focusIndex, device, mode)) : null;
       timeline.igniteTransform(
         mode === "after",
-        processes.map((node) => ({
-          before: device === "mobile" ? node.mobilePosition.before : node.desktopPosition.before,
-          after: device === "mobile" ? node.mobilePosition.after : node.desktopPosition.after,
+        processes.map((_, index) => ({
+          before: ecosystemPositions(processes.length, device, "before")[index],
+          after: ecosystemPositions(processes.length, device, "after")[index],
         })),
         overview,
         focusReturn,
@@ -242,12 +252,12 @@ function SceneContents({
     const index = processes.findIndex((node) => node.id === activeId);
     const duration = 1; // within the spec's 800-1200ms window
     if (index >= 0) {
-      const dest = focusCameraFor(device, positionFor(processes[index], device, mode));
+      const dest = focusCameraFor(device, positionFor(index, device, mode));
       timeline.moveCamera(dest.position, dest.target, duration);
-      gsap.to(timeline.shared.focusBlend, { value: 1, duration: 0.5, ease: "power2.out" });
+      gsap.to(timeline.shared.focusBlend, { value: 1, duration: motionDuration.slower, ease: easeGsap.soft });
     } else {
       timeline.moveCamera(overview.position, overview.target, duration);
-      gsap.to(timeline.shared.focusBlend, { value: 0, duration: 0.45, ease: "power2.out" });
+      gsap.to(timeline.shared.focusBlend, { value: 0, duration: motionDuration.slower, ease: easeGsap.soft });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
@@ -283,7 +293,12 @@ function SceneContents({
           <Lightformer form="ring" intensity={1.2} position={[-3, -1, -2]} scale={2} color="#7657f7" />
         </Environment>
 
-        <CoreMesh quality={quality} registerCore={timeline.registerCore} sharedAfterness={timeline.shared.afterness} />
+        <CoreMesh
+          quality={quality}
+          registerCore={timeline.registerCore}
+          sharedAfterness={timeline.shared.afterness}
+          scale={composition.coreScale / DESIGN_CORE_RADIUS}
+        />
 
         {processes.map((node, index) => (
           <SatelliteMesh
@@ -325,7 +340,7 @@ export default function EcosystemScene({ processes, mode, activeId, onSelect, qu
     <Canvas
       className="ecosystem-canvas"
       dpr={quality === "high" ? [1, 1.75] : [1, 1]}
-      camera={{ position: [...OVERVIEW[device].position], fov: 42 }}
+      camera={{ position: [...ecosystemComposition(device).camera.position], fov: 42 }}
       gl={{ antialias: quality === "high", alpha: true }}
       frameloop={paused ? "never" : "always"}
       onPointerMissed={() => onSelect(null)}

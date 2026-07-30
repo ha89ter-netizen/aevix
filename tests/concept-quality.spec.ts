@@ -8,7 +8,9 @@ import { test, expect, type Page } from "@playwright/test";
  * AI key needed).
  */
 
-test.use({ reducedMotion: "reduce" });
+// Playwright 1.61 exposes reducedMotion through contextOptions, not as a flat test option —
+// the flat form type-errors even though it happens to work at runtime.
+test.use({ contextOptions: { reducedMotion: "reduce" } });
 
 async function openExample(page: Page, name: RegExp) {
   await page.goto("/");
