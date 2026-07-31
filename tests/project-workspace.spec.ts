@@ -115,7 +115,8 @@ test.describe("project persistence", () => {
   test("direct navigation to a valid project URL works", async ({ page }) => {
     await seedStorage(page, [seededProject({ id: "direct-nav", name: "Direct Nav Project" })]);
     await page.goto("/app/projects/direct-nav/pricing");
-    await expect(page.locator(".workspace-tab.is-active")).toHaveText(/Цены/);
+    // Project sections live in the sidebar now, and the header names the open section.
+    await expect(page.locator(".shell-title-section")).toHaveText("Цены");
   });
 });
 
@@ -125,12 +126,12 @@ test.describe("navigation surface", () => {
     await page.goto("/app");
     await page.waitForURL("**/app/projects");
 
-    const sidebar = page.locator(".workspace-sidebar");
+    const sidebar = page.locator(".shell-sidebar");
     await expect(sidebar.getByRole("link", { name: "Проекты" })).toBeVisible();
     await expect(sidebar.getByRole("link", { name: "Создать проект" })).toBeVisible();
     await expect(sidebar.getByRole("link", { name: "На сайт AEVIX" })).toBeVisible();
-    // Nothing else: brand + 2 nav items + exit = 4 links total.
-    await expect(sidebar.locator("a")).toHaveCount(4);
+    // Nothing else: 2 nav items + the exit link. The landing sections must not leak in here.
+    await expect(sidebar.locator("a")).toHaveCount(3);
   });
 
   test("the projects page shows the local-storage notice", async ({ page }) => {
@@ -156,7 +157,8 @@ test.describe("project creation", () => {
 
     await page.waitForURL(/\/app\/projects\/.+/);
     await expect(page.locator(".workspace-project-name")).toHaveText("Барбершоп на Абая");
-    await expect(page.locator(".workspace-page-desc").first()).toContainText("Барбершоп · Алматы");
+    await expect(page.locator(".overview-facts")).toContainText("Барбершоп");
+    await expect(page.locator(".overview-facts")).toContainText("Алматы");
 
     // Visible on the dashboard with the collected fields, via a FULL page load (not client-side
     // navigation) — proves the project was persisted, not just held in memory. Retried because
@@ -168,7 +170,8 @@ test.describe("project creation", () => {
     await expect(card).toHaveCount(1);
     await expect(card.locator(".workspace-project-card-name")).toHaveText("Барбершоп на Абая");
     await expect(card.locator(".workspace-project-card-type")).toContainText("Барбершоп · Алматы");
-    await expect(card.locator(".workspace-status-badge")).toHaveText("Новый");
+    // Creation now generates everything up front, so a brand-new project is already complete.
+    await expect(card.locator(".workspace-status-badge")).toHaveText("Готов");
   });
 
   test("submit is disabled until a business name is entered", async ({ page }) => {
@@ -248,7 +251,9 @@ test.describe("saving module state into a project", () => {
     await page.waitForTimeout(400); // let the save-to-project effect chain flush before navigating away
 
     await page.goto(projectUrl);
-    await expect(page.locator(".workspace-card-desc").nth(3)).not.toHaveText("Стоимость пока не рассчитана.");
+    await expect(page.locator(".overview-card", { hasText: "Стоимость" }).locator(".overview-card-status")).toHaveText(
+      "Готово",
+    );
   });
 });
 
@@ -329,7 +334,6 @@ test.describe("project navigation responsiveness", () => {
 
     const overflowX = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     expect(overflowX).toBe(false);
-    await expect(page.locator(".workspace-tab")).toHaveCount(5);
   });
 
   test("project tab bar and sidebar render with no console errors on desktop", async ({ page }, testInfo) => {
@@ -340,8 +344,9 @@ test.describe("project navigation responsiveness", () => {
     await seedStorage(page, [seededProject({ id: "responsive-project" })]);
     await page.goto("/app/projects/responsive-project");
 
-    await expect(page.locator(".workspace-sidebar")).toBeVisible();
-    await expect(page.locator(".workspace-tab")).toHaveCount(5);
+    await expect(page.locator(".shell-sidebar")).toBeVisible();
+    // The open project shows exactly its own five sections.
+    await expect(page.locator(".shell-sidebar .shell-nav-item")).toHaveCount(5);
     expect(errors).toEqual([]);
   });
 });

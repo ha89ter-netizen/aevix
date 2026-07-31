@@ -6,16 +6,18 @@ import { Copy, FolderKanban, MoreVertical, Pencil, Plus, Smartphone, Trash2 } fr
 import { cn } from "@/lib/utils";
 import { useProjects, getProjectStatus, type Project } from "@/lib/projects";
 import { WorkspacePageHeader } from "@/components/workspace/page-header";
-import { projectHref } from "@/components/workspace/project-nav";
+import { projectHref } from "@/components/shell/shell-nav";
 import { formatProjectDate } from "@/components/workspace/project-meta";
 
 function ProjectCard({
   project,
+  generatingId,
   onDuplicate,
   onRename,
   onDeleteRequest,
 }: {
   project: Project;
+  generatingId: string | null;
   onDuplicate: () => void;
   onRename: (name: string) => void;
   onDeleteRequest: () => void;
@@ -23,7 +25,7 @@ function ProjectCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const status = getProjectStatus(project);
+  const status = getProjectStatus(project, generatingId);
 
   // Close on any click outside the menu — a dropdown that only closes via its own button
   // would trap the user.
@@ -138,7 +140,7 @@ function ProjectCard({
 }
 
 export default function ProjectsPage() {
-  const { projects, isLoaded, rename, duplicate, remove } = useProjects();
+  const { projects, isLoaded, rename, duplicate, remove, generation } = useProjects();
   const [pendingDelete, setPendingDelete] = useState<Project | null>(null);
 
   return (
@@ -159,6 +161,7 @@ export default function ProjectsPage() {
             <ProjectCard
               key={project.id}
               project={project}
+              generatingId={generation?.projectId ?? null}
               onRename={(name) => rename(project.id, name)}
               onDuplicate={() => duplicate(project.id)}
               onDeleteRequest={() => setPendingDelete(project)}

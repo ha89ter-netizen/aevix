@@ -122,16 +122,6 @@ export type EstimateResult = {
   callToAction: string;
 };
 
-const navItems = [
-  { label: "Главная", href: "#главная", desc: "Начало и анализ бизнеса" },
-  { label: "AI-анализ", href: "#ai-анализ", desc: "Разбор процессов вашего бизнеса" },
-  { label: "Проблемы", href: "#проблемы", desc: "Что съедает время команды" },
-  { label: "Стоимость", href: "#стоимость", desc: "Модули, автоматизации и открытые цены" },
-  { label: "Кто мы", href: "#кто-мы", desc: "Команда и подход AEVIX" },
-  { label: "FAQ", href: "#faq", desc: "Частые вопросы по вашему бизнесу" },
-  { label: "Контакты", href: "#контакты", desc: "Обсудить проект" },
-];
-
 export const contacts = {
   whatsapp: {
     label: "WhatsApp",
@@ -623,7 +613,7 @@ function calculateEstimate(form: EstimateForm) {
   };
 }
 
-function buildFallbackEstimate(form: EstimateForm): EstimateResult {
+export function buildFallbackEstimate(form: EstimateForm): EstimateResult {
   const estimate = calculateEstimate(form);
   const modules = estimate.selected.map((service) => service.title);
   const includesAutomation = form.selectedServices.includes("automation");
@@ -904,177 +894,6 @@ function AnimatedNumber({ value, className }: { value: number; className?: strin
   return <span className={className}>{display}</span>;
 }
 
-function TopNav() {
-  const { status, profile, content, reset, openConsultation } = useBusiness();
-  const [activeHref, setActiveHref] = useState("#главная");
-  const [centerOpen, setCenterOpen] = useState(false);
-
-  useEffect(() => {
-    const sections = navItems
-      .map((item) => document.querySelector<HTMLElement>(item.href))
-      .filter((section): section is HTMLElement => Boolean(section));
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (visible?.target.id) setActiveHref(`#${visible.target.id}`);
-      },
-      { rootMargin: "-32% 0px -56% 0px", threshold: [0, 0.15, 0.35, 0.6] },
-    );
-
-    sections.forEach((section) => observer.observe(section));
-    return () => observer.disconnect();
-  }, []);
-
-  const activeItem = navItems.find((item) => item.href === activeHref) ?? navItems[0];
-  const personalized = status === "ready" && profile && content;
-  const StatusIcon = personalized ? categoryIcons[profile.category] : Command;
-
-  // Close the Navigation Center, then scroll — the modal unlocks the body scroll on close,
-  // so the programmatic scroll must run just after that.
-  const goTo = (href: string) => {
-    setCenterOpen(false);
-    const id = decodeURIComponent(href.replace("#", ""));
-    window.setTimeout(() => {
-      document.getElementById(id)?.scrollIntoView({
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-        block: "start",
-      });
-    }, 90);
-  };
-
-  return (
-    <>
-      <motion.header
-        initial={{ opacity: 0, y: -18 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={motionTransition.ambient}
-        className="site-header fixed inset-x-0 top-0 z-40 px-4 pt-4 sm:px-6"
-      >
-        <nav className="site-nav mx-auto flex max-w-[74rem] items-center justify-between rounded-full border border-ink/10 bg-porcelain/72 px-3 py-2 shadow-[0_14px_44px_rgba(9,8,7,0.08)] backdrop-blur-2xl">
-          <a
-            href="#главная"
-            aria-label="AEVIX, перейти к началу страницы"
-            className="group flex items-center gap-3 rounded-full px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/40"
-          >
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ink text-[10px] font-semibold text-porcelain transition group-hover:rotate-6">
-              AX
-            </span>
-            <span className="text-sm font-semibold text-ink">AEVIX</span>
-          </a>
-          <div className="flex items-center gap-2">
-            {personalized ? (
-              <span className="nav-persona-chip hidden items-center gap-1.5 md:inline-flex" title={content.persona}>
-                <StatusIcon className="h-3.5 w-3.5 text-violet" />
-                {profile.label}
-              </span>
-            ) : null}
-            <Link
-              href="/app"
-              className="workspace-entry-link hidden items-center gap-2 rounded-full border border-ink/10 bg-white/56 px-3 py-2 text-sm font-medium text-ink transition hover:bg-white sm:inline-flex"
-            >
-              <LayoutDashboard className="h-4 w-4 text-violet" />
-              Workspace
-            </Link>
-            <Button type="button" size="sm" className="hidden sm:inline-flex" onClick={openConsultation}>
-              <Sparkles className="mr-2 h-4 w-4" />
-              Бесплатная консультация
-            </Button>
-            <button
-              type="button"
-              aria-haspopup="dialog"
-              aria-expanded={centerOpen}
-              aria-label="Открыть центр навигации"
-              onClick={() => setCenterOpen(true)}
-              className="nav-center-trigger flex items-center gap-2 rounded-full border border-ink/10 bg-white/56 px-3 py-2 text-sm font-medium text-ink transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/30"
-            >
-              <Command className="h-4 w-4 text-violet" />
-              <span className="hidden sm:inline">{activeItem.label}</span>
-              <Menu className="h-4 w-4 sm:hidden" />
-            </button>
-          </div>
-        </nav>
-      </motion.header>
-
-      <PremiumModal
-        open={centerOpen}
-        onClose={() => setCenterOpen(false)}
-        titleId="nav-center-title"
-        panelClassName="md:h-auto md:max-w-2xl"
-      >
-        <div className="nav-center">
-          <div className="nav-center-head">
-            <p className="nav-center-eyebrow">Центр управления</p>
-            <h2 id="nav-center-title">Навигация AEVIX</h2>
-          </div>
-
-          {personalized ? (
-            <div className="nav-center-status is-ready">
-              <span className="nav-center-status-icon">
-                <StatusIcon className="h-5 w-5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="title">{content.persona}</p>
-                <p className="label">
-                  {profile.label} · автоматизация {content.metrics.automationScore}% · +{content.metrics.revenueUpliftPct}% выручка
-                </p>
-              </div>
-              <button type="button" onClick={reset} className="nav-center-reset">
-                <RotateCcw className="h-3.5 w-3.5" /> Сбросить
-              </button>
-            </div>
-          ) : (
-            <button type="button" onClick={() => goTo("#главная")} className="nav-center-status is-idle">
-              <div className="min-w-0">
-                <p className="title">Сайт ещё не персонализирован</p>
-                <p className="label">Опишите бизнес в начале страницы — интерфейс подстроится под вас</p>
-              </div>
-              <ArrowRight className="h-4 w-4 shrink-0 text-violet" />
-            </button>
-          )}
-
-          <div className="nav-center-grid">
-            {navItems.map((item, index) => (
-              <button
-                key={item.href}
-                type="button"
-                onClick={() => goTo(item.href)}
-                aria-current={activeHref === item.href ? "true" : undefined}
-                className={cn("nav-center-card", activeHref === item.href && "is-active")}
-              >
-                <span className="nav-center-index">{String(index + 1).padStart(2, "0")}</span>
-                <span className="nav-center-card-label">{item.label}</span>
-                <span className="nav-center-card-desc">{item.desc}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="nav-center-actions">
-            <Button type="button" variant="glass" className="w-full sm:w-auto" asChild>
-              <Link href="/app" onClick={() => setCenterOpen(false)}>
-                <LayoutDashboard className="mr-2 h-4 w-4" />
-                Открыть Workspace
-              </Link>
-            </Button>
-            <Button
-              type="button"
-              className="w-full sm:w-auto"
-              onClick={() => {
-                setCenterOpen(false);
-                openConsultation();
-              }}
-            >
-              <Sparkles className="mr-2 h-4 w-4" />
-              Бесплатная консультация
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </PremiumModal>
-    </>
-  );
-}
 
 /**
  * Drives the Hero placeholder as a soft cross-fade between whole example phrases. While
@@ -3533,41 +3352,6 @@ function StructuredData() {
  * shell's registered `--accent-*` channels and the whole product re-themes with a smooth,
  * inherited transition (see globals.css). Idle falls back to the AEVIX violet.
  */
-function AppShell({ children }: { children: ReactNode }) {
-  const { status, content } = useBusiness();
-  const accent = status === "ready" && content ? content.accent : null;
-  const style = accent
-    ? ({
-        "--accent-r": accent.r,
-        "--accent-g": accent.g,
-        "--accent-b": accent.b,
-        // Ambient tones ride along with the accent so the whole room lights differently per
-        // business, not just the interactive colour.
-        "--mood-a-r": content!.mood.a.r,
-        "--mood-a-g": content!.mood.a.g,
-        "--mood-a-b": content!.mood.a.b,
-        "--mood-b-r": content!.mood.b.r,
-        "--mood-b-g": content!.mood.b.g,
-        "--mood-b-b": content!.mood.b.b,
-      } as CSSProperties)
-    : undefined;
-
-  // One-shot accent sweep at the moment the interface re-themes, tying the rebuild together.
-  const [rebuildKey, setRebuildKey] = useState(0);
-  const wasReady = useRef(false);
-  useEffect(() => {
-    if (status === "ready" && !wasReady.current) setRebuildKey((key) => key + 1);
-    wasReady.current = status === "ready";
-  }, [status]);
-
-  return (
-    <div className="app-shell" style={style}>
-      {rebuildKey > 0 ? <span key={rebuildKey} className="app-rebuild-flash" aria-hidden="true" /> : null}
-      {children}
-      <ConsultationModal />
-    </div>
-  );
-}
 
 /**
  * Free-consultation popup. Opened by every generic "get in touch" CTA (header, Navigation
@@ -3639,10 +3423,9 @@ export function LandingExperience() {
   // BusinessProvider and MotionConfig now live in the root layout (shared with the Workspace
   // at /app so a described business carries over); this page only owns its own scene tree.
   return (
-    <AppShell>
+    <>
       <main>
         <StructuredData />
-        <TopNav />
         <HeroScene />
         <WhatIsAevixScene />
         <AiConsultantScene />
@@ -3656,6 +3439,6 @@ export function LandingExperience() {
         <ContactScene />
         <FooterScene />
       </main>
-    </AppShell>
+    </>
   );
 }

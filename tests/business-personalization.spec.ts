@@ -2,13 +2,12 @@ import { test, expect, type Page, type Route } from "@playwright/test";
 
 /**
  * Once a business is recognised it becomes the source of state for the whole page: the Hero
- * dashboard, cases, solutions and CTAs all adapt, and the Navigation Center reflects it.
+ * dashboard, cases, solutions and CTAs all adapt, and the product sidebar reflects it.
  * The analysis endpoint is mocked for determinism.
  */
 
 const FIELD = "#hero-business-input";
 const RESULT = ".hero-result";
-const TRIGGER = ".nav-center-trigger";
 const DIALOG = '[role="dialog"]';
 const BARBER_TEXT = "У меня барбершоп на 3 мастера, запись вручную";
 
@@ -43,12 +42,16 @@ async function analyzeBarber(page: Page) {
   await expect(page.locator(RESULT)).toBeVisible();
 }
 
-async function openNavCenter(page: Page) {
-  const dialog = page.locator(DIALOG);
-  await expect(async () => {
-    await page.locator(TRIGGER).click();
-    await expect(dialog).toBeVisible({ timeout: 1500 });
-  }).toPass({ timeout: 20000 });
+/** The sidebar is pinned open on desktop and lives behind the hamburger below 1024px. */
+async function openNav(page: Page) {
+  const menu = page.locator(".shell-menu-button");
+  if (await menu.isVisible()) {
+    await expect(async () => {
+      await menu.click();
+      await expect(page.locator(".shell-sidebar")).toBeVisible({ timeout: 1500 });
+    }).toPass({ timeout: 20000 });
+  }
+  await expect(page.locator(".shell-sidebar")).toBeVisible();
 }
 
 test.describe("site personalisation", () => {
@@ -103,7 +106,7 @@ test.describe("site personalisation", () => {
     // The shell's registered accent channel morphs away from the default violet (122,92,255).
     await expect
       .poll(() =>
-        page.locator(".app-shell").evaluate((el) =>
+        page.locator(".shell").evaluate((el) =>
           Math.round(parseFloat(getComputedStyle(el).getPropertyValue("--accent-r"))),
         ),
       )
@@ -176,14 +179,12 @@ test.describe("site personalisation", () => {
     await analyzeBarber(page);
     await expect(page.locator(".hero-personal-case")).toBeVisible();
 
-    await openNavCenter(page);
-    await expect(page.locator(".nav-center-status.is-ready")).toBeVisible();
-    await page.locator(".nav-center-reset").click();
+    await openNav(page);
+    await expect(page.locator(".shell-persona")).toBeVisible();
+    await page.locator(".shell-persona-reset").click();
 
-    // Status flips back to the idle prompt, and personalised blocks disappear.
-    await expect(page.locator(".nav-center-status.is-idle")).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(page.locator(DIALOG)).toHaveCount(0);
+    // The persona panel disappears along with every personalised block.
+    await expect(page.locator(".shell-persona")).toHaveCount(0);
     await expect(page.locator(".hero-personal-case")).toHaveCount(0);
     await expect(page.locator(".pricing-scene .hero-recommend-badge")).toHaveCount(0);
   });
@@ -268,25 +269,30 @@ test.describe("consultation popup", () => {
   });
 });
 
-test.describe("navigation center", () => {
-  test("opens as a dialog with grouped destinations", async ({ page }) => {
+test.describe("product navigation", () => {
+  test("the sidebar lists every landing section and nothing else", async ({ page }) => {
     await gotoHydrated(page);
-    await openNavCenter(page);
-    await expect(page.getByRole("heading", { name: "Навигация AEVIX" })).toBeVisible();
-    await expect(page.locator(".nav-center-card")).toHaveCount(7);
-    // Idle: prompts the visitor to personalise.
-    await expect(page.locator(".nav-center-status.is-idle")).toBeVisible();
+    await openNav(page);
+    await expect(page.locator(".shell-sidebar .shell-nav-item")).toHaveText([
+      "Главная",
+      "Возможности",
+      "Как работает",
+      "Кейсы",
+      "Цены",
+      "FAQ",
+      "Контакты",
+    ]);
+    // Nothing personalised yet, so no persona panel.
+    await expect(page.locator(".shell-persona")).toHaveCount(0);
   });
 
-  test("selecting a destination scrolls and closes without locking scroll", async ({ page }) => {
+  test("selecting a destination scrolls to it without locking scroll", async ({ page }) => {
     await gotoHydrated(page);
-    await openNavCenter(page);
+    await openNav(page);
 
-    await page.locator(".nav-center-card", { hasText: "Стоимость" }).click();
+    await page.locator(".shell-nav-item", { hasText: "Цены" }).click();
 
-    // Panel closes...
-    await expect(page.locator(DIALOG)).toHaveCount(0);
-    // ...the target section is scrolled into view...
+    // The target section is scrolled into view...
     await expect(page.locator("#стоимость")).toBeInViewport({ timeout: 5000 });
 
     // ...and no scroll lock lingers.
@@ -304,10 +310,9 @@ test.describe("navigation center", () => {
 
   test("reflects the recognised business", async ({ page }) => {
     await analyzeBarber(page);
-    await openNavCenter(page);
-    const status = page.locator(".nav-center-status.is-ready");
-    await expect(status).toBeVisible();
-    await expect(status.getByText(/Барбершоп/)).toBeVisible();
-    await expect(status.getByText(/автоматизация 82%/)).toBeVisible();
+    await openNav(page);
+    const persona = page.locator(".shell-persona");
+    await expect(persona).toBeVisible();
+    await expect(persona.getByText(/Барбершоп/)).toBeVisible();
   });
 });

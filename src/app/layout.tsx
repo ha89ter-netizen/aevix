@@ -4,6 +4,7 @@ import { MotionConfig } from "framer-motion";
 import { BusinessProvider } from "@/lib/business-context";
 import { ProjectsProvider } from "@/lib/projects";
 import "./globals.css";
+import { ProductShell } from "@/components/shell/product-shell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -79,7 +80,9 @@ export default function RootLayout({
             client-side navigation keeps this provider mounted, only the route content swaps. */}
         <BusinessProvider>
           <ProjectsProvider>
-            <MotionConfig reducedMotion="user">{children}</MotionConfig>
+            <MotionConfig reducedMotion="user">
+              <ProductShell>{children}</ProductShell>
+            </MotionConfig>
           </ProjectsProvider>
         </BusinessProvider>
       </body>

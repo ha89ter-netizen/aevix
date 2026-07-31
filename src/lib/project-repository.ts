@@ -35,10 +35,16 @@ function normalizeProject(value: unknown): Project | null {
   if (typeof value.name !== "string" || !value.name) return null;
   if (typeof value.createdAt !== "number" || typeof value.updatedAt !== "number") return null;
 
-  const preferredStyleId =
-    typeof value.preferredStyleId === "string" && knownStyleIds.has(value.preferredStyleId)
-      ? (value.preferredStyleId as ConceptStyleId)
-      : null;
+  // Accepts both shapes: the current array and the single `preferredStyleId` written before the
+  // briefing allowed up to three, so older projects keep the style they were created with.
+  const rawStyles = Array.isArray(value.preferredStyleIds)
+    ? value.preferredStyleIds
+    : typeof value.preferredStyleId === "string"
+      ? [value.preferredStyleId]
+      : [];
+  const preferredStyleIds = rawStyles
+    .filter((id): id is ConceptStyleId => typeof id === "string" && knownStyleIds.has(id))
+    .slice(0, 3);
   const preferredColorIds = Array.isArray(value.preferredColorIds)
     ? (value.preferredColorIds.filter((id): id is ConceptColorId => typeof id === "string" && knownColorIds.has(id)))
     : [];
@@ -49,8 +55,17 @@ function normalizeProject(value: unknown): Project | null {
     businessType: typeof value.businessType === "string" ? value.businessType : "",
     businessDescription: typeof value.businessDescription === "string" ? value.businessDescription : "",
     city: typeof value.city === "string" ? value.city : "",
-    preferredStyleId,
+    preferredStyleIds,
     preferredColorIds,
+    generatedAt: typeof value.generatedAt === "number" ? value.generatedAt : null,
+    publishedAt: typeof value.publishedAt === "number" ? value.publishedAt : null,
+    // Older projects predate the AI Designer and simply start with an empty history.
+    designerLog: Array.isArray(value.designerLog)
+      ? (value.designerLog.filter(
+          (entry): entry is Project["designerLog"][number] =>
+            isRecord(entry) && typeof entry.id === "string" && typeof entry.request === "string",
+        ))
+      : [],
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
     analysis: isRecord(value.analysis) ? (value.analysis as Project["analysis"]) : null,

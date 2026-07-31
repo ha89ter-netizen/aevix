@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -636,10 +636,22 @@ function ConceptPreview({
   );
 }
 
+/** Accepts PremiumModal's props so the two are interchangeable, and ignores the modal-only ones. */
+function EmbeddedSurface({ children, open }: { children: ReactNode; open?: boolean } & Record<string, unknown>) {
+  if (!open) return null;
+  return <div className="concept-embedded">{children}</div>;
+}
+
 export function WebsiteConceptExperience({
   initialConcept = null,
   onConceptSaved,
+  embedded = false,
 }: {
+  /** Renders inline as a Workspace page instead of inside a fullscreen modal. Inside a project
+   * the design IS the page — pulling the visitor into an overlay made the workspace feel like
+   * somewhere they had left rather than somewhere they were working. The landing page keeps the
+   * modal, where the concept genuinely is a self-contained demo launched from a button. */
+  embedded?: boolean;
   /** Restores a previously-saved concept (e.g. reopening a project) — shown immediately instead
    * of behind the "get a concept" trigger button. */
   initialConcept?: WebsiteConcept | null;
@@ -647,7 +659,7 @@ export function WebsiteConceptExperience({
    * keeps working exactly the same with no props (used standalone on the landing page). */
   onConceptSaved?: (concept: WebsiteConcept) => void;
 } = {}) {
-  const [open, setOpen] = useState(Boolean(initialConcept));
+  const [open, setOpen] = useState(embedded || Boolean(initialConcept));
   const [step, setStep] = useState(0);
   const [input, setInput] = useState<WebsiteConceptInput>(initialInput);
   const [concept, setConcept] = useState<WebsiteConcept | null>(initialConcept);
@@ -901,13 +913,18 @@ export function WebsiteConceptExperience({
     window.setTimeout(() => document.getElementById("контакты")?.scrollIntoView({ behavior: "smooth" }), 120);
   };
 
+  // Same children, two containers. Embedded mode drops every modal affordance (backdrop, focus
+  // trap, close button) because inside a project this content is the page itself.
+  const Surface = embedded ? EmbeddedSurface : PremiumModal;
+
   const showDemoAction = () => {
     setDemoMessage("Это демонстрация интерфейса. Функция будет подключена в готовом проекте.");
   };
 
   return (
     <>
-      <div className="concept-trigger-group mt-7">
+      {embedded ? null : (
+        <div className="concept-trigger-group mt-7">
         <Button type="button" onClick={() => { setShowExamples(false); setConcept(null); setOpen(true); }} className="concept-trigger">
           <WandSparkles className="mr-2 h-4 w-4" />
           Получить концепт сайта
@@ -915,9 +932,10 @@ export function WebsiteConceptExperience({
         <Button type="button" variant="glass" onClick={() => { setShowExamples(true); setConcept(null); setOpen(true); }}>
           Посмотреть пример <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
-      </div>
+        </div>
+      )}
 
-      <PremiumModal
+      <Surface
         open={open}
         onClose={() => {
           // Escape unwinds one layer at a time: sidebar -> fullscreen -> preview -> close.
@@ -1265,7 +1283,7 @@ export function WebsiteConceptExperience({
             </div>
           </div>
         )}
-      </PremiumModal>
+      </Surface>
     </>
   );
 }

@@ -12,6 +12,7 @@ export default function ProjectDesignPage() {
 
   return (
     <WebsiteConceptExperience
+      embedded
       initialConcept={project.design}
       onConceptSaved={(concept) => saveDesign(project.id, concept)}
     />
