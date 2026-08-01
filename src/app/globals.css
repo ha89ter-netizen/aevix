@@ -6256,8 +6256,32 @@ button.workspace-card:hover {
   padding: clamp(1.25rem, 3vw, 2rem);
 }
 
-.overview-summary-inner .workspace-status-badge {
-  justify-self: start;
+.overview-status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.overview-publish {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.4);
+  padding: 0.22rem 0.7rem;
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+  font-size: 0.72rem;
+  font-weight: 620;
+  transition: background var(--motion-base) var(--ease-premium);
+}
+
+.overview-publish:hover {
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.1);
+}
+
+.overview-publish.is-published {
+  border-color: var(--line);
+  color: rgba(9, 8, 7, 0.5);
 }
 
 .overview-brief {

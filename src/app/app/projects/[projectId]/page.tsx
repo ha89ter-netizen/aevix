@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Bot, Palette, Pencil, RefreshCw, Wallet, Workflow } from "lucide-react";
+import { ArrowRight, Bot, Globe, Palette, Pencil, RefreshCw, Wallet, Workflow } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { conceptStyles, generateVisualIdentity } from "@/lib/website-concept";
 import { conceptImagesFor } from "@/lib/concept-images";
@@ -18,7 +18,7 @@ import { GenerationScreen } from "@/components/workspace/generation-screen";
  */
 export default function ProjectOverviewPage() {
   const { project, projectId } = useCurrentProject();
-  const { rename, generation, regenerate } = useProjects();
+  const { rename, generation, regenerate, publish, unpublish } = useProjects();
   const [editingName, setEditingName] = useState(false);
 
   if (!project || !projectId) return null; // layout already renders the not-found/loading state
@@ -96,7 +96,20 @@ export default function ProjectOverviewPage() {
     <div className="workspace-project-overview">
       <section className="overview-summary" style={{ backgroundImage: `url(${imagery.hero})` }}>
         <div className="overview-summary-inner">
-          <span className={cn("workspace-status-badge", `is-${status.id}`)}>{status.label}</span>
+          <div className="overview-status-row">
+            <span className={cn("workspace-status-badge", `is-${status.id}`)}>{status.label}</span>
+            {progress.completedCount === progress.totalCount ? (
+              project.publishedAt ? (
+                <button type="button" className="overview-publish is-published" onClick={() => unpublish(project.id)}>
+                  <Globe className="h-3.5 w-3.5" /> Снять с публикации
+                </button>
+              ) : (
+                <button type="button" className="overview-publish" onClick={() => publish(project.id)}>
+                  <Globe className="h-3.5 w-3.5" /> Опубликовать
+                </button>
+              )
+            ) : null}
+          </div>
           {editingName ? (
             <input
               autoFocus
@@ -140,6 +153,12 @@ export default function ProjectOverviewPage() {
               <dt>Обновлён</dt>
               <dd>{formatProjectDate(project.updatedAt)}</dd>
             </div>
+            {project.publishedAt ? (
+              <div>
+                <dt>Опубликован</dt>
+                <dd>{formatProjectDate(project.publishedAt)}</dd>
+              </div>
+            ) : null}
           </dl>
         </div>
       </section>

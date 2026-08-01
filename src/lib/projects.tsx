@@ -34,6 +34,32 @@ export type DesignerEntry = {
   suggestion: string | null;
 };
 
+/**
+ * One reversible step, stored as the FIELDS that changed rather than a full concept snapshot.
+ * A designer edit touches a palette, a style, a layout, a page or one price — keeping only those
+ * keeps the stack small enough to persist with the project instead of dying with the tab.
+ */
+export type ConceptDiff = Partial<Pick<WebsiteConcept, "colorIds" | "styleId" | "layoutId" | "offers" | "pages">>;
+
+const DIFF_KEYS = ["colorIds", "styleId", "layoutId", "offers", "pages"] as const;
+
+/** The fields of `from` that differ from `to` — i.e. what to write to get back to `from`. */
+export function conceptDiff(from: WebsiteConcept | null, to: WebsiteConcept | null): ConceptDiff {
+  if (!from) return {};
+  const diff: ConceptDiff = {};
+  for (const key of DIFF_KEYS) {
+    if (!to || JSON.stringify(from[key]) !== JSON.stringify(to[key])) {
+      Object.assign(diff, { [key]: from[key] });
+    }
+  }
+  return diff;
+}
+
+export function applyConceptDiff(design: WebsiteConcept | null, diff: ConceptDiff): WebsiteConcept | null {
+  if (!design) return design;
+  return { ...design, ...diff };
+}
+
 export type ProjectPricing = {
   form: EstimateForm;
   result: EstimateResult;
@@ -63,6 +89,10 @@ export type Project = {
    * be able to leak one client's design decisions into another's project.
    */
   designerLog: DesignerEntry[];
+  /** Undo stack, oldest first. Each entry restores the state before one edit. */
+  editHistory: ConceptDiff[];
+  /** Redo stack, populated as steps are undone. */
+  redoHistory: ConceptDiff[];
   createdAt: number;
   updatedAt: number;
   analysis: AnalysisResult | null;
@@ -166,14 +196,17 @@ type ProjectsContextValue = {
   savePricing: (id: string, pricing: ProjectPricing) => void;
   /** Appends one AI Designer exchange to this project's own memory. */
   appendDesignerEntry: (id: string, entry: DesignerEntry) => void;
-  /** Records the pre-edit design so the change can be reverted. Call before saveDesign. */
-  pushHistory: (id: string, previous: WebsiteConcept | null) => void;
+  /** Records a reversible step. Both sides are required: the diff is computed between them, and
+   * at call time the project still holds `previous`, so it cannot be derived from state. */
+  pushHistory: (id: string, previous: WebsiteConcept | null, next: WebsiteConcept | null) => void;
   undo: (id: string) => void;
   redo: (id: string) => void;
   canUndo: (id: string) => boolean;
   canRedo: (id: string) => boolean;
   /** Marks the project published — the one lifecycle state a person sets deliberately. */
   publish: (id: string) => void;
+  /** Returns a published project to the editable states, so publishing is not a one-way door. */
+  unpublish: (id: string) => void;
   generation: GenerationState;
   /** Runs the full first generation for a freshly created project. */
   generateAll: (project: Project) => Promise<void>;
@@ -238,6 +271,8 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
       generatedAt: null,
       publishedAt: null,
       designerLog: [],
+      editHistory: [],
+      redoHistory: [],
       createdAt: now,
       updatedAt: now,
       analysis: null,
@@ -285,12 +320,12 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
-   * Undo/redo for AI edits.
+   * Undo/redo for AI edits, persisted with the project.
    *
-   * Snapshots live in a ref rather than in the project itself: a full concept is a large object,
-   * and writing every intermediate state to localStorage would bloat storage for a stack whose
-   * whole purpose is to be transient. The consequence — history is per session and resets on
-   * reload — is the deliberate trade, and the saved project is always the committed state.
+   * Only the FIELDS an edit actually touched are stored, not whole concept snapshots — a designer
+   * edit changes a palette, a style or one price, so a diff is a fraction of the size of the
+   * document and the stack survives a reload without bloating storage. The stack is capped, and
+   * the oldest step is dropped first.
    */
   const historyRef = useRef<Map<string, { past: (WebsiteConcept | null)[]; future: (WebsiteConcept | null)[] }>>(new Map());
   // Refs don't re-render, but the Undo/Redo buttons must enable and disable as the stack moves.
@@ -305,13 +340,20 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
     return stack;
   };
 
-  const pushHistory = useCallback((id: string, previous: WebsiteConcept | null) => {
+  const pushHistory = useCallback((id: string, previous: WebsiteConcept | null, next: WebsiteConcept | null) => {
     const stack = stackFor(id);
     // A new edit invalidates anything that was undone — the classic branch-and-drop.
     stack.past.push(previous);
     stack.future = [];
     if (stack.past.length > 30) stack.past.shift();
     bumpHistory((value) => value + 1);
+    setProjects((current) =>
+      current.map((project) =>
+        project.id === id
+          ? { ...project, editHistory: [...project.editHistory, conceptDiff(previous, next)].slice(-20), redoHistory: [] }
+          : project,
+      ),
+    );
   }, []);
 
   /**
@@ -321,17 +363,34 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
    */
   const undo = useCallback((id: string) => {
     const stack = stackFor(id);
-    if (!stack.past.length) return;
-    const previous = stack.past.pop() ?? null;
-    let reverted = false;
+    // In-session stack first (exact snapshots); otherwise replay the persisted diff, which is
+    // what makes undo survive a reload.
+    if (stack.past.length) {
+      const previous = stack.past.pop() ?? null;
+      let reverted = false;
+      setProjects((current) =>
+        current.map((project) => {
+          if (project.id !== id) return project;
+          if (!reverted) {
+            stack.future.push(project.design);
+            reverted = true;
+          }
+          return touch({ ...project, design: previous, editHistory: project.editHistory.slice(0, -1), redoHistory: [...project.redoHistory, conceptDiff(project.design, previous)] });
+        }),
+      );
+      bumpHistory((value) => value + 1);
+      return;
+    }
     setProjects((current) =>
       current.map((project) => {
-        if (project.id !== id) return project;
-        if (!reverted) {
-          stack.future.push(project.design);
-          reverted = true;
-        }
-        return touch({ ...project, design: previous });
+        if (project.id !== id || !project.editHistory.length) return project;
+        const diff = project.editHistory[project.editHistory.length - 1];
+        return touch({
+          ...project,
+          design: applyConceptDiff(project.design, diff),
+          editHistory: project.editHistory.slice(0, -1),
+          redoHistory: [...project.redoHistory, conceptDiff(project.design, applyConceptDiff(project.design, diff))],
+        });
       }),
     );
     bumpHistory((value) => value + 1);
@@ -339,24 +398,50 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
 
   const redo = useCallback((id: string) => {
     const stack = stackFor(id);
-    if (!stack.future.length) return;
-    const next = stack.future.pop() ?? null;
-    let restored = false;
+    if (stack.future.length) {
+      const next = stack.future.pop() ?? null;
+      let restored = false;
+      setProjects((current) =>
+        current.map((project) => {
+          if (project.id !== id) return project;
+          if (!restored) {
+            stack.past.push(project.design);
+            restored = true;
+          }
+          return touch({ ...project, design: next, redoHistory: project.redoHistory.slice(0, -1), editHistory: [...project.editHistory, conceptDiff(project.design, next)] });
+        }),
+      );
+      bumpHistory((value) => value + 1);
+      return;
+    }
     setProjects((current) =>
       current.map((project) => {
-        if (project.id !== id) return project;
-        if (!restored) {
-          stack.past.push(project.design);
-          restored = true;
-        }
-        return touch({ ...project, design: next });
+        if (project.id !== id || !project.redoHistory.length) return project;
+        const diff = project.redoHistory[project.redoHistory.length - 1];
+        const restoredDesign = applyConceptDiff(project.design, diff);
+        return touch({
+          ...project,
+          design: restoredDesign,
+          redoHistory: project.redoHistory.slice(0, -1),
+          editHistory: [...project.editHistory, conceptDiff(project.design, restoredDesign)],
+        });
       }),
     );
     bumpHistory((value) => value + 1);
   }, []);
 
-  const canUndo = useCallback((id: string) => Boolean(historyRef.current.get(id)?.past.length), []);
-  const canRedo = useCallback((id: string) => Boolean(historyRef.current.get(id)?.future.length), []);
+  const canUndo = useCallback(
+    (id: string) =>
+      Boolean(historyRef.current.get(id)?.past.length) ||
+      Boolean(projects.find((project) => project.id === id)?.editHistory.length),
+    [projects],
+  );
+  const canRedo = useCallback(
+    (id: string) =>
+      Boolean(historyRef.current.get(id)?.future.length) ||
+      Boolean(projects.find((project) => project.id === id)?.redoHistory.length),
+    [projects],
+  );
 
   const appendDesignerEntry = useCallback((id: string, entry: DesignerEntry) => {
     setProjects((current) =>
@@ -371,6 +456,12 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
   const publish = useCallback((id: string) => {
     setProjects((current) =>
       current.map((project) => (project.id === id ? touch({ ...project, publishedAt: Date.now() }) : project)),
+    );
+  }, []);
+
+  const unpublish = useCallback((id: string) => {
+    setProjects((current) =>
+      current.map((project) => (project.id === id ? touch({ ...project, publishedAt: null }) : project)),
     );
   }, []);
 
@@ -445,11 +536,12 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
       canUndo,
       canRedo,
       publish,
+      unpublish,
       generation,
       generateAll,
       regenerate,
     }),
-    [projects, isLoaded, saveState, create, rename, duplicate, remove, getProject, saveAnalysis, saveDesign, savePricing, appendDesignerEntry, pushHistory, undo, redo, canUndo, canRedo, publish, generation, generateAll, regenerate],
+    [projects, isLoaded, saveState, create, rename, duplicate, remove, getProject, saveAnalysis, saveDesign, savePricing, appendDesignerEntry, pushHistory, undo, redo, canUndo, canRedo, publish, unpublish, generation, generateAll, regenerate],
   );
 
   return <ProjectsContext.Provider value={value}>{children}</ProjectsContext.Provider>;

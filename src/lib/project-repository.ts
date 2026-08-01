@@ -71,6 +71,9 @@ function normalizeProject(value: unknown): Project | null {
     analysis: isRecord(value.analysis) ? (value.analysis as Project["analysis"]) : null,
     design: isRecord(value.design) ? (value.design as Project["design"]) : null,
     pricing: isRecord(value.pricing) ? (value.pricing as Project["pricing"]) : null,
+    // Older projects have no stored history; they simply start with an empty stack.
+    editHistory: Array.isArray(value.editHistory) ? (value.editHistory as Project["editHistory"]).slice(-20) : [],
+    redoHistory: Array.isArray(value.redoHistory) ? (value.redoHistory as Project["redoHistory"]).slice(-20) : [],
   };
 }
 

@@ -153,8 +153,9 @@ export function AiDesignerPanel({ project }: { project: Project }) {
     }
     selection?.setEditing(null);
 
-    // Snapshot BEFORE committing, so this edit is the thing Undo reverses.
-    pushHistory(project.id, project.design);
+    // Both sides are passed: the project still holds the old design at this point, so the diff
+    // cannot be derived from state alone.
+    pushHistory(project.id, project.design, outcome.design);
     saveDesign(project.id, outcome.design);
     appendDesignerEntry(project.id, toLogEntry(trimmed, outcome));
     setSuggestion(outcome.suggestion);
