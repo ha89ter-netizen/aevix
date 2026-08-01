@@ -25,6 +25,7 @@ import { ConceptSidebar } from "@/components/concept-sidebar";
 import { cn } from "@/lib/utils";
 import { conceptImagesFor, type ConceptImagery } from "@/lib/concept-images";
 import { businessKnowledgeFor, type BusinessKnowledge } from "@/lib/business-knowledge";
+import { SECTION_LABELS, useDesignerSelection } from "@/components/workspace/designer-selection";
 import { motionTransition } from "@/lib/motion";
 import {
   buildFallbackWebsiteConcept,
@@ -184,6 +185,7 @@ function ConceptSection({
   onDemoAction,
   imagery,
   knowledge,
+  offers,
   businessName,
 }: {
   section: WebsiteConceptSection;
@@ -191,23 +193,27 @@ function ConceptSection({
   onDemoAction: () => void;
   imagery: ConceptImagery;
   knowledge: BusinessKnowledge;
+  /** The project's own price list when it has one; otherwise the niche defaults are used. */
+  offers?: WebsiteConcept["offers"];
   businessName: string;
 }) {
   if (section.type === "pricing") {
     // The catalogue: products for product businesses (menu/rooms/каталог), the full service
     // price list otherwise. The FULL list lives only here — home never repeats it.
-    const offers = knowledge.products.length ? knowledge.products : knowledge.services;
+    const products = offers?.products ?? knowledge.products;
+    const services = offers?.services ?? knowledge.services;
+    const priceList = products.length ? products : services;
     return (
       <section className="concept-section concept-list-section">
         <div className="concept-section-heading">
           <p>
-            {knowledge.products.length ? knowledge.productsPageName ?? "Каталог" : "Услуги и цены"} <DemoChip label="Демо-цены" />
+            {products.length ? knowledge.productsPageName ?? "Каталог" : "Услуги и цены"} <DemoChip label="Демо-цены" />
           </p>
           <h3>{section.title}</h3>
           {section.text ? <span>{section.text}</span> : null}
         </div>
         <div className="concept-pricelist">
-          {offers.map((offer) => (
+          {priceList.map((offer) => (
             <div key={offer.name} className="concept-pricelist-row">
               <strong>{offer.name}</strong>
               <span className="concept-pricelist-dots" aria-hidden="true" />
@@ -224,7 +230,7 @@ function ConceptSection({
     // Home shows a 3-card teaser; inner pages show up to 6 — the exhaustive list with prices
     // is the pricing section's job, so these cards never duplicate it.
     const limit = isHomePage ? 3 : 6;
-    const cards = knowledge.services.slice(0, limit);
+    const cards = (offers?.services ?? knowledge.services).slice(0, limit);
     return (
       <section className="concept-section concept-list-section">
         <div className="concept-section-heading">
@@ -476,9 +482,12 @@ function ConceptPreview({
   activePageId,
   onPageChange,
   onDemoAction,
+  onImproveSection,
   isPreview = false,
 }: {
   concept: WebsiteConcept;
+  /** Opens the AI Designer's quick actions for one section. Absent on the landing. */
+  onImproveSection?: (section: ConceptSectionType) => void;
   mode: PreviewMode;
   /** True once the active page's hero is part of the reveal — always true once settled. */
   heroVisible: boolean;
@@ -493,6 +502,7 @@ function ConceptPreview({
   onDemoAction: () => void;
   isPreview?: boolean;
 }) {
+  const selection = useDesignerSelection();
   const stageRef = useRef<HTMLDivElement>(null);
   const imagery = conceptImagesFor(concept.businessType, concept.businessName);
   const knowledge = businessKnowledgeFor(concept.businessType, concept.businessName);
@@ -612,13 +622,50 @@ function ConceptPreview({
                 // most of the build); any other page, once it exists at all, shows in full.
                 const visible = !isHomePage || index < sectionCount;
                 return (
-                  <div key={`${section.type}-${index}`} className={cn("concept-section-piece", visible && "is-visible")}>
+                  <div
+                    key={`${section.type}-${index}`}
+                    className={cn(
+                      "concept-section-piece",
+                      visible && "is-visible",
+                      // Editing/selection chrome only exists inside a project, never on the
+                      // landing's read-only demo.
+                      selection && "is-editable",
+                      selection?.selected?.type === section.type && "is-selected",
+                      selection?.editing === section.type && "is-editing",
+                    )}
+                    onClick={
+                      selection
+                        ? () => selection.select({ type: section.type, label: SECTION_LABELS[section.type] })
+                        : undefined
+                    }
+                  >
+                    {selection ? (
+                      <div className="concept-section-tools" onClick={(event) => event.stopPropagation()}>
+                        <span className="concept-section-name">{SECTION_LABELS[section.type]}</span>
+                        <button
+                          type="button"
+                          className="concept-improve"
+                          onClick={() => {
+                            selection.select({ type: section.type, label: SECTION_LABELS[section.type] });
+                            onImproveSection?.(section.type);
+                          }}
+                        >
+                          <Sparkles className="h-3 w-3" /> Улучшить
+                        </button>
+                      </div>
+                    ) : null}
+                    {selection?.editing === section.type ? (
+                      <span className="concept-section-editing">
+                        Обновляем «{SECTION_LABELS[section.type]}»…
+                      </span>
+                    ) : null}
                     <ConceptSection
                       section={section}
                       isHomePage={isHomePage}
                       onDemoAction={onDemoAction}
                       imagery={imagery}
                       knowledge={knowledge}
+                      offers={concept.offers}
                       businessName={concept.businessName}
                     />
                   </div>
@@ -645,8 +692,11 @@ function EmbeddedSurface({ children, open }: { children: ReactNode; open?: boole
 export function WebsiteConceptExperience({
   initialConcept = null,
   onConceptSaved,
+  onImproveSection,
   embedded = false,
 }: {
+  /** Forwarded to the preview so a section's "Улучшить" reaches the AI Designer. */
+  onImproveSection?: (section: ConceptSectionType) => void;
   /** Renders inline as a Workspace page instead of inside a fullscreen modal. Inside a project
    * the design IS the page — pulling the visitor into an overlay made the workspace feel like
    * somewhere they had left rather than somewhere they were working. The landing page keeps the
@@ -1074,6 +1124,7 @@ export function WebsiteConceptExperience({
                       activePageId={activePageId}
                       onPageChange={setActivePageId}
                       onDemoAction={showDemoAction}
+                      onImproveSection={onImproveSection}
                       isPreview={isPreview}
                     />
                   ) : (

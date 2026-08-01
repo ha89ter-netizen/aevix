@@ -62,7 +62,3 @@ export const motionTransition = {
   slower: { duration: duration.slower, ease: easeCubic.premium },
   ambient: { duration: duration.ambient, ease: easeCubic.soft },
 } as const;
-
-/** Stagger step between siblings revealing in sequence. One value, so every list, grid and
- * reveal cascade shares a rhythm. */
-export const staggerStep = 0.055;

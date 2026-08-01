@@ -6722,6 +6722,134 @@ button.workspace-card:hover {
   }
 }
 
+
+/* ---- Section selection, live edit highlight and inline improve ---- */
+
+.concept-section-piece.is-editable {
+  position: relative;
+  cursor: pointer;
+  transition: box-shadow var(--motion-slow) var(--ease-premium);
+}
+
+.concept-section-piece.is-editable:hover {
+  box-shadow: inset 0 0 0 1px rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.35);
+}
+
+.concept-section-piece.is-selected {
+  box-shadow: inset 0 0 0 2px rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.55);
+}
+
+/* The section being rewritten glows while its steps run, so "what changed, and where" is
+   answered by the page itself rather than only by the panel's text. */
+.concept-section-piece.is-editing {
+  animation: concept-editing var(--motion-ambient) var(--ease-soft) infinite alternate;
+}
+
+@keyframes concept-editing {
+  from { box-shadow: inset 0 0 0 2px rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.3); }
+  to { box-shadow: inset 0 0 0 3px rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.75); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .concept-section-piece.is-editing {
+    animation: none;
+    box-shadow: inset 0 0 0 2px rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.6);
+  }
+}
+
+.concept-section-tools {
+  position: absolute;
+  z-index: 6;
+  top: 0.6rem;
+  right: 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  opacity: 0;
+  transition: opacity var(--motion-base) var(--ease-premium);
+}
+
+.concept-section-piece.is-editable:hover .concept-section-tools,
+.concept-section-piece.is-selected .concept-section-tools {
+  opacity: 1;
+}
+
+.concept-section-name {
+  border-radius: var(--radius-pill);
+  background: rgba(9, 8, 7, 0.62);
+  padding: 0.2rem 0.6rem;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 620;
+  backdrop-filter: blur(6px);
+}
+
+.concept-improve {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: var(--radius-pill);
+  background: #fff;
+  padding: 0.25rem 0.65rem;
+  color: #111214;
+  font-size: 0.7rem;
+  font-weight: 650;
+  box-shadow: 0 6px 18px rgba(9, 8, 7, 0.2);
+}
+
+.concept-section-editing {
+  position: absolute;
+  z-index: 6;
+  top: 0.6rem;
+  left: 0.6rem;
+  border-radius: var(--radius-pill);
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+  padding: 0.2rem 0.65rem;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 620;
+}
+
+.designer-scope {
+  display: grid;
+  gap: 0.45rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: rgba(9, 8, 7, 0.03);
+  padding: 0.6rem 0.7rem;
+  color: rgba(9, 8, 7, 0.6);
+  font-size: 0.76rem;
+}
+
+.designer-scope b {
+  color: #111214;
+}
+
+.designer-scope-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.designer-scope-actions button {
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 0.22rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 560;
+  transition: border-color var(--motion-base) var(--ease-premium);
+}
+
+.designer-scope-actions button:hover {
+  border-color: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.5);
+}
+
+.designer-suggestion.is-insight {
+  border-color: rgba(217, 119, 6, 0.3);
+  background: rgba(217, 119, 6, 0.08);
+}
+
 /* =========================================================================
    PRODUCT SHELL — the one frame every route renders inside. Replaces the
    landing's floating pill header, the Workspace's own sidebar/topbar and the

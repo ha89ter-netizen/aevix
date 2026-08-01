@@ -5,9 +5,34 @@ import { ArrowUp, Check, Redo2, Sparkles, Undo2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProjects } from "@/lib/projects";
 import type { Project } from "@/lib/projects";
-import { applyDesignerRequest, toLogEntry, type DesignerSuggestion } from "@/lib/ai-designer";
+import { applyDesignerRequest, toLogEntry, type DesignerSuggestion, type ResolvedIntent } from "@/lib/ai-designer";
+import { SECTION_IMPROVEMENTS, useDesignerSelection } from "./designer-selection";
 
 const OPENED_KEY = "aevix.designer.opened";
+
+/** Asks the server to place a request the local matcher could not. Returns null on any failure,
+ * including no configured key — the caller then shows its normal "не понял" hint. */
+async function resolveWithModel(request: string, project: Project): Promise<ResolvedIntent | null> {
+  const offers = [
+    ...(project.design?.offers?.products ?? []),
+    ...(project.design?.offers?.services ?? []),
+  ].map((offer) => offer.name);
+  const sections = Array.from(
+    new Set((project.design?.pages ?? []).flatMap((page) => page.sections.map((section) => section.type))),
+  );
+  try {
+    const response = await fetch("/api/designer-intent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ request, offers, sections }),
+    });
+    const data = (await response.json()) as { intent?: { id: string; value?: string; target?: string; text?: string } | null };
+    if (!data.intent) return null;
+    return data.intent as ResolvedIntent;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * The AI Designer.
@@ -27,7 +52,9 @@ export function AiDesignerPanel({ project }: { project: Project }) {
   const [working, setWorking] = useState(false);
   const [suggestion, setSuggestion] = useState<DesignerSuggestion | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [insight, setInsight] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const selection = useDesignerSelection();
 
   // First open is automatic and one-off; the flag is global rather than per project because it
   // marks "this person has met the designer", not "this project has".
@@ -41,6 +68,34 @@ export function AiDesignerPanel({ project }: { project: Project }) {
       // Storage disabled — simply never auto-opens.
     }
   }, [project.generatedAt]);
+
+  useEffect(() => {
+    const open = () => setOpen(true);
+    window.addEventListener("aevix:designer-open", open);
+    return () => window.removeEventListener("aevix:designer-open", open);
+  }, []);
+
+  /**
+   * A single observation when returning to a project that has been sitting untouched. Rare by
+   * construction: it needs a day since the last edit, at least one edit already made, and it is
+   * shown once per project — a designer who greets you every visit is wallpaper, not insight.
+   */
+  useEffect(() => {
+    if (!project.generatedAt || !project.designerLog.length) return;
+    const key = `aevix.insight.${project.id}`;
+    const lastTouch = project.updatedAt;
+    if (Date.now() - lastTouch < 24 * 60 * 60 * 1000) return;
+    try {
+      if (window.localStorage.getItem(key)) return;
+      window.localStorage.setItem(key, "1");
+      setInsight(
+        "Я пересмотрел проект: блок цен сейчас читается слабее остальных — типографика там осталась от первой генерации.",
+      );
+      setOpen(true);
+    } catch {
+      // Storage disabled — the insight simply never appears.
+    }
+  }, [project.id, project.generatedAt, project.updatedAt, project.designerLog.length]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -66,12 +121,23 @@ export function AiDesignerPanel({ project }: { project: Project }) {
     setSteps([]);
     setRequest("");
 
-    const outcome = applyDesignerRequest(trimmed, project);
+    let outcome = applyDesignerRequest(trimmed, project);
+
+    // The local matcher only covers common phrasings. Rather than tell someone their wording was
+    // wrong, hand the sentence to the model — it picks from the same closed list of operations,
+    // so whatever comes back is applied by the identical bounded, undoable code path.
+    if (!outcome.design && outcome.intent === "unknown" && project.design) {
+      setSteps(["Разбираем запрос…"]);
+      const resolved = await resolveWithModel(trimmed, project);
+      if (resolved) outcome = applyDesignerRequest(trimmed, project, resolved);
+      setSteps([]);
+    }
+
     if (!outcome.design) {
       setWorking(false);
       setNote(
         outcome.intent === "unknown"
-          ? "Не понял правку. Попробуйте: «сделай темнее», «добавь отзывы», «смени макет»."
+          ? "Не понял правку. Попробуйте: «сделай темнее», «добавь отзывы», «цена «Капучино» 1500»."
           : "Сначала нужно сгенерировать сайт проекта.",
       );
       return;
@@ -79,10 +145,13 @@ export function AiDesignerPanel({ project }: { project: Project }) {
 
     // Each step is a real change being applied; they are revealed in sequence so the work reads
     // as progress rather than a single silent jump.
+    const target = selection?.selected?.type ?? null;
+    selection?.setEditing(target);
     for (const step of outcome.steps) {
       setSteps((current) => [...current, step.label]);
       await new Promise((resolve) => setTimeout(resolve, 260));
     }
+    selection?.setEditing(null);
 
     // Snapshot BEFORE committing, so this edit is the thing Undo reverses.
     pushHistory(project.id, project.design);
@@ -138,6 +207,35 @@ export function AiDesignerPanel({ project }: { project: Project }) {
           </header>
 
           <div className="designer-body">
+            {selection?.selected ? (
+              <div className="designer-scope">
+                <span>
+                  Правка применится к разделу <b>{selection.selected.label}</b>
+                </span>
+                <div className="designer-scope-actions">
+                  {SECTION_IMPROVEMENTS.map((item) => (
+                    <button key={item.request} type="button" onClick={() => void run(item.request)}>
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {insight ? (
+              <div className="designer-suggestion is-insight">
+                <p>{insight}</p>
+                <div>
+                  <button type="button" onClick={() => { setInsight(null); void run("Улучши типографику"); }}>
+                    Посмотреть
+                  </button>
+                  <button type="button" className="is-ghost" onClick={() => setInsight(null)}>
+                    Скрыть
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
             {steps.length ? (
               <ul className="designer-steps">
                 {steps.map((step, index) => (

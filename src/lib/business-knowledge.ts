@@ -1131,8 +1131,6 @@ const GENERIC: BusinessKnowledge = {
   styles: ["minimal", "modern", "premium"],
 };
 
-export const businessKnowledgeBase: BusinessKnowledge[] = KNOWLEDGE;
-
 /**
  * Match order matters: specific niches must be checked before broad ones, or «барбершоп» would
  * hit the restaurant's «бар» keyword and «стоматология» could hit a broad match first. This is

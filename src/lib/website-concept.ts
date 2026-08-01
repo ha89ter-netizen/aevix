@@ -126,6 +126,8 @@ export type WebsiteConceptInput = {
   wishes: string;
 };
 
+export type ConceptOffer = { name: string; price: string };
+
 export type WebsiteConceptSection = {
   type: ConceptSectionType;
   title: string;
@@ -156,6 +158,13 @@ export type WebsiteConcept = {
   /** Optional for backward compatibility: concepts saved before layouts existed render with
    * the seeded default (see resolveConceptLayout). */
   layoutId?: ConceptLayoutId;
+  /**
+   * The project's own price list. Seeded from the niche knowledge at generation time and owned
+   * by the project from then on — prices and service names are the things people most want to
+   * change, and they cannot be edited while they live in a shared constant. Absent on concepts
+   * generated before this existed, which then fall back to the knowledge base.
+   */
+  offers?: { products: ConceptOffer[]; services: ConceptOffer[] };
   navigation: Array<{ label: string; pageId: string }>;
   pages: WebsiteConceptPage[];
 };
@@ -508,9 +517,13 @@ export function generateVisualIdentity(colorIds: ConceptColorId[], styleId: Conc
   };
 }
 
-// Same tiny string hash as concept-images: only needs to spread similar names apart so two
-// businesses in the same niche don't get identical layout/rating picks.
-function conceptSeed(input: string): number {
+/**
+ * Tiny, dependency-free string hash. It only needs to spread similar business names apart so two
+ * businesses in the same niche don't land on identical layouts or photo sets — it is not, and
+ * does not need to be, collision-resistant. Exported because concept-images.ts seeds from the
+ * same value; two copies of it drifting apart would silently decouple layout from imagery.
+ */
+export function conceptSeed(input: string): number {
   let hash = 0;
   for (let index = 0; index < input.length; index += 1) {
     hash = (hash * 31 + input.charCodeAt(index)) | 0;

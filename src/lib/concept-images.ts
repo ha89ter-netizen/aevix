@@ -1,4 +1,5 @@
 import { businessKnowledgeFor } from "./business-knowledge";
+import { conceptSeed } from "./website-concept";
 
 /**
  * Category-matched imagery for the generated website concept, so a coffee concept shows a
@@ -156,16 +157,6 @@ const SETS: Record<string, ConceptImagerySet> = {
   },
 };
 
-// Small, dependency-free string hash — just needs to spread similar business names apart, not
-// resist collisions the way a real hash would.
-function seedFrom(input: string): number {
-  let hash = 0;
-  for (let index = 0; index < input.length; index += 1) {
-    hash = (hash * 31 + input.charCodeAt(index)) | 0;
-  }
-  return Math.abs(hash);
-}
-
 /**
  * Round-robin picker across the role pools with a seeded start offset per pool and a global
  * "used" set, so a single concept never repeats the same photo across hero/gallery/about, and
@@ -194,7 +185,7 @@ export function conceptImagesFor(businessType: string, seed?: string): ConceptIm
   const knowledge = businessKnowledgeFor(businessType, seed ?? "");
   const set = SETS[knowledge.id] ?? SETS.generic;
 
-  const n = seedFrom(seed?.trim() || businessType);
+  const n = conceptSeed(seed?.trim() || businessType);
   const used = new Set<string>();
 
   const heroId = set.heroes[n % set.heroes.length];

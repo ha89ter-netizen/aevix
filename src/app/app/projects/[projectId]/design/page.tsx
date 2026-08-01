@@ -14,6 +14,10 @@ export default function ProjectDesignPage() {
     <WebsiteConceptExperience
       embedded
       initialConcept={project.design}
+      onImproveSection={() => {
+        // Opening the panel is enough: it reads the section that was just selected.
+        window.dispatchEvent(new CustomEvent("aevix:designer-open"));
+      }}
       onConceptSaved={(concept) => saveDesign(project.id, concept)}
     />
   );

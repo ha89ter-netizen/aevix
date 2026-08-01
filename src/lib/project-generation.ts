@@ -216,6 +216,8 @@ export async function runProjectGeneration(
     colorIds: brief.colorIds.length ? brief.colorIds : concept.colorIds,
     styleId: brief.styleIds[0] ?? concept.styleId,
     layoutId: resolveConceptLayout({ businessType: brief.businessType, businessName: brief.name }),
+    // Copied out of the knowledge base and onto the project, so the price list becomes editable.
+    offers: concept.offers ?? { products: [...knowledge.products], services: [...knowledge.services] },
   };
 
   onStage("imagery");

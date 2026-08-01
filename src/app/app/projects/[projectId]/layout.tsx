@@ -6,6 +6,7 @@ import { FolderX } from "lucide-react";
 import { useCurrentProject } from "@/components/workspace/use-current-project";
 import { WorkspaceEmptyState } from "@/components/workspace/empty-state";
 import { AiDesignerPanel } from "@/components/workspace/ai-designer-panel";
+import { DesignerSelectionProvider } from "@/components/workspace/designer-selection";
 
 /**
  * The in-page tab row that used to live here is gone: a project's sections are now the sidebar's
@@ -39,10 +40,12 @@ export default function ProjectLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="workspace-page workspace-project-scope">
-      {children}
-      {/* Available from every section of an open project, not just Overview. */}
-      <AiDesignerPanel project={project} />
-    </div>
+    <DesignerSelectionProvider>
+      <div className="workspace-page workspace-project-scope">
+        {children}
+        {/* Available from every section of an open project, not just Overview. */}
+        <AiDesignerPanel project={project} />
+      </div>
+    </DesignerSelectionProvider>
   );
 }
