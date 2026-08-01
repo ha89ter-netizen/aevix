@@ -158,9 +158,16 @@ test.describe("ecosystem visualisation (reduced motion → CSS fallback)", () =>
     const detail = page.locator(".ecosystem-detail");
     await expect(detail).toBeVisible();
 
-    const box = await detail.boundingBox();
-    // Click a corner of the backdrop, away from the orb/copy panel in the centre.
-    await page.mouse.click((box?.x ?? 0) + 10, (box?.y ?? 0) + 10);
+    // The overlay closes only when the click lands on the overlay ITSELF, so the point has to be
+    // provably outside the content panel. Deriving it from the overlay's own corner was the bug:
+    // on a phone the panel is bottom-anchored and full width, so that corner is sometimes covered
+    // and the click hit the panel instead — which is exactly why this passed alone and failed in
+    // a full run. Aim at the gap between the overlay's top edge and the content's top edge.
+    const overlay = await detail.boundingBox();
+    const content = await page.locator(".ecosystem-detail-body").boundingBox();
+    const gapTop = overlay!.y;
+    const gapBottom = content ? content.y : overlay!.y + overlay!.height;
+    await page.mouse.click(overlay!.x + overlay!.width / 2, (gapTop + gapBottom) / 2);
     await expect(detail).toHaveCount(0, { timeout: 5000 });
   });
 

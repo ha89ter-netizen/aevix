@@ -128,47 +128,63 @@ test.describe("concept preview mode", () => {
       .toBeGreaterThan(0);
   });
 
-  test("keyboard drives the preview scroll (PageDown / End / Home)", async ({ page }, testInfo) => {
-    // Physical page keys are a desktop concern; touch devices have no equivalent.
-    test.skip(testInfo.project.name !== "desktop", "desktop-only scenario");
-    await openConceptExample(page);
-    await enterPreview(page);
+  /**
+   * Runs with reduced motion, which is what makes this test deterministic rather than merely
+   * patient.
+   *
+   * In preview the stage sets `scroll-behavior: smooth`, so every assertion here used to poll a
+   * moving target: the scroll position was mid-animation, and the "am I at the bottom?" check
+   * could also be chasing a `scrollHeight` that was still settling. Under full-suite load that
+   * animation regularly outlasted the poll budget, which is why this was the one test that kept
+   * flapping — passing alone, failing in a crowd.
+   *
+   * The behaviour under test is "the page keys drive the stage's own scroll container", not how
+   * long the animation takes. Reduced motion turns the same scroll into an instant jump (see the
+   * global `scroll-behavior: auto !important` rule), so the assertions read a settled value every
+   * time. Nothing about what is verified changes; only the timing dependency is removed.
+   */
+  test.describe("with instant scrolling", () => {
+    test.use({ contextOptions: { reducedMotion: "reduce" } });
 
-    const stage = page.locator(STAGE);
-    const scrollTop = () => stage.evaluate((el) => Math.round(el.scrollTop));
+    test("keyboard drives the preview scroll (PageDown / End / Home)", async ({ page }, testInfo) => {
+      // Physical page keys are a desktop concern; touch devices have no equivalent.
+      test.skip(testInfo.project.name !== "desktop", "desktop-only scenario");
+      await openConceptExample(page);
+      await enterPreview(page);
 
-    await waitForStableScrollHeight(page);
+      const stage = page.locator(STAGE);
+      const scrollTop = () => stage.evaluate((el) => Math.round(el.scrollTop));
 
-    // Preview focuses the stage in an effect; wait for that before sending keys, otherwise
-    // they land on the body and the stage never scrolls.
-    await expect
-      .poll(() =>
-        page.evaluate(() => document.activeElement?.classList.contains("concept-preview-stage")),
-      )
-      .toBe(true);
+      await waitForStableScrollHeight(page);
 
-    expect(await scrollTop()).toBe(0);
+      // Preview focuses the stage in an effect; wait for that before sending keys, otherwise
+      // they land on the body and the stage never scrolls.
+      await expect
+        .poll(() =>
+          page.evaluate(() => document.activeElement?.classList.contains("concept-preview-stage")),
+        )
+        .toBe(true);
 
-    // The stage uses `scroll-behavior: smooth`, so each assertion polls until the
-    // keyboard-driven scroll animation settles rather than reading mid-flight. Timeouts are
-    // generous because the shared dev server can animate slowly under full-suite load.
-    await page.keyboard.press("PageDown");
-    await expect.poll(scrollTop, { timeout: 10000 }).toBeGreaterThan(0);
+      expect(await scrollTop()).toBe(0);
 
-    await page.keyboard.press("End");
-    await expect
-      .poll(
-        () => stage.evaluate((el) => Math.abs(el.scrollTop - (el.scrollHeight - el.clientHeight)) < 2),
-        { timeout: 10000 },
-      )
-      .toBe(true);
+      // Every keypress here is retried until it takes effect. Each keydown re-renders the
+      // preview chrome (it wakes the idle-fading exit pill), and a press that lands between
+      // renders is simply dropped — the real reason this test flapped, which reduced motion
+      // alone did not address. Only `Home` was retried before, so `End` was the one left racy.
+      const pressUntil = (key: string, settled: () => Promise<boolean>) =>
+        expect(async () => {
+          await page.keyboard.press(key);
+          await expect.poll(settled, { timeout: 2000 }).toBe(true);
+        }).toPass({ timeout: 15000 });
 
-    // Retry the keypress: each keydown re-renders the preview chrome, so an individual press
-    // can land between renders and be dropped.
-    await expect(async () => {
-      await page.keyboard.press("Home");
-      await expect.poll(scrollTop, { timeout: 2000 }).toBe(0);
-    }).toPass({ timeout: 15000 });
+      await pressUntil("PageDown", async () => (await scrollTop()) > 0);
+
+      await pressUntil("End", () =>
+        stage.evaluate((el) => Math.abs(el.scrollTop - (el.scrollHeight - el.clientHeight)) < 2),
+      );
+
+      await pressUntil("Home", async () => (await scrollTop()) === 0);
+    });
   });
 
   test("Escape returns to the editor without losing project state", async ({ page }) => {

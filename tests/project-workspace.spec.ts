@@ -76,6 +76,8 @@ async function createProjectViaForm(page: Page, name: string) {
   }).toPass({ timeout: 15_000 });
   await submit.click();
   await page.waitForURL(/\/app\/projects\/.+/);
+  // Generation runs on arrival; callers assume a settled project.
+  await expect(page.locator(".overview-card-grid")).toBeVisible({ timeout: 60_000 });
   return page.url();
 }
 
@@ -156,6 +158,10 @@ test.describe("project creation", () => {
     await page.getByRole("button", { name: "Создать проект" }).click();
 
     await page.waitForURL(/\/app\/projects\/.+/);
+    // Creating a project now starts generation, and the Overview shows the generation screen
+    // until it finishes. Waiting for the finished layout first stops the assertions below from
+    // racing that work with their default 5s budget.
+    await expect(page.locator(".overview-card-grid")).toBeVisible({ timeout: 60_000 });
     await expect(page.locator(".workspace-project-name")).toHaveText("Барбершоп на Абая");
     await expect(page.locator(".overview-facts")).toContainText("Барбершоп");
     await expect(page.locator(".overview-facts")).toContainText("Алматы");

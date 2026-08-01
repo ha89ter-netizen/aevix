@@ -32,6 +32,9 @@ async function createProject(page: Page, name: string) {
   }).toPass({ timeout: 15_000 });
   await submit.click();
   await page.waitForURL(/\/app\/projects\/[^/]+$/);
+  // The project generates on arrival; every caller here navigates afterwards and would
+  // otherwise be clicking through a screen that is about to be replaced.
+  await expect(page.locator(".overview-card-grid")).toBeVisible({ timeout: 60_000 });
 }
 
 test.describe("one header, one job per zone", () => {

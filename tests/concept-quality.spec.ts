@@ -16,11 +16,24 @@ async function openExample(page: Page, name: RegExp) {
   await page.goto("/");
   const trigger = page.getByRole("button", { name: "Посмотреть пример" });
   await trigger.scrollIntoViewIfNeeded();
-  await trigger.click();
-  await page.getByRole("button", { name }).click();
-  await expect(page.locator(".concept-preview-stage")).toBeVisible();
-  // Reduced motion applies the whole reveal instantly; give React a beat to settle.
-  await page.waitForTimeout(400);
+
+  // Both clicks are retried: server-rendered markup is clickable before React attaches its
+  // handlers, so a click that lands during hydration passes every actionability check and still
+  // does nothing. Under full-suite load that window is wide enough to hit regularly.
+  await expect(async () => {
+    await trigger.click();
+    await expect(page.getByRole("button", { name })).toBeVisible({ timeout: 1500 });
+  }).toPass({ timeout: 20_000 });
+
+  await expect(async () => {
+    await page.getByRole("button", { name }).click();
+    await expect(page.locator(".concept-preview-stage")).toBeVisible({ timeout: 1500 });
+  }).toPass({ timeout: 20_000 });
+
+  // The app publishes its own "the concept is fully built" signal: the Просмотр control stays
+  // disabled until `isSettled`. Waiting on that beats sleeping for a fixed 400ms and hoping —
+  // the sleep is what made these assertions load-sensitive.
+  await expect(page.getByRole("button", { name: "Просмотр" })).toBeEnabled({ timeout: 20_000 });
 }
 
 function conceptNav(page: Page) {
