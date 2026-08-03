@@ -11,11 +11,55 @@ import {
 } from "@/lib/website-concept";
 
 export const runtime = "nodejs";
+/**
+ * Задано явно, потому что теперь маршрут может делать до трёх запросов к модели подряд.
+ * Значение по умолчанию у Vercel меньше суммарного бюджета попыток, и функцию оборвало бы
+ * посреди второй — то есть повторы существовали бы только на localhost.
+ */
+export const maxDuration = 60;
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 4;
-const REQUEST_TIMEOUT_MS = 24_000;
 const MAX_REQUEST_BYTES = 10_000;
+
+/**
+ * Повторы генерации концепта.
+ *
+ * Измерено на живых запросах: модель проходила собственную проверку маршрута примерно в
+ * половине случаев — три ответа из шести приходили без одной из обязательных секций, и человек
+ * молча получал локальный концепт вместо AI. Свойство «никогда не пусто» при этом работало
+ * безупречно, а потому и скрывало проблему.
+ *
+ * Повтор здесь не слепой: следующей попытке прямо сообщается, каких секций не хватило (см.
+ * `retryHint`). Повторять тот же запрос теми же словами — надеяться на удачу; назвать
+ * недостающее — дать модели то, чего ей не хватило.
+ *
+ * Что дали повторы на самом деле (то же измерение, шесть запросов): 4 успеха из 6 против 3 из
+ * 6. Меньше, чем обещает арифметика независимых попыток, и по двум понятным причинам. Одна
+ * попытка занимает 15–22 секунды, поэтому в бюджет реально укладываются две, а не три. И срывы
+ * не независимы: на одном и том же описании бизнеса модель склонна упускать одну и ту же
+ * секцию, так что вторая попытка — не второй бросок монеты, а тот же бросок с подсказкой.
+ *
+ * Потолок здесь — время. Уложить три попытки значит держать человека у экрана генерации около
+ * минуты, что хуже локального концепта. Дальше эту долю поднимать надо не числом попыток.
+ */
+const MAX_ATTEMPTS = 3;
+const ATTEMPT_TIMEOUT_MS = 22_000;
+/** Общий потолок на все попытки, с запасом под maxDuration ниже. */
+const TOTAL_BUDGET_MS = 50_000;
+
+/** Повторяем только то, что бывает разовым. Неверный ключ и отвергнутый запрос — не бывают. */
+function isWorthRetrying(status: number | undefined): boolean {
+  // status отсутствует у обрыва соединения и у нашего же таймаута — это как раз повторяемое.
+  if (status === undefined) return true;
+  return status === 408 || status === 409 || status === 429 || status >= 500;
+}
+
+/** Подсказка для повторной попытки: что именно не прошло проверку в прошлый раз. */
+function retryHint(missing: ConceptSectionType[]): string {
+  if (!missing.length) return "";
+  return `\n\nВНИМАНИЕ: предыдущая попытка отклонена — во всём сайте не хватало обязательных секций: ${missing.join(", ")}. Обязательно включи их в этот раз.`;
+}
 
 // See the identical note in api/business-analysis/route.ts: per-instance only, not a hard cap.
 const requestBuckets = new Map<string, { count: number; resetAt: number }>();
@@ -131,84 +175,96 @@ export async function POST(request: Request) {
     });
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
   // Load the niche knowledge BEFORE generating — the model builds on category structure
   // instead of inventing the niche from scratch each time.
   const knowledge = businessKnowledgeFor(input.businessType, input.businessName);
+  const client = new OpenAI({ apiKey });
 
-  try {
-    const client = new OpenAI({ apiKey });
-    const response = await client.responses.create(
-      {
-        model: "gpt-4.1-mini",
-        instructions: `${SYSTEM_INSTRUCTIONS}\n\n${knowledgeDigest(knowledge)}`,
-        input: JSON.stringify(input),
-        max_output_tokens: 3800,
-        text: {
-          format: {
-            type: "json_schema",
-            name: "aevix_website_concept",
-            strict: true,
-            schema: WEBSITE_CONCEPT_SCHEMA,
+  const requiredTypes: ConceptSectionType[] = [
+    "services",
+    "about",
+    "contacts",
+    input.goals.includes("Записывать клиентов") ? "booking" : "pricing",
+  ];
+
+  const startedAt = Date.now();
+  /** Чего не хватило в прошлой попытке — уходит в подсказку следующей. */
+  let missingTypes: ConceptSectionType[] = [];
+  let lastNotice = "Не удалось получить AI-концепт. Показан локальный вариант AEVIX.";
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    // Следующая попытка начинается, только если на неё есть время: оборванный на середине
+    // ответ — это те же деньги и та же задержка, но без результата.
+    if (attempt > 1 && Date.now() - startedAt > TOTAL_BUDGET_MS - ATTEMPT_TIMEOUT_MS) break;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), ATTEMPT_TIMEOUT_MS);
+
+    try {
+      const response = await client.responses.create(
+        {
+          model: "gpt-4.1-mini",
+          instructions: `${SYSTEM_INSTRUCTIONS}\n\n${knowledgeDigest(knowledge)}${retryHint(missingTypes)}`,
+          input: JSON.stringify(input),
+          max_output_tokens: 3800,
+          text: {
+            format: {
+              type: "json_schema",
+              name: "aevix_website_concept",
+              strict: true,
+              schema: WEBSITE_CONCEPT_SCHEMA,
+            },
+            verbosity: "medium",
           },
-          verbosity: "medium",
         },
-      },
-      { signal: controller.signal },
-    );
+        { signal: controller.signal },
+      );
 
-    const rawConcept = response.output_text?.trim();
-    const content = rawConcept ? validateWebsiteConcept(JSON.parse(rawConcept)) : null;
+      const rawConcept = response.output_text?.trim();
+      const content = rawConcept ? validateWebsiteConcept(JSON.parse(rawConcept)) : null;
 
-    if (!content) {
-      return NextResponse.json({
-        concept: fallback,
-        source: "fallback",
-        notice: "AI вернул неподдерживаемую структуру. Показан безопасный локальный концепт.",
-      });
+      if (!content) {
+        lastNotice = "AI вернул неподдерживаемую структуру. Показан безопасный локальный концепт.";
+        missingTypes = [];
+        continue;
+      }
+
+      // Visual identity (color + style + layout) always comes from our own side, never from the
+      // model — this guarantees a consistent, always-valid identity regardless of what the AI did.
+      const concept = {
+        ...content,
+        colorIds: input.colorIds,
+        styleId: input.styleId,
+        layoutId: resolveConceptLayout({ businessType: input.businessType, businessName: input.businessName }),
+      };
+
+      const generatedTypes = new Set(concept.pages.flatMap((page) => page.sections.map((section) => section.type)));
+      missingTypes = requiredTypes.filter((type) => !generatedTypes.has(type));
+
+      if (missingTypes.length) {
+        lastNotice = "AI вернул неполную структуру страниц. Показан безопасный локальный концепт.";
+        continue;
+      }
+
+      if (attempt > 1) {
+        console.warn(`[website-concept] AI-концепт получен с попытки ${attempt}`);
+      }
+      return NextResponse.json({ concept, source: "ai", attempts: attempt });
+    } catch (err) {
+      // Статус и текст ошибки OpenAI пишутся в лог (ключ в них уже маскирован самим
+      // OpenAI). Без этого «неверный ключ» выглядит для пользователя как «сеть недоступна»,
+      // и настоящая причина не сохраняется нигде.
+      const status = (err as { status?: number }).status;
+      console.error(`Website concept generation failed (попытка ${attempt}):`, status, (err as Error).message?.slice(0, 300));
+      lastNotice = "Не удалось получить AI-концепт. Показан локальный вариант AEVIX.";
+      // Неверный ключ или отвергнутый запрос повтором не лечатся — от повтора будет ровно та
+      // же ошибка, только вдвое дольше. Повторяем лишь то, что бывает разовым: обрыв, таймаут,
+      // перегрузку на стороне модели.
+      if (!isWorthRetrying(status)) break;
+    } finally {
+      clearTimeout(timeout);
     }
-
-    // Visual identity (color + style + layout) always comes from our own side, never from the
-    // model — this guarantees a consistent, always-valid identity regardless of what the AI did.
-    const concept = {
-      ...content,
-      colorIds: input.colorIds,
-      styleId: input.styleId,
-      layoutId: resolveConceptLayout({ businessType: input.businessType, businessName: input.businessName }),
-    };
-
-    const generatedTypes = new Set(concept.pages.flatMap((page) => page.sections.map((section) => section.type)));
-    const requiredTypes: ConceptSectionType[] = [
-      "services",
-      "about",
-      "contacts",
-      input.goals.includes("Записывать клиентов") ? "booking" : "pricing",
-    ];
-    if (requiredTypes.some((type) => !generatedTypes.has(type))) {
-      return NextResponse.json({
-        concept: fallback,
-        source: "fallback",
-        notice: "AI вернул неполную структуру страниц. Показан безопасный локальный концепт.",
-      });
-    }
-
-    return NextResponse.json({
-      concept,
-      source: "ai",
-    });
-  } catch (err) {
-    // Статус и текст ошибки OpenAI пишутся в лог (ключ в них уже маскирован самим
-    // OpenAI). Без этого «неверный ключ» выглядит для пользователя как «сеть недоступна»,
-    // и настоящая причина не сохраняется нигде.
-    console.error("Website concept generation failed:", (err as { status?: number }).status, (err as Error).message?.slice(0, 300));
-    return NextResponse.json({
-      concept: fallback,
-      source: "fallback",
-      notice: "Не удалось получить AI-концепт. Показан локальный вариант AEVIX.",
-    });
-  } finally {
-    clearTimeout(timeout);
   }
+
+  return NextResponse.json({ concept: fallback, source: "fallback", notice: lastNotice });
 }
