@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./support/fixtures";
 
 /**
  * The navigation architecture: one shell for the whole product, with a sidebar whose contents
@@ -34,7 +34,9 @@ async function createProject(page: Page, name: string) {
   await page.waitForURL(/\/app\/projects\/[^/]+$/);
   // The project generates on arrival; every caller here navigates afterwards and would
   // otherwise be clicking through a screen that is about to be replaced.
-  await expect(page.locator(".overview-card-grid")).toBeVisible({ timeout: 60_000 });
+  // 20s, not more: the per-test timeout is 45s, so anything above it is a budget that can
+  // never be spent. Generation is local under the stubbed AI and settles in well under a second.
+  await expect(page.locator(".overview-card-grid")).toBeVisible({ timeout: 20_000 });
 }
 
 test.describe("one header, one job per zone", () => {

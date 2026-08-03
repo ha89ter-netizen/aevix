@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Route } from "@playwright/test";
+import { test, expect, type Page, type Route } from "./support/fixtures";
 
 /**
  * The Workspace's project system: every business worked on in AEVIX becomes a Project that
@@ -77,7 +77,7 @@ async function createProjectViaForm(page: Page, name: string) {
   await submit.click();
   await page.waitForURL(/\/app\/projects\/.+/);
   // Generation runs on arrival; callers assume a settled project.
-  await expect(page.locator(".overview-card-grid")).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator(".overview-card-grid")).toBeVisible({ timeout: 20_000 });
   return page.url();
 }
 
@@ -161,7 +161,7 @@ test.describe("project creation", () => {
     // Creating a project now starts generation, and the Overview shows the generation screen
     // until it finishes. Waiting for the finished layout first stops the assertions below from
     // racing that work with their default 5s budget.
-    await expect(page.locator(".overview-card-grid")).toBeVisible({ timeout: 60_000 });
+    await expect(page.locator(".overview-card-grid")).toBeVisible({ timeout: 20_000 });
     await expect(page.locator(".workspace-project-name")).toHaveText("Барбершоп на Абая");
     await expect(page.locator(".overview-facts")).toContainText("Барбершоп");
     await expect(page.locator(".overview-facts")).toContainText("Алматы");

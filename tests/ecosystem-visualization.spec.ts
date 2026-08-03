@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./support/fixtures";
 
 /**
  * The "До и после AEVIX" section — AEVIX Process Orbit. EcosystemSceneLoader picks between two

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./support/fixtures";
 
 /**
  * Regression cover for the concept workspace scroll defect.

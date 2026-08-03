@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Route } from "@playwright/test";
+import { test, expect, type Page, type Route } from "./support/fixtures";
 
 /**
  * Once a business is recognised it becomes the source of state for the whole page: the Hero

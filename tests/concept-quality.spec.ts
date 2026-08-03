@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./support/fixtures";
 
 /**
  * Quality contract for generated website concepts: knowledge-driven page structure per niche,
