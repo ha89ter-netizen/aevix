@@ -2,10 +2,24 @@ import type { Project } from "./projects";
 import { conceptColors, conceptStyles, type ConceptColorId, type ConceptStyleId } from "./website-concept";
 
 /**
- * The only place that touches localStorage for projects. Everything else goes through
- * `useProjects()`, so this file is the single seam a real backend replaces later — every method
- * here keeps the exact same signature a server-backed version would have (load/save/clear).
+ * The single seam between the app and wherever projects are stored.
+ *
+ * Everything else goes through `useProjects()`, so swapping the browser for a database means
+ * writing one more implementation of `ProjectStore` and pointing `projectRepository` at it — no
+ * page or component changes.
+ *
+ * The methods are async even though the browser implementation answers instantly. That is the
+ * whole point: a server round-trip cannot be made synchronous later, so the callers are written
+ * to await from the start. Doing it the other way round would mean touching every caller on the
+ * day the database arrives, which is exactly the migration this seam exists to avoid.
  */
+
+/** Implement this to move projects off the device. See docs/database.md. */
+export type ProjectStore = {
+  load(): Promise<Project[]>;
+  save(projects: Project[]): Promise<void>;
+  clear(): Promise<void>;
+};
 const STORAGE_KEY = "aevix.projects";
 const STORAGE_VERSION = 1;
 
@@ -93,10 +107,10 @@ function parseEnvelope(raw: string): Project[] {
   return parsed.projects.map(normalizeProject).filter((project): project is Project => project !== null);
 }
 
-export const projectRepository = {
-  /** Never called during SSR — every caller guards with `typeof window !== "undefined"` first
-   * (or, in practice, only calls this from a useEffect, which never runs on the server). */
-  load(): Project[] {
+/** The device-local store: what ships today, and the offline fallback once a server exists. */
+export const localProjectStore: ProjectStore = {
+  /** Never called during SSR — callers only invoke this from an effect. */
+  async load(): Promise<Project[]> {
     if (typeof window === "undefined") return [];
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -109,7 +123,7 @@ export const projectRepository = {
     }
   },
 
-  save(projects: Project[]) {
+  async save(projects: Project[]): Promise<void> {
     if (typeof window === "undefined") return;
     try {
       const envelope: StoredEnvelope = { version: STORAGE_VERSION, projects };
@@ -120,7 +134,7 @@ export const projectRepository = {
     }
   },
 
-  clear() {
+  async clear(): Promise<void> {
     if (typeof window === "undefined") return;
     try {
       window.localStorage.removeItem(STORAGE_KEY);
@@ -129,3 +143,18 @@ export const projectRepository = {
     }
   },
 };
+
+/**
+ * The store the app actually uses. Swap this one line for a server-backed implementation and the
+ * rest of the application is unchanged.
+ */
+export const projectRepository: ProjectStore = localProjectStore;
+
+/**
+ * Reads whatever is on this device, for a one-time hand-off into an account on first sign-in.
+ * Without this the day authentication ships is the day everyone's existing work disappears —
+ * the migration matters more than the storage swap itself.
+ */
+export async function readLocalProjectsForMigration(): Promise<Project[]> {
+  return localProjectStore.load();
+}

@@ -243,8 +243,15 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    setProjects(projectRepository.load());
-    setIsLoaded(true);
+    let cancelled = false;
+    void projectRepository.load().then((stored) => {
+      if (cancelled) return;
+      setProjects(stored);
+      setIsLoaded(true);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Skip the very first run (before the load above has happened) so it can't stomp real stored
@@ -253,9 +260,20 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isLoaded) return;
     setSaveState("saving");
-    projectRepository.save(projects);
-    const timer = setTimeout(() => setSaveState("saved"), 350);
-    return () => clearTimeout(timer);
+    let cancelled = false;
+    // The indicator holds "saving" for a beat even when the write is instant, so a change is
+    // visibly acknowledged; with a server behind this, the real latency simply takes over.
+    const started = Date.now();
+    void projectRepository.save(projects).then(() => {
+      if (cancelled) return;
+      const remaining = Math.max(0, 350 - (Date.now() - started));
+      window.setTimeout(() => {
+        if (!cancelled) setSaveState("saved");
+      }, remaining);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [projects, isLoaded]);
 
   const create = useCallback((input: CreateProjectInput) => {
