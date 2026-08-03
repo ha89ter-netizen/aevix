@@ -242,6 +242,12 @@ export async function POST(request: Request) {
       missingTypes = requiredTypes.filter((type) => !generatedTypes.has(type));
 
       if (missingTypes.length) {
+        // Пишем, ЧЕГО именно не хватило. «Неполная структура» в логе не даёт понять, упирается
+        // ли модель каждый раз в одну и ту же секцию (тогда чинить надо запрос) или срывается
+        // вразнобой (тогда — требование маршрута).
+        console.warn(
+          `[website-concept] попытка ${attempt}: не хватило ${missingTypes.join(", ")}; получено: ${[...generatedTypes].join(", ")}`,
+        );
         lastNotice = "AI вернул неполную структуру страниц. Показан безопасный локальный концепт.";
         continue;
       }
