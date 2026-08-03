@@ -99,6 +99,7 @@ export function shellTitle(pathname: string, projectName?: string | null): strin
   }
   if (mode === "workspace") {
     if (pathname.startsWith("/app/new")) return "Создать проект";
+    if (pathname.startsWith("/app/login")) return "Вход";
     return "Workspace";
   }
   return "Главная";

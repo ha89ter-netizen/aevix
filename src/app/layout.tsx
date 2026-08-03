@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Manrope } from "next/font/google";
 import { MotionConfig } from "framer-motion";
+import { AuthProvider } from "@/lib/auth-context";
 import { BusinessProvider } from "@/lib/business-context";
 import { ProjectsProvider } from "@/lib/projects";
 import "./globals.css";
@@ -78,13 +79,17 @@ export default function RootLayout({
         {/* Shared across the landing page and the Workspace, mounted once here so a business
             described on either side carries over when the visitor navigates between them —
             client-side navigation keeps this provider mounted, only the route content swaps. */}
-        <BusinessProvider>
-          <ProjectsProvider>
-            <MotionConfig reducedMotion="user">
-              <ProductShell>{children}</ProductShell>
-            </MotionConfig>
-          </ProjectsProvider>
-        </BusinessProvider>
+        {/* AuthProvider — выше ProjectsProvider: последний обязан знать, вошёл ли человек,
+            прежде чем решать, у какого хранилища спрашивать проекты. */}
+        <AuthProvider>
+          <BusinessProvider>
+            <ProjectsProvider>
+              <MotionConfig reducedMotion="user">
+                <ProductShell>{children}</ProductShell>
+              </MotionConfig>
+            </ProjectsProvider>
+          </BusinessProvider>
+        </AuthProvider>
       </body>
     </html>
   );

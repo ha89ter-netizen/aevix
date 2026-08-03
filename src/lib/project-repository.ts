@@ -1,17 +1,22 @@
 import type { Project } from "./projects";
-import { conceptColors, conceptStyles, type ConceptColorId, type ConceptStyleId } from "./website-concept";
+import { normalizeProjects } from "./project-schema";
 
 /**
  * The single seam between the app and wherever projects are stored.
  *
  * Everything else goes through `useProjects()`, so swapping the browser for a database means
- * writing one more implementation of `ProjectStore` and pointing `projectRepository` at it — no
- * page or component changes.
+ * writing one more implementation of `ProjectStore` and pointing the app at it — no page or
+ * component changes.
  *
  * The methods are async even though the browser implementation answers instantly. That is the
  * whole point: a server round-trip cannot be made synchronous later, so the callers are written
  * to await from the start. Doing it the other way round would mean touching every caller on the
  * day the database arrives, which is exactly the migration this seam exists to avoid.
+ *
+ * Тот день настал, и оказалось, что реализация не одна, а две. Вошедший в аккаунт работает с
+ * сервером, не вошедший — как и раньше, с браузером: Workspace никогда не требовал регистрации,
+ * и требовать её теперь означало бы забрать у людей то, что уже работает. Отсюда `storeFor()`
+ * вместо одной константы.
  */
 
 /** Implement this to move projects off the device. See docs/database.md. */
@@ -28,69 +33,6 @@ type StoredEnvelope = {
   projects: Project[];
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-const knownStyleIds = new Set<string>(conceptStyles.map((style) => style.id));
-const knownColorIds = new Set<string>(conceptColors.map((color) => color.id));
-
-/**
- * Normalizing instead of strictly validating: id/name/timestamps are required (a project without
- * them can't render safely), everything else falls back to a sane default. That way projects
- * saved by an OLDER version of the app (before city/style/color preferences existed) load intact
- * instead of being dropped — the "no data loss after refresh" rule extends across app updates.
- * Nested analysis/design/pricing are only checked for "null or object" — they're written
- * exclusively by our own app and already validated at their source.
- */
-function normalizeProject(value: unknown): Project | null {
-  if (!isRecord(value)) return null;
-  if (typeof value.id !== "string" || !value.id) return null;
-  if (typeof value.name !== "string" || !value.name) return null;
-  if (typeof value.createdAt !== "number" || typeof value.updatedAt !== "number") return null;
-
-  // Accepts both shapes: the current array and the single `preferredStyleId` written before the
-  // briefing allowed up to three, so older projects keep the style they were created with.
-  const rawStyles = Array.isArray(value.preferredStyleIds)
-    ? value.preferredStyleIds
-    : typeof value.preferredStyleId === "string"
-      ? [value.preferredStyleId]
-      : [];
-  const preferredStyleIds = rawStyles
-    .filter((id): id is ConceptStyleId => typeof id === "string" && knownStyleIds.has(id))
-    .slice(0, 3);
-  const preferredColorIds = Array.isArray(value.preferredColorIds)
-    ? (value.preferredColorIds.filter((id): id is ConceptColorId => typeof id === "string" && knownColorIds.has(id)))
-    : [];
-
-  return {
-    id: value.id,
-    name: value.name,
-    businessType: typeof value.businessType === "string" ? value.businessType : "",
-    businessDescription: typeof value.businessDescription === "string" ? value.businessDescription : "",
-    city: typeof value.city === "string" ? value.city : "",
-    preferredStyleIds,
-    preferredColorIds,
-    generatedAt: typeof value.generatedAt === "number" ? value.generatedAt : null,
-    publishedAt: typeof value.publishedAt === "number" ? value.publishedAt : null,
-    // Older projects predate the AI Designer and simply start with an empty history.
-    designerLog: Array.isArray(value.designerLog)
-      ? (value.designerLog.filter(
-          (entry): entry is Project["designerLog"][number] =>
-            isRecord(entry) && typeof entry.id === "string" && typeof entry.request === "string",
-        ))
-      : [],
-    createdAt: value.createdAt,
-    updatedAt: value.updatedAt,
-    analysis: isRecord(value.analysis) ? (value.analysis as Project["analysis"]) : null,
-    design: isRecord(value.design) ? (value.design as Project["design"]) : null,
-    pricing: isRecord(value.pricing) ? (value.pricing as Project["pricing"]) : null,
-    // Older projects have no stored history; they simply start with an empty stack.
-    editHistory: Array.isArray(value.editHistory) ? (value.editHistory as Project["editHistory"]).slice(-20) : [],
-    redoHistory: Array.isArray(value.redoHistory) ? (value.redoHistory as Project["redoHistory"]).slice(-20) : [],
-  };
-}
-
 function parseEnvelope(raw: string): Project[] {
   let parsed: unknown;
   try {
@@ -99,12 +41,14 @@ function parseEnvelope(raw: string): Project[] {
     return [];
   }
 
-  if (!isRecord(parsed) || !Array.isArray(parsed.projects)) return [];
+  if (typeof parsed !== "object" || parsed === null) return [];
+  const envelope = parsed as Partial<StoredEnvelope>;
+  if (!Array.isArray(envelope.projects)) return [];
   // No migration path exists yet for older/newer versions — an unexpected version is treated
   // like corrupt data (dropped) rather than risk shape mismatches from a future format.
-  if (parsed.version !== STORAGE_VERSION) return [];
+  if (envelope.version !== STORAGE_VERSION) return [];
 
-  return parsed.projects.map(normalizeProject).filter((project): project is Project => project !== null);
+  return normalizeProjects(envelope.projects);
 }
 
 /** The device-local store: what ships today, and the offline fallback once a server exists. */
@@ -145,10 +89,40 @@ export const localProjectStore: ProjectStore = {
 };
 
 /**
- * The store the app actually uses. Swap this one line for a server-backed implementation and the
- * rest of the application is unchanged.
+ * Серверное хранилище: ходит на свои же маршруты, а не в базу напрямую — строка подключения
+ * не должна оказаться в браузере.
+ *
+ * Ошибка чтения возвращает пустой список, но НЕ приводит к записи: провайдер сохраняет только
+ * то, что сам изменил, а «загрузилось пусто» изменением не считается. Иначе одна неудачная
+ * загрузка стёрла бы человеку все проекты на сервере.
  */
-export const projectRepository: ProjectStore = localProjectStore;
+export const serverProjectStore: ProjectStore = {
+  async load(): Promise<Project[]> {
+    const response = await fetch("/api/projects", { cache: "no-store" });
+    if (!response.ok) throw new Error("Не удалось загрузить проекты");
+    const data = (await response.json()) as { projects?: unknown };
+    return normalizeProjects(data.projects);
+  },
+
+  async save(projects: Project[]): Promise<void> {
+    const response = await fetch("/api/projects", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projects }),
+    });
+    if (!response.ok) throw new Error("Не удалось сохранить проекты");
+  },
+
+  async clear(): Promise<void> {
+    const response = await fetch("/api/projects", { method: "DELETE" });
+    if (!response.ok) throw new Error("Не удалось очистить проекты");
+  },
+};
+
+/** Хранилище для текущего состояния входа. Единственное место, где делается этот выбор. */
+export function storeFor(signedIn: boolean): ProjectStore {
+  return signedIn ? serverProjectStore : localProjectStore;
+}
 
 /**
  * Reads whatever is on this device, for a one-time hand-off into an account on first sign-in.
@@ -157,4 +131,9 @@ export const projectRepository: ProjectStore = localProjectStore;
  */
 export async function readLocalProjectsForMigration(): Promise<Project[]> {
   return localProjectStore.load();
+}
+
+/** Убирает локальную копию — вызывается ТОЛЬКО после подтверждённой записи на сервер. */
+export async function clearLocalProjectsAfterMigration(): Promise<void> {
+  return localProjectStore.clear();
 }

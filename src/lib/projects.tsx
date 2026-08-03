@@ -3,7 +3,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { AnalysisResult, EstimateForm, EstimateResult } from "@/components/site-experience";
 import type { ConceptColorId, ConceptStyleId, WebsiteConcept } from "@/lib/website-concept";
-import { projectRepository } from "./project-repository";
+import { useAuth } from "./auth-context";
+import {
+  clearLocalProjectsAfterMigration,
+  readLocalProjectsForMigration,
+  serverProjectStore,
+  storeFor,
+} from "./project-repository";
 import {
   generationStages,
   runProjectGeneration,
@@ -165,8 +171,11 @@ export function getProjectStatus(project: Project, generatingId?: string | null)
   return { id: "ready", label: "Готов" };
 }
 
-/** "saving" flashes briefly on every change, then settles on "saved" — the topbar indicator. */
-export type SaveState = "idle" | "saving" | "saved";
+/** "saving" flashes briefly on every change, then settles on "saved" — the topbar indicator.
+ * "error" появился вместе с сервером: запись по сети, в отличие от записи в localStorage,
+ * умеет не удаваться, и молчать об этом нельзя — человек продолжит работать, считая, что всё
+ * сохранено. */
+export type SaveState = "idle" | "saving" | "saved" | "error";
 
 /** Which project is currently generating, and how far along. Lives on the provider (mounted in
  * the root layout) rather than in a page component, so navigating from the briefing straight to
@@ -186,6 +195,15 @@ type ProjectsContextValue = {
    * loading" from "genuinely no projects" (the empty state waits for this). */
   isLoaded: boolean;
   saveState: SaveState;
+  /** Куда пишутся проекты прямо сейчас. Список проектов показывает по этому полю, лежит ли
+   * работа в аккаунте или всё ещё только на этом устройстве. */
+  storage: "device" | "account";
+  /** Заполняется, если проекты аккаунта не удалось прочитать. Пока оно не null, приложение
+   * НИЧЕГО не сохраняет: записать пустой список поверх сервера значило бы стереть работу. */
+  loadError: string | null;
+  /** Заполняется, если перенос локальных проектов в аккаунт не удался. Локальная копия при
+   * этом остаётся нетронутой. */
+  migrationError: string | null;
   create: (input: CreateProjectInput) => Project;
   rename: (id: string, name: string) => void;
   duplicate: (id: string) => Project | null;
@@ -235,46 +253,170 @@ function touch<T extends { updatedAt: number }>(project: T): T {
  * only thing that changes post-hydration is a normal state update — never a server/client
  * mismatch.
  */
+/** Задержка перед отправкой на сервер. Для localStorage запись бесплатна и делается сразу;
+ * по сети каждая правка палитры превратилась бы в отдельный запрос. */
+const SAVE_DEBOUNCE_MS = 1000;
+
+/**
+ * Сливает то, что лежало в браузере, с тем, что уже есть в аккаунте.
+ *
+ * Совпадение по id возможно: человек мог войти на устройстве, где раньше работал без аккаунта,
+ * а тот же проект уже перенесён с другого. Выигрывает более свежая версия — это единственное
+ * правило, которое не требует спрашивать человека и не теряет более новую работу.
+ */
+function mergeForMigration(account: Project[], local: Project[]): Project[] {
+  const byId = new Map(account.map((project) => [project.id, project]));
+  for (const project of local) {
+    const existing = byId.get(project.id);
+    if (!existing || project.updatedAt > existing.updatedAt) byId.set(project.id, project);
+  }
+  return [...byId.values()].sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
 export function ProjectsProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [migrationError, setMigrationError] = useState<string | null>(null);
   const [generation, setGeneration] = useState<GenerationState>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  const { user, isLoaded: authLoaded } = useAuth();
+  const signedIn = Boolean(user);
+  const accountId = user?.id ?? null;
+
+  /**
+   * Загрузка. Ждёт ответа о состоянии входа: до него неизвестно, у какого хранилища спрашивать,
+   * а прочитать не у того — значит показать человеку чужой (пустой) Workspace и следом
+   * сохранить эту пустоту.
+   *
+   * Перезапускается при смене аккаунта: вход и выход обязаны менять содержимое Workspace.
+   */
   useEffect(() => {
+    if (!authLoaded) return;
     let cancelled = false;
-    void projectRepository.load().then((stored) => {
-      if (cancelled) return;
-      setProjects(stored);
-      setIsLoaded(true);
-    });
+    setIsLoaded(false);
+    setLoadError(null);
+    setMigrationError(null);
+
+    void (async () => {
+      try {
+        const stored = await storeFor(signedIn).load();
+        if (cancelled) return;
+
+        if (!signedIn) {
+          setProjects(stored);
+          setIsLoaded(true);
+          return;
+        }
+
+        // Перенос при входе. Порядок из docs/database.md: сначала убедиться, что данные приняты
+        // сервером, и только потом убирать их с устройства. Наоборот — значит однажды потерять
+        // чужую работу из-за сетевого сбоя.
+        const local = await readLocalProjectsForMigration();
+        if (cancelled) return;
+        if (!local.length) {
+          setProjects(stored);
+          setIsLoaded(true);
+          return;
+        }
+
+        const merged = mergeForMigration(stored, local);
+        try {
+          await serverProjectStore.save(merged);
+          await clearLocalProjectsAfterMigration();
+          if (cancelled) return;
+          setProjects(merged);
+        } catch {
+          // Ничего не удалено: локальная копия цела, перенос можно повторить входом заново.
+          if (cancelled) return;
+          setMigrationError(
+            "Проекты с этого устройства не удалось перенести в аккаунт. Они остались здесь — попробуйте войти ещё раз.",
+          );
+          setProjects(stored);
+        }
+        setIsLoaded(true);
+      } catch {
+        if (cancelled) return;
+        // Сознательно НЕ выставляем isLoaded: пока данные аккаунта не прочитаны, сохранять
+        // нечего и опасно — эффект ниже записал бы пустой список поверх реальных проектов.
+        setLoadError("Не удалось загрузить проекты аккаунта. Обновите страницу.");
+        setSaveState("error");
+      }
+    })();
+
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authLoaded, signedIn, accountId]);
+
+  /**
+   * Последнее, что ещё не подтверждено сервером. Нужен для досохранения при закрытии вкладки:
+   * задержка перед отправкой создаёт окно, в которое правка живёт только в памяти.
+   */
+  const pendingRef = useRef<Project[] | null>(null);
 
   // Skip the very first run (before the load above has happened) so it can't stomp real stored
-  // data with the initial empty array. The write itself is synchronous; the short "saving"
-  // window exists so the indicator visibly reacts to every change.
+  // data with the initial empty array.
   useEffect(() => {
     if (!isLoaded) return;
     setSaveState("saving");
+    pendingRef.current = projects;
     let cancelled = false;
-    // The indicator holds "saving" for a beat even when the write is instant, so a change is
-    // visibly acknowledged; with a server behind this, the real latency simply takes over.
-    const started = Date.now();
-    void projectRepository.save(projects).then(() => {
-      if (cancelled) return;
-      const remaining = Math.max(0, 350 - (Date.now() - started));
-      window.setTimeout(() => {
-        if (!cancelled) setSaveState("saved");
-      }, remaining);
-    });
+    const store = storeFor(signedIn);
+
+    const timer = window.setTimeout(() => {
+      // The indicator holds "saving" for a beat even when the write is instant, so a change is
+      // visibly acknowledged; with a server behind this, the real latency simply takes over.
+      const started = Date.now();
+      store
+        .save(projects)
+        .then(() => {
+          if (cancelled) return;
+          pendingRef.current = null;
+          const remaining = Math.max(0, 350 - (Date.now() - started));
+          window.setTimeout(() => {
+            if (!cancelled) setSaveState("saved");
+          }, remaining);
+        })
+        .catch(() => {
+          // Локальная запись не умеет не удаваться, серверная умеет. Показать это обязательно:
+          // иначе человек продолжит работать в уверенности, что всё сохранено.
+          if (!cancelled) setSaveState("error");
+        });
+    }, signedIn ? SAVE_DEBOUNCE_MS : 0);
+
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
-  }, [projects, isLoaded]);
+  }, [projects, isLoaded, signedIn]);
+
+  /**
+   * Досохранение при уходе со страницы.
+   *
+   * `pagehide` вместо `beforeunload`: последний не срабатывает на мобильных при переключении
+   * приложения, а это как раз тот случай, когда вкладку больше не увидят. `keepalive`
+   * разрешает запросу пережить закрытие документа.
+   */
+  useEffect(() => {
+    if (!signedIn) return;
+    const flush = () => {
+      const pending = pendingRef.current;
+      if (!pending) return;
+      pendingRef.current = null;
+      // Напрямую, а не через хранилище: keepalive — свойство именно этого, последнего запроса.
+      void fetch("/api/projects", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projects: pending }),
+        keepalive: true,
+      }).catch(() => {});
+    };
+    window.addEventListener("pagehide", flush);
+    return () => window.removeEventListener("pagehide", flush);
+  }, [signedIn]);
 
   const create = useCallback((input: CreateProjectInput) => {
     const now = Date.now();
@@ -539,6 +681,9 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
       projects,
       isLoaded,
       saveState,
+      storage: signedIn ? "account" : "device",
+      loadError,
+      migrationError,
       create,
       rename,
       duplicate,
@@ -559,7 +704,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
       generateAll,
       regenerate,
     }),
-    [projects, isLoaded, saveState, create, rename, duplicate, remove, getProject, saveAnalysis, saveDesign, savePricing, appendDesignerEntry, pushHistory, undo, redo, canUndo, canRedo, publish, unpublish, generation, generateAll, regenerate],
+    [projects, isLoaded, saveState, signedIn, loadError, migrationError, create, rename, duplicate, remove, getProject, saveAnalysis, saveDesign, savePricing, appendDesignerEntry, pushHistory, undo, redo, canUndo, canRedo, publish, unpublish, generation, generateAll, regenerate],
   );
 
   return <ProjectsContext.Provider value={value}>{children}</ProjectsContext.Provider>;

@@ -6,6 +6,7 @@ import { RotateCcw, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBusiness } from "@/lib/business-context";
 import { useProjects } from "@/lib/projects";
+import { ShellAccount } from "./shell-account";
 import {
   landingNavItems,
   projectIdFromPath,
@@ -109,6 +110,8 @@ export function ShellSidebar({
             </nav>
 
             <div className="shell-sidebar-spacer" />
+
+            <ShellAccount onNavigate={onClose} />
 
             <Link href={shellCrossLinks.toSite.href} className="shell-sidebar-exit" onClick={onClose}>
               <shellCrossLinks.toSite.icon className="h-4 w-4" />

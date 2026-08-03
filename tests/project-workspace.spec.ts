@@ -132,8 +132,13 @@ test.describe("navigation surface", () => {
     await expect(sidebar.getByRole("link", { name: "Проекты" })).toBeVisible();
     await expect(sidebar.getByRole("link", { name: "Создать проект" })).toBeVisible();
     await expect(sidebar.getByRole("link", { name: "На сайт AEVIX" })).toBeVisible();
-    // Nothing else: 2 nav items + the exit link. The landing sections must not leak in here.
-    await expect(sidebar.locator("a")).toHaveCount(3);
+    // Аккаунт — четвёртая ссылка и единственная добавка с тех пор, как их было три. Настоящая
+    // ссылка, а не кнопка с обработчиком: средний клик, «открыть в новой вкладке» и переход с
+    // клавиатуры должны работать как у любой навигации.
+    await expect(sidebar.getByRole("link", { name: "Войти" })).toBeVisible();
+    // Nothing else: 2 nav items + the account entry + the exit link. The landing sections must
+    // not leak in here.
+    await expect(sidebar.locator("a")).toHaveCount(4);
   });
 
   test("the projects page shows the local-storage notice", async ({ page }) => {

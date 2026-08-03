@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Copy, FolderKanban, MoreVertical, Pencil, Plus, Smartphone, Trash2 } from "lucide-react";
+import { Cloud, Copy, FolderKanban, MoreVertical, Pencil, Plus, Smartphone, Trash2, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProjects, getProjectStatus, type Project } from "@/lib/projects";
 import { WorkspacePageHeader } from "@/components/workspace/page-header";
@@ -140,7 +140,7 @@ function ProjectCard({
 }
 
 export default function ProjectsPage() {
-  const { projects, isLoaded, rename, duplicate, remove, generation } = useProjects();
+  const { projects, isLoaded, rename, duplicate, remove, generation, storage, loadError, migrationError } = useProjects();
   const [pendingDelete, setPendingDelete] = useState<Project | null>(null);
 
   return (
@@ -150,10 +150,33 @@ export default function ProjectsPage() {
         description="Каждый бизнес в AEVIX — это проект: AI-анализ, дизайн, процесс и цены живут вместе и сохраняются между визитами."
       />
 
-      <p className="workspace-storage-notice">
-        <Smartphone className="h-3.5 w-3.5" />
-        Проекты пока хранятся только на этом устройстве.
-      </p>
+      {/* Где лежит работа — честно и в одном месте. Пока аккаунта нет, предупреждение остаётся
+          тем же, каким было: проекты действительно живут в одном браузере. */}
+      {storage === "account" ? (
+        <p className="workspace-storage-notice">
+          <Cloud className="h-3.5 w-3.5" />
+          Проекты сохраняются в аккаунт и доступны с любого устройства.
+        </p>
+      ) : (
+        <p className="workspace-storage-notice">
+          <Smartphone className="h-3.5 w-3.5" />
+          Проекты пока хранятся только на этом устройстве.
+        </p>
+      )}
+
+      {loadError ? (
+        <p className="workspace-storage-notice" role="alert">
+          <TriangleAlert className="h-3.5 w-3.5" />
+          {loadError}
+        </p>
+      ) : null}
+
+      {migrationError ? (
+        <p className="workspace-storage-notice" role="alert">
+          <TriangleAlert className="h-3.5 w-3.5" />
+          {migrationError}
+        </p>
+      ) : null}
 
       {projects.length ? (
         <div className="workspace-project-card-grid">
