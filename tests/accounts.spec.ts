@@ -175,6 +175,23 @@ test.describe("аккаунты · сайдбар", () => {
     for (const email of created) await deleteAccount(email);
   });
 
+  test("вход в шапке виден с любой страницы и пропадает у вошедшего", async ({ page }) => {
+    const email = uniqueEmail();
+    created.push(email);
+
+    // Лендинг: боковой панели с аккаунтом здесь нет вовсе, поэтому шапка — единственное место,
+    // откуда посетитель может войти.
+    await page.goto("/");
+    await expect(page.getByRole("link", { name: "Войти в аккаунт" })).toBeVisible();
+
+    await signIn(page, email);
+
+    // Вошедшему регистрироваться незачем: место освобождается, а не занимается третьей кнопкой.
+    await expect(page.getByRole("link", { name: "Войти в аккаунт" })).toHaveCount(0);
+    await page.goto("/");
+    await expect(page.getByRole("link", { name: "Войти в аккаунт" })).toHaveCount(0);
+  });
+
   test("показывает почту вошедшего и кнопку выхода", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "desktop", "боковая панель закреплена только на десктопе");
     const email = uniqueEmail();

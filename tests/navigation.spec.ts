@@ -40,10 +40,17 @@ async function createProject(page: Page, name: string) {
 }
 
 test.describe("one header, one job per zone", () => {
-  test("the right side carries exactly one call to action", async ({ page }) => {
+  test("the right side carries one call to action, plus a quieter way in", async ({ page }) => {
     await page.goto("/");
+    // Целевое действие по-прежнему ровно одно: консультация приносит клиентов, вход нужен уже
+    // пришедшим. Вход добавлен рядом по решению владельца продукта, но подчинён ей —
+    // контурная ссылка против сплошной кнопки. Два одинаково громких элемента здесь однажды
+    // уже сделали зону нечитаемой, и именно это правило тест и стережёт.
     await expect(page.locator(".shell-header-right button")).toHaveCount(1);
     await expect(page.locator(".shell-header-right")).toContainText("Бесплатная консультация");
+    await expect(page.getByRole("link", { name: "Войти в аккаунт" })).toBeVisible();
+    // Ничего третьего.
+    await expect(page.locator(".shell-header-right > *")).toHaveCount(2);
     // The old floating pill header and its modal navigation centre are gone for good.
     await expect(page.locator(".site-nav, .nav-center-trigger")).toHaveCount(0);
   });

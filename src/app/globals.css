@@ -7297,7 +7297,30 @@ a.shell-account:hover {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  gap: 0.5rem;
   min-width: 0;
+}
+
+/* Вход рядом с консультацией, но заметно тише её: контурная кнопка против сплошной чёрной.
+   Иерархия здесь не украшение — две одинаково громкие кнопки рядом перестают читаться обе. */
+.shell-header-login {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: 0.55rem 0.9rem;
+  color: rgba(9, 8, 7, 0.72);
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: border-color var(--motion-base) var(--ease-premium), color var(--motion-base) var(--ease-premium);
+}
+
+.shell-header-login:hover {
+  border-color: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.5);
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
 }
 
 .shell-cta {
@@ -7339,8 +7362,15 @@ a.shell-account:hover {
 }
 
 @media (max-width: 767px) {
-  .shell-cta span {
+  /* На телефоне обе кнопки схлопываются в значки: подписи рядом не помещаются, а урезать
+     что-то одно значит сделать вторую кнопку непонятной. */
+  .shell-cta span,
+  .shell-header-login span {
     display: none;
+  }
+
+  .shell-header-login {
+    padding: 0.55rem 0.6rem;
   }
 
   .shell-cta {

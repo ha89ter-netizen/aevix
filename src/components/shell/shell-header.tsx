@@ -5,6 +5,7 @@ import { Menu, Sparkles } from "lucide-react";
 import { useBusiness } from "@/lib/business-context";
 import { useProjects } from "@/lib/projects";
 import { projectIdFromPath, projectSectionLabel, shellTitle } from "./shell-nav";
+import { ShellHeaderAccount } from "./shell-header-account";
 
 /**
  * Three zones, one job each — the previous header offered four competing controls of equal
@@ -43,11 +44,17 @@ export function ShellHeader({ onOpenSidebar, onGoHome }: { onOpenSidebar: () => 
         {section && project ? <span className="shell-title-section">{section}</span> : null}
       </div>
 
+      {/* Правая зона несёт основное целевое действие — консультацию — и сразу за ним вход.
+          Второй элемент добавлен по решению владельца продукта: аккаунт должен быть виден из
+          любой точки сайта, а не только из боковой панели Workspace. Чтобы это не вернуло
+          прежнюю беду с четырьмя равнозначными кнопками, вход оформлен подчёркнуто тише
+          консультации и исчезает у вошедшего — ему регистрироваться уже незачем. */}
       <div className="shell-header-right">
         <button type="button" className="shell-cta" onClick={openConsultation}>
           <Sparkles className="h-4 w-4" />
           <span>Бесплатная консультация</span>
         </button>
+        <ShellHeaderAccount />
       </div>
     </header>
   );
