@@ -27,9 +27,14 @@ export default defineConfig({
    * compiles routes on demand, all through a single worker. Individually every test is
    * deterministic — the failures that appear in a full run land on a DIFFERENT test each time,
    * which is the signature of contention for machine resources rather than a bug in any one of
-   * them. Four such tests were fixed at the mechanism level first (dropped keypresses, a click
-   * target derived from the moving element, races against project generation); this covers the
+   * them. Such tests are fixed at the mechanism level first (dropped keypresses, a click target
+   * derived from the moving element, races against project generation, and clicks on
+   * server-rendered controls that land before React attaches its handlers); this covers the
    * residue.
+   *
+   * "Одно и то же место каждый раз" — это НЕ contention, а баг. Именно так был найден регресс с
+   * потерей проекта: тест переименования дважды списали на флакость, а он ловил настоящую
+   * пропажу данных. Прежде чем принять флакость, стоит убедиться, что мигает каждый раз разное.
    *
    * A retry does not hide anything: Playwright reports a test that needed one as "flaky", so a
    * genuinely broken test still fails twice and stays red.
@@ -37,7 +42,8 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 1,
   // Serialised on purpose. These specs drive one shared `next dev` server, which compiles
   // routes on demand; parallel workers make the first request per worker stall long enough
-  // to trip the timeout. The suite is small, so serial is both reliable and fast (~20s).
+  // to trip the timeout. Полный прогон занимает около 15 минут: он давно не «маленький», но
+  // параллельные воркеры делают его не быстрее, а краснее.
   workers: 1,
   timeout: 45_000,
   reporter: process.env.CI ? "line" : [["list"]],

@@ -60,6 +60,29 @@ async function clickUntil(page: Page, click: () => Promise<void>, expected: () =
   }).toPass({ timeout: 10_000 });
 }
 
+/**
+ * Открывает панель узла, повторяя клик.
+ *
+ * Та же гонка с гидратацией, ради которой существует clickUntil выше: узел отрисован сервером и
+ * кликабелен до того, как React навесит onClick, поэтому клик проходит все проверки
+ * доступности элемента и не делает ничего. Узлы были единственным местом, где клик оставался
+ * одиночным, — отсюда и то, что в полном прогоне мигал каждый раз ДРУГОЙ тест этой группы:
+ * какой успел кликнуть в момент гидратации, тот и упал.
+ *
+ * Повтор безопасен: обработчик узла — `onSelect(node.id)`, а не переключатель, поэтому второй
+ * клик по тому же узлу оставляет панель открытой с тем же содержимым.
+ */
+async function openNode(page: Page, index: number, title?: string) {
+  await clickUntil(
+    page,
+    () => page.locator(".ecosystem-node").nth(index).click(),
+    () =>
+      title
+        ? expect(page.locator(".ecosystem-detail h3")).toHaveText(title, { timeout: 1000 })
+        : expect(page.locator(".ecosystem-detail")).toBeVisible({ timeout: 1000 }),
+  );
+}
+
 async function switchToAfter(page: Page) {
   await clickUntil(
     page,
@@ -127,8 +150,7 @@ test.describe("ecosystem visualisation (reduced motion → CSS fallback)", () =>
   test("clicking a node opens a detail panel with description and highlight, matching the mode", async ({ page }) => {
     await gotoEcosystem(page);
 
-    await page.locator(".ecosystem-node").first().click();
-    await expect(page.locator(".ecosystem-detail h3")).toHaveText("Ручные ответы");
+    await openNode(page, 0, "Ручные ответы");
     await expect(page.locator(".ecosystem-detail-eyebrow")).toHaveText("Что мешает");
     await expect(page.locator(".ecosystem-detail-highlight")).toContainText("Главный риск");
 
@@ -136,16 +158,14 @@ test.describe("ecosystem visualisation (reduced motion → CSS fallback)", () =>
     await expect(page.locator(".ecosystem-detail")).toHaveCount(0);
 
     await switchToAfter(page);
-    await page.locator(".ecosystem-node").first().click();
-    await expect(page.locator(".ecosystem-detail h3")).toHaveText("AI-консультант");
+    await openNode(page, 0, "AI-консультант");
     await expect(page.locator(".ecosystem-detail-eyebrow")).toHaveText("Что меняет AEVIX");
   });
 
   test("Escape closes the detail panel", async ({ page }) => {
     await gotoEcosystem(page);
 
-    await page.locator(".ecosystem-node").nth(2).click();
-    await expect(page.locator(".ecosystem-detail")).toBeVisible();
+    await openNode(page, 2);
 
     await page.keyboard.press("Escape");
     await expect(page.locator(".ecosystem-detail")).toHaveCount(0, { timeout: 5000 });
@@ -154,9 +174,8 @@ test.describe("ecosystem visualisation (reduced motion → CSS fallback)", () =>
   test("clicking the backdrop closes the detail panel", async ({ page }) => {
     await gotoEcosystem(page);
 
-    await page.locator(".ecosystem-node").nth(3).click();
+    await openNode(page, 3);
     const detail = page.locator(".ecosystem-detail");
-    await expect(detail).toBeVisible();
 
     // The overlay closes only when the click lands on the overlay ITSELF, so the point has to be
     // provably outside the content panel. Deriving it from the overlay's own corner was the bug:
@@ -175,8 +194,7 @@ test.describe("ecosystem visualisation (reduced motion → CSS fallback)", () =>
     await gotoEcosystem(page);
 
     for (let i = 0; i < BEFORE_TITLES.length; i++) {
-      await page.locator(".ecosystem-node").nth(i).click();
-      await expect(page.locator(".ecosystem-detail h3")).toHaveText(BEFORE_TITLES[i]);
+      await openNode(page, i, BEFORE_TITLES[i]);
       await page.locator(".ecosystem-detail-close").click();
       await expect(page.locator(".ecosystem-detail")).toHaveCount(0, { timeout: 5000 });
     }
