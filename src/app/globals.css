@@ -1999,6 +1999,26 @@ body::before {
   border-top: 1px solid var(--line);
 }
 
+/**
+ * Встроенный режим (страница «Дизайн» проекта) — единственный, где превью не прокручивается
+ * внутри себя, а растёт вместе со страницей. Боковая панель как flex-сосед растягивалась под
+ * его высоту, а `margin-top: auto` у подвала уводил цену к самому низу — между инструментами и
+ * ценой получалось около 700 пикселей пустоты в колонке шириной 272.
+ *
+ * Колонка теперь высотой по содержимому и липнет при прокрутке: пустоты нет, а инструменты не
+ * уезжают вверх, когда листаешь длинный макет.
+ */
+@media (min-width: 768px) {
+  .concept-embedded .concept-sidebar {
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    /* Если инструментов однажды станет больше, чем помещается на экран, панель прокрутится
+       сама, а не вылезет за пределы окна. */
+    max-height: 100svh;
+  }
+}
+
 @media (max-width: 767px) {
   .concept-sidebar {
     position: fixed;
@@ -6732,7 +6752,9 @@ button.workspace-card:hover {
   display: flex;
   min-height: min(46rem, calc(100svh - 9rem));
   flex-direction: column;
-  overflow: hidden;
+  /* `clip`, а не `hidden`: обрезает точно так же, но не создаёт контейнер прокрутки, из-за
+     которого `position: sticky` у боковой панели внутри переставал работать. */
+  overflow: clip;
   border-radius: var(--radius-lg);
   border: 1px solid var(--line);
   background: #f7f8f9;

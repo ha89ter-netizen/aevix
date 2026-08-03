@@ -225,6 +225,41 @@ test.describe("saving module state into a project", () => {
     await expect(page.locator(".ai-short-answer")).toBeVisible();
   });
 
+  test("боковая панель концепта не растягивается пустотой под высоту превью", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop", "на мобильном панель — выдвижная, колонки нет");
+    await seedStorage(page, [
+      seededProject({
+        id: "sidebar-gap",
+        design: {
+          businessName: "FORMA",
+          businessType: "Барбершоп",
+          colorIds: ["black"],
+          styleId: "minimal",
+          navigation: [{ label: "Главная", pageId: "home" }],
+          pages: [
+            {
+              id: "home",
+              name: "Главная",
+              hero: { eyebrow: "Барбершоп", title: "FORMA", subtitle: "Стрижки", primaryCta: "Записаться", secondaryCta: "Услуги" },
+              sections: [{ type: "services", title: "Услуги" }],
+            },
+          ],
+        },
+      }),
+    ]);
+    await page.goto("/app/projects/sidebar-gap/design");
+    await expect(page.locator(".concept-preview-stage")).toBeVisible();
+
+    // Во встроенном режиме превью растёт вместе со страницей. Пока панель тянулась под его
+    // высоту, `margin-top: auto` у подвала уводил цену вниз, и между инструментами и ценой
+    // зияло около 700 пустых пикселей. Порог с запасом: обычный зазор здесь — десятки.
+    const gap = await page.locator(".concept-sidebar").evaluate((el) => {
+      const kids = [...el.children];
+      return kids[kids.length - 1].getBoundingClientRect().top - kids[kids.length - 2].getBoundingClientRect().bottom;
+    });
+    expect(gap).toBeLessThan(120);
+  });
+
   test("секцию можно выбрать с клавиатуры, и фокус на ней видно", async ({ page }) => {
     await seedStorage(page, [
       seededProject({
