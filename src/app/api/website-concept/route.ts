@@ -198,8 +198,11 @@ export async function POST(request: Request) {
       concept,
       source: "ai",
     });
-  } catch {
-    console.error("Website concept generation failed");
+  } catch (err) {
+    // Статус и текст ошибки OpenAI пишутся в лог (ключ в них уже маскирован самим
+    // OpenAI). Без этого «неверный ключ» выглядит для пользователя как «сеть недоступна»,
+    // и настоящая причина не сохраняется нигде.
+    console.error("Website concept generation failed:", (err as { status?: number }).status, (err as Error).message?.slice(0, 300));
     return NextResponse.json({
       concept: fallback,
       source: "fallback",

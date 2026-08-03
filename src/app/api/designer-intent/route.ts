@@ -134,7 +134,8 @@ export async function POST(request: Request) {
         max_output_tokens: 300,
         text: {
           format: { type: "json_schema", name: "aevix_designer_intent", strict: true, schema: INTENT_SCHEMA },
-          verbosity: "low",
+          // gpt-4.1-mini принимает только "medium": "low" отклоняется с 400.
+          verbosity: "medium",
         },
       },
       { signal: controller.signal },
@@ -156,8 +157,11 @@ export async function POST(request: Request) {
       },
       source: "ai",
     });
-  } catch {
-    console.error("Designer intent resolution failed");
+  } catch (err) {
+    // Статус и текст ошибки OpenAI пишутся в лог (ключ в них уже маскирован самим
+    // OpenAI). Без этого «неверный ключ» выглядит для пользователя как «сеть недоступна»,
+    // и настоящая причина не сохраняется нигде.
+    console.error("Designer intent resolution failed:", (err as { status?: number }).status, (err as Error).message?.slice(0, 300));
     return NextResponse.json({ intent: null });
   } finally {
     clearTimeout(timeout);
