@@ -3,6 +3,20 @@ import { defineConfig, devices } from "@playwright/test";
 const PORT = 3000;
 const BASE_URL = `http://localhost:${PORT}`;
 
+/**
+ * Тестовому процессу нужны DATABASE_URL и AUTH_SECRET: тесты аккаунтов заводят пользователей и
+ * выпускают ссылки для входа напрямую, а не через письмо. Next.js читает .env.local сам, но
+ * только для сервера — здесь это отдельный процесс.
+ *
+ * Как и `--env-file`, не перебивает уже заданные переменные окружения: экспортированное в
+ * оболочке значение остаётся главнее файла.
+ */
+try {
+  process.loadEnvFile(".env.local");
+} catch {
+  // Файла нет — тесты аккаунтов пропустят сами себя, остальные не заметят.
+}
+
 export default defineConfig({
   testDir: "./tests",
   forbidOnly: Boolean(process.env.CI),
