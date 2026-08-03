@@ -6793,19 +6793,42 @@ button.workspace-card:hover {
   transition: opacity var(--motion-base) var(--ease-premium);
 }
 
+/* :focus-within обязателен, а не желателен. Панель скрыта до наведения, и без этой строки
+   пришедший табом фокус вставал бы на невидимую кнопку: человек нажимает Tab и не видит, где
+   он находится. Именно это делало выбор секции недоступным с клавиатуры наравне с
+   обработчиком на div. */
 .concept-section-piece.is-editable:hover .concept-section-tools,
+.concept-section-piece.is-editable:focus-within .concept-section-tools,
 .concept-section-piece.is-selected .concept-section-tools {
   opacity: 1;
 }
 
 .concept-section-name {
+  border: 0;
   border-radius: var(--radius-pill);
   background: rgba(9, 8, 7, 0.62);
   padding: 0.2rem 0.6rem;
   color: #fff;
+  font-family: inherit;
   font-size: 0.68rem;
   font-weight: 620;
+  cursor: pointer;
   backdrop-filter: blur(6px);
+  transition: background var(--motion-base) var(--ease-premium);
+}
+
+.concept-section-name:hover,
+.concept-section-name[aria-pressed="true"] {
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.85);
+}
+
+/* Заметная рамка поверх произвольной картинки секции: контур в один цвет на светлом фоне
+   теряется, поэтому светлый контур с тёмной обводкой снаружи. */
+.concept-section-name:focus-visible,
+.concept-improve:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px rgba(9, 8, 7, 0.75);
 }
 
 .concept-improve {

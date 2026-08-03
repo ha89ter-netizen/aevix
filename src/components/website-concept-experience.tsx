@@ -640,11 +640,27 @@ function ConceptPreview({
                     }
                   >
                     {selection ? (
+                      /* Клик по самой секции — удобство для мыши, но не единственный путь:
+                         название секции здесь настоящая кнопка, поэтому выбрать секцию можно
+                         табом и Enter. Обработчик на обёртке этого не давал — она не попадает
+                         в порядок табуляции. Сделать кнопкой саму обёртку нельзя: внутри
+                         секции есть свои кнопки, а кнопка в кнопке — недопустимая разметка. */
                       <div className="concept-section-tools" onClick={(event) => event.stopPropagation()}>
-                        <span className="concept-section-name">{SECTION_LABELS[section.type]}</span>
+                        <button
+                          type="button"
+                          className="concept-section-name"
+                          aria-pressed={selection.selected?.type === section.type}
+                          aria-label={`Выбрать секцию «${SECTION_LABELS[section.type]}»`}
+                          onClick={() => selection.select({ type: section.type, label: SECTION_LABELS[section.type] })}
+                        >
+                          {SECTION_LABELS[section.type]}
+                        </button>
                         <button
                           type="button"
                           className="concept-improve"
+                          // Название секции в подписи: при переходе табом подряд идут несколько
+                          // одинаковых «Улучшить», и без него неясно, что именно улучшаешь.
+                          aria-label={`Улучшить секцию «${SECTION_LABELS[section.type]}»`}
                           onClick={() => {
                             selection.select({ type: section.type, label: SECTION_LABELS[section.type] });
                             onImproveSection?.(section.type);

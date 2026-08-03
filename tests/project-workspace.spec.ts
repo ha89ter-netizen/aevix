@@ -225,6 +225,50 @@ test.describe("saving module state into a project", () => {
     await expect(page.locator(".ai-short-answer")).toBeVisible();
   });
 
+  test("секцию можно выбрать с клавиатуры, и фокус на ней видно", async ({ page }) => {
+    await seedStorage(page, [
+      seededProject({
+        id: "keyboard-design",
+        design: {
+          businessName: "FORMA",
+          businessType: "Барбершоп",
+          colorIds: ["purple"],
+          styleId: "minimal",
+          navigation: [{ label: "Главная", pageId: "home" }],
+          pages: [
+            {
+              id: "home",
+              name: "Главная",
+              hero: { eyebrow: "Барбершоп", title: "FORMA", subtitle: "Тест", primaryCta: "Записаться", secondaryCta: "Услуги" },
+              sections: [{ type: "reviews", title: "Отзывы" }],
+            },
+          ],
+        },
+      }),
+    ]);
+    await page.goto("/app/projects/keyboard-design/design");
+
+    // Выбор секции обязан быть настоящей кнопкой: обработчик на div не попадает в порядок
+    // табуляции, и с клавиатуры секцию было не выбрать вовсе.
+    const select = page.getByRole("button", { name: "Выбрать секцию «Отзывы»" });
+    await expect(select).toBeVisible();
+
+    await select.focus();
+    // Панель инструментов скрыта прозрачностью до наведения. Без :focus-within фокус вставал бы
+    // на невидимую кнопку — человек нажимает Tab и не понимает, где он.
+    await expect
+      .poll(async () => page.locator(".concept-section-tools").first().evaluate((el) => getComputedStyle(el).opacity))
+      .toBe("1");
+
+    await page.keyboard.press("Enter");
+    await expect(page.locator(".concept-section-piece").first()).toHaveClass(/is-selected/);
+    await expect(select).toHaveAttribute("aria-pressed", "true");
+
+    // Повторное нажатие снимает выбор — то же поведение, что и у клика.
+    await page.keyboard.press("Enter");
+    await expect(page.locator(".concept-section-piece").first()).not.toHaveClass(/is-selected/);
+  });
+
   test("restores selected colors and visual style when reopening the Design tab", async ({ page }) => {
     const design = {
       businessName: "FORMA",
