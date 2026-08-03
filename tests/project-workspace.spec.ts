@@ -269,6 +269,21 @@ test.describe("saving module state into a project", () => {
 });
 
 test.describe("project card actions", () => {
+  test("проект, созданный до ответа о состоянии входа, не теряется", async ({ page }) => {
+    // Провайдер обязан дождаться ответа о сессии, прежде чем читать хранилище: до него
+    // неизвестно, у какого хранилища спрашивать. Ответ идёт по сети, и в это окно спокойно
+    // помещается создание проекта — он существует только в состоянии, потому что запись
+    // заблокирована до конца загрузки. Пришедший следом список ОБЯЗАН слиться с ним, а не
+    // заменить его собой.
+    await page.route("**/api/auth/session", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      await route.continue();
+    });
+
+    await createProjectViaForm(page, "Создан во время проверки входа");
+    await expect(page.locator(".workspace-project-name")).toHaveText("Создан во время проверки входа");
+  });
+
   test("renaming through the three-dot menu updates immediately", async ({ page }) => {
     // Created through the UI, not seeded — addInitScript re-applies its seed on every reload,
     // which would silently undo the rename before the persistence assertion below.

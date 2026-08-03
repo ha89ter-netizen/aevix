@@ -264,9 +264,9 @@ const SAVE_DEBOUNCE_MS = 1000;
  * а тот же проект уже перенесён с другого. Выигрывает более свежая версия — это единственное
  * правило, которое не требует спрашивать человека и не теряет более новую работу.
  */
-function mergeForMigration(account: Project[], local: Project[]): Project[] {
-  const byId = new Map(account.map((project) => [project.id, project]));
-  for (const project of local) {
+function mergeById(base: Project[], incoming: Project[]): Project[] {
+  const byId = new Map(base.map((project) => [project.id, project]));
+  for (const project of incoming) {
     const existing = byId.get(project.id);
     if (!existing || project.updatedAt > existing.updatedAt) byId.set(project.id, project);
   }
@@ -285,6 +285,32 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
   const { user, isLoaded: authLoaded } = useAuth();
   const signedIn = Boolean(user);
   const accountId = user?.id ?? null;
+
+  /**
+   * Первая загрузка отличается от последующих: она НЕ имеет права затирать то, что человек
+   * успел создать, пока она шла.
+   *
+   * Раньше чтение начиналось сразу при монтировании и завершалось прежде, чем до интерфейса
+   * доходили руки. Теперь оно ждёт ответа о состоянии входа, то есть сетевого запроса, — и в
+   * это окно помещается создание проекта. Проект в этот момент живёт только в состоянии
+   * (сохранение заблокировано до `isLoaded`), поэтому пришедший из хранилища список его не
+   * содержит, и простое присваивание стёрло бы работу.
+   *
+   * Смена аккаунта — другое дело: там присваивание как раз и нужно, иначе проекты предыдущего
+   * человека остались бы на экране следующего.
+   */
+  const firstLoadRef = useRef(true);
+
+  const applyLoaded = useCallback((stored: Project[]) => {
+    // Флаг снимается ДО setProjects, а не внутри него. React намеренно вызывает функцию-
+    // обновление дважды в разработке, и правка ref внутри неё привела бы к тому, что второй
+    // вызов увидел бы флаг уже снятым и вернул `stored`, потеряв созданное. Ровно на этом
+    // однажды сломался undo — см. комментарий над ним.
+    const isFirst = firstLoadRef.current;
+    firstLoadRef.current = false;
+    // Слияние только на первой загрузке и только если человек уже что-то создал.
+    setProjects((current) => (isFirst && current.length ? mergeById(stored, current) : stored));
+  }, []);
 
   /**
    * Загрузка. Ждёт ответа о состоянии входа: до него неизвестно, у какого хранилища спрашивать,
@@ -306,7 +332,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
 
         if (!signedIn) {
-          setProjects(stored);
+          applyLoaded(stored);
           setIsLoaded(true);
           return;
         }
@@ -317,24 +343,24 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
         const local = await readLocalProjectsForMigration();
         if (cancelled) return;
         if (!local.length) {
-          setProjects(stored);
+          applyLoaded(stored);
           setIsLoaded(true);
           return;
         }
 
-        const merged = mergeForMigration(stored, local);
+        const merged = mergeById(stored, local);
         try {
           await serverProjectStore.save(merged);
           await clearLocalProjectsAfterMigration();
           if (cancelled) return;
-          setProjects(merged);
+          applyLoaded(merged);
         } catch {
           // Ничего не удалено: локальная копия цела, перенос можно повторить входом заново.
           if (cancelled) return;
           setMigrationError(
             "Проекты с этого устройства не удалось перенести в аккаунт. Они остались здесь — попробуйте войти ещё раз.",
           );
-          setProjects(stored);
+          applyLoaded(stored);
         }
         setIsLoaded(true);
       } catch {
@@ -349,7 +375,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [authLoaded, signedIn, accountId]);
+  }, [authLoaded, signedIn, accountId, applyLoaded]);
 
   /**
    * Последнее, что ещё не подтверждено сервером. Нужен для досохранения при закрытии вкладки:
