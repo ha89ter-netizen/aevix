@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
+    "test:live": "playwright test --config playwright.live.config.ts",
     "db:push": "node --env-file=.env.local scripts/db-push.mjs"
   },
   "dependencies": {
