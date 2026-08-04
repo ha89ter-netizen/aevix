@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { AnalysisResult, EstimateForm, EstimateResult } from "@/components/site-experience";
-import type { ConceptColorId, ConceptStyleId, WebsiteConcept } from "@/lib/website-concept";
+import type { ConceptColorId, ConceptGoal, ConceptSectionType, ConceptStyleId, WebsiteConcept } from "@/lib/website-concept";
 import { useAuth } from "./auth-context";
 import {
   clearLocalProjectsAfterMigration,
@@ -84,6 +84,19 @@ export type Project = {
    * so the Overview can show what the project was asked for. */
   preferredStyleIds: ConceptStyleId[];
   preferredColorIds: ConceptColorId[];
+  /**
+   * Задача сайта и набор разделов — то, что мастер на лендинге спрашивал, а Workspace нет.
+   * Пустой массив означает проект, созданный до того, как их начали спрашивать: генерация в
+   * этом случае берёт свои прежние умолчания, а не падает.
+   *
+   * Задача — не украшение брифа: от неё зависит, потребует ли маршрут концепта секцию записи
+   * или секцию цен. Пока её зашивали в «Получать заявки», каждый проект из Workspace строился
+   * под заявки, даже когда бизнесу нужна запись.
+   */
+  goals: ConceptGoal[];
+  sections: ConceptSectionType[];
+  /** Свободные пожелания к характеру сайта — уходят в запрос к модели как есть. */
+  wishes: string;
   /** When the automatic first generation finished. Null while a project has never been generated
    * (only possible for projects created before this flow existed). */
   generatedAt: number | null;
@@ -113,6 +126,9 @@ export type CreateProjectInput = {
   city?: string;
   preferredStyleIds?: ConceptStyleId[];
   preferredColorIds?: ConceptColorId[];
+  goals?: ConceptGoal[];
+  sections?: ConceptSectionType[];
+  wishes?: string;
 };
 
 /**
@@ -454,6 +470,9 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
       city: input.city ?? "",
       preferredStyleIds: input.preferredStyleIds ?? [],
       preferredColorIds: input.preferredColorIds ?? [],
+      goals: input.goals ?? [],
+      sections: input.sections ?? [],
+      wishes: input.wishes ?? "",
       generatedAt: null,
       publishedAt: null,
       designerLog: [],
@@ -658,6 +677,9 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
     description: project.businessDescription,
     styleIds: project.preferredStyleIds,
     colorIds: project.preferredColorIds,
+    goals: project.goals,
+    sections: project.sections,
+    wishes: project.wishes,
   });
 
   const run = useCallback(async (project: Project, scope: GenerationScope[]) => {

@@ -1,5 +1,14 @@
 import type { Project } from "./projects";
-import { conceptColors, conceptStyles, type ConceptColorId, type ConceptStyleId } from "./website-concept";
+import {
+  conceptColors,
+  conceptGoals,
+  conceptSectionOptions,
+  conceptStyles,
+  type ConceptColorId,
+  type ConceptGoal,
+  type ConceptSectionType,
+  type ConceptStyleId,
+} from "./website-concept";
 
 /**
  * Что считается проектом. Один модуль на всё приложение, потому что проверять форму приходится
@@ -14,6 +23,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 const knownStyleIds = new Set<string>(conceptStyles.map((style) => style.id));
 const knownColorIds = new Set<string>(conceptColors.map((color) => color.id));
+const knownGoals = new Set<string>(conceptGoals);
+const knownSectionTypes = new Set<string>(conceptSectionOptions.map((option) => option.id));
 
 /**
  * Normalizing instead of strictly validating: id/name/timestamps are required (a project without
@@ -42,6 +53,14 @@ export function normalizeProject(value: unknown): Project | null {
   const preferredColorIds = Array.isArray(value.preferredColorIds)
     ? (value.preferredColorIds.filter((id): id is ConceptColorId => typeof id === "string" && knownColorIds.has(id)))
     : [];
+  // Задача и разделы появились позже: у проектов, созданных раньше, их просто нет, и пустой
+  // массив здесь — не потеря данных, а честное «не спрашивали».
+  const goals = Array.isArray(value.goals)
+    ? (value.goals.filter((goal): goal is ConceptGoal => typeof goal === "string" && knownGoals.has(goal)))
+    : [];
+  const sections = Array.isArray(value.sections)
+    ? (value.sections.filter((type): type is ConceptSectionType => typeof type === "string" && knownSectionTypes.has(type)))
+    : [];
 
   return {
     id: value.id,
@@ -51,6 +70,9 @@ export function normalizeProject(value: unknown): Project | null {
     city: typeof value.city === "string" ? value.city : "",
     preferredStyleIds,
     preferredColorIds,
+    goals,
+    sections,
+    wishes: typeof value.wishes === "string" ? value.wishes : "",
     generatedAt: typeof value.generatedAt === "number" ? value.generatedAt : null,
     publishedAt: typeof value.publishedAt === "number" ? value.publishedAt : null,
     // Older projects predate the AI Designer and simply start with an empty history.

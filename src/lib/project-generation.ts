@@ -5,6 +5,8 @@ import {
   buildFallbackWebsiteConcept,
   resolveConceptLayout,
   type ConceptColorId,
+  type ConceptGoal,
+  type ConceptSectionType,
   type ConceptStyleId,
   type WebsiteConcept,
   type WebsiteConceptInput,
@@ -50,7 +52,25 @@ export type ProjectBrief = {
   description: string;
   styleIds: ConceptStyleId[];
   colorIds: ConceptColorId[];
+  /** Пустые массивы — проект, созданный до того, как об этом начали спрашивать. Умолчания ниже
+   * ровно те, что подставлялись жёстко, поэтому такие проекты генерируются как прежде. */
+  goals?: ConceptGoal[];
+  sections?: ConceptSectionType[];
+  wishes?: string;
 };
+
+/** Что подставить, когда бриф старый и задачи в нём нет. Ровно прежнее зашитое поведение. */
+const DEFAULT_GOALS: ConceptGoal[] = ["Получать заявки"];
+const DEFAULT_SECTIONS: ConceptSectionType[] = [
+  "services",
+  "pricing",
+  "about",
+  "gallery",
+  "reviews",
+  "booking",
+  "contacts",
+  "faq",
+];
 
 export type GeneratedProject = {
   analysis: AnalysisResult | null;
@@ -79,18 +99,19 @@ function estimateBusinessType(businessType: string): EstimateForm["businessType"
 }
 
 /** The modules a niche most obviously needs — the same set the roadmap already recommends. */
-function recommendedServices(businessType: string): EstimateForm["selectedServices"] {
+function recommendedServices(businessType: string, goals: ConceptGoal[]): EstimateForm["selectedServices"] {
   const knowledge = businessKnowledgeFor(businessType, "");
   const booking = ["barbershop", "beauty", "dental", "fitness", "restaurant", "auto", "hotel"];
-  return booking.includes(knowledge.id)
-    ? ["ai", "whatsapp", "site", "crm"]
-    : ["ai", "whatsapp", "site"];
+  // Ниша подсказывает, но названная задача весомее: если человек прямо сказал «записывать
+  // клиентов», модуль записи нужен, даже когда ниша обычно обходится без него.
+  const needsBooking = booking.includes(knowledge.id) || goals.includes("Записывать клиентов");
+  return needsBooking ? ["ai", "whatsapp", "site", "crm"] : ["ai", "whatsapp", "site"];
 }
 
 function buildEstimateForm(brief: ProjectBrief): EstimateForm {
   return {
     businessType: estimateBusinessType(brief.businessType),
-    selectedServices: recommendedServices(brief.businessType),
+    selectedServices: recommendedServices(brief.businessType, brief.goals ?? DEFAULT_GOALS),
     branchCount: "1",
     manualWork: brief.description,
     currentServices: "",
@@ -111,9 +132,13 @@ function conceptInputFrom(brief: ProjectBrief): WebsiteConceptInput {
     styleId: brief.styleIds[0] ?? knowledge.styles[0] ?? "minimal",
     colorIds: brief.colorIds.length ? brief.colorIds : ["black", "gold"],
     customColors: "",
-    goals: ["Получать заявки"],
-    sections: ["services", "pricing", "about", "gallery", "reviews", "booking", "contacts", "faq"],
-    wishes: brief.description,
+    // Задача идёт из брифа, а не подставляется: от неё зависит, потребует ли маршрут концепта
+    // секцию записи или секцию цен, то есть под что вообще строится сайт.
+    goals: brief.goals?.length ? brief.goals : DEFAULT_GOALS,
+    sections: brief.sections?.length ? brief.sections : DEFAULT_SECTIONS,
+    // Пожелания и описание — разные вещи: первое про характер сайта, второе про бизнес. Пока
+    // спрашивали только описание, оно шло и туда; теперь склеиваем, если есть оба.
+    wishes: [brief.wishes, brief.description].filter(Boolean).join(". "),
   } as WebsiteConceptInput;
 }
 
