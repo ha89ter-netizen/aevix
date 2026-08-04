@@ -4738,6 +4738,12 @@ body::before {
   line-height: 1.55;
 }
 
+/* Ссылка-обёртка вокруг кнопки: переход в Workspace должен быть настоящей ссылкой — средний
+   клик, «открыть в новой вкладке» и клавиатура обязаны работать как у любой навигации. */
+.concept-trigger-link {
+  display: inline-flex;
+}
+
 .concept-trigger-group {
   display: flex;
   flex-wrap: wrap;

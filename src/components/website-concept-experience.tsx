@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -991,10 +993,22 @@ export function WebsiteConceptExperience({
     <>
       {embedded ? null : (
         <div className="concept-trigger-group mt-7">
-        <Button type="button" onClick={() => { setShowExamples(false); setConcept(null); setOpen(true); }} className="concept-trigger">
-          <WandSparkles className="mr-2 h-4 w-4" />
-          Получить концепт сайта
-        </Button>
+        {/* Создание живёт в одном месте — в Workspace. Раньше эта кнопка открывала здесь же
+            свой мастер, и он выдавал концепт, который проектом не становился: человек проходил
+            бриф, любовался результатом, а сохранить его было некуда. Две разные формы под одну
+            задачу вдобавок разъезжались — на лендинге спрашивали задачу сайта и разделы, в
+            Workspace нет.
+
+            Размен назван вслух: посетитель теперь уходит с лендинга, чтобы собрать концепт.
+            Порог выше, зато результат остаётся у него проектом, а не картинкой в окне. */}
+        <Link href="/app/new" className="concept-trigger-link">
+          <Button type="button" className="concept-trigger">
+            <WandSparkles className="mr-2 h-4 w-4" />
+            Получить концепт сайта
+          </Button>
+        </Link>
+        {/* Примеры остаются здесь: это витрина, а не создание. Посмотреть, на что похож
+            результат, не покидая страницу, — ровно то, ради чего человек на неё пришёл. */}
         <Button type="button" variant="glass" onClick={() => { setShowExamples(true); setConcept(null); setOpen(true); }}>
           Посмотреть пример <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
