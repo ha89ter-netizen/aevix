@@ -6064,18 +6064,25 @@ button.workspace-card:hover {
 }
 
 /* The miniature is themed entirely by the --sc-* variables the card computes from the real
-   visual-identity generator, so every style genuinely looks like itself. */
+   visual-identity generator, so every style genuinely looks like itself.
+
+   Отступы и размеры считаются от --sc-spacing и --sc-heading-scale, а не заданы числом: именно
+   плотность и масштаб заголовка отличают «Роскошь» от «Брутализма». Пока они были захардкожены,
+   все стили выглядели одинаково. */
 .style-card-preview {
   display: grid;
-  gap: 0.3rem;
+  gap: calc(0.3rem * var(--sc-spacing));
   overflow: hidden;
   aspect-ratio: 4 / 3;
-  border: 1px solid var(--sc-border);
+  border: var(--sc-border-width) solid var(--sc-border);
   border-radius: var(--sc-radius);
   background: var(--sc-bg);
   box-shadow: var(--sc-shadow);
-  padding: 0.4rem;
-  align-content: start;
+  padding: calc(0.4rem * var(--sc-spacing));
+  /* Шапка и герой по содержимому, карточки — в остаток и прижаты к низу. Раньше стоял
+     `align-content: start`, и он гасил `margin-top: auto` у нижнего ряда: миниатюра
+     скучивалась вверху, а треть рамки пустовала. */
+  grid-template-rows: auto auto 1fr;
 }
 
 .style-card-nav {
@@ -6101,41 +6108,51 @@ button.workspace-card:hover {
 
 .style-card-hero {
   display: grid;
-  gap: 0.22rem;
-  margin-top: 0.32rem;
+  gap: calc(0.22rem * var(--sc-spacing));
+  justify-items: start;
+  margin-top: calc(0.32rem * var(--sc-spacing));
 }
 
-.style-card-hero b {
-  height: 0.42rem;
-  width: 86%;
-  border-radius: var(--sc-radius-sm);
-  background: var(--sc-text);
+/* Настоящий текст, а не полоска: вес и межбуквенный интервал на прямоугольнике не видны, а
+   именно они и различают стили сильнее всего. */
+.style-card-heading {
+  color: var(--sc-text);
+  font-size: calc(0.82rem * var(--sc-heading-scale));
+  font-weight: var(--sc-heading-weight);
   letter-spacing: var(--sc-tracking);
-  opacity: calc(var(--sc-heading-weight) / 1000 + 0.35);
+  line-height: 1.1;
 }
 
-.style-card-hero b.is-short {
-  width: 54%;
+.style-card-sub {
+  color: var(--sc-muted);
+  font-size: 0.46rem;
+  font-weight: var(--sc-body-weight);
+  letter-spacing: var(--sc-tracking);
 }
 
 .style-card-cta {
-  height: 0.5rem;
-  width: 2.1rem;
-  margin-top: 0.16rem;
+  margin-top: calc(0.16rem * var(--sc-spacing));
   border-radius: var(--sc-radius-sm);
   background: var(--sc-accent);
+  /* Цвет фона поверх акцента: акцент строится в противоположном фону конце шкалы светлоты,
+     поэтому контраст гарантирован при любой палитре. */
+  color: var(--sc-bg);
+  padding: 0.14rem 0.42rem;
+  font-size: 0.42rem;
+  font-weight: var(--sc-body-weight);
+  letter-spacing: var(--sc-tracking);
 }
 
 .style-card-row {
   display: grid;
-  gap: 0.22rem;
+  gap: calc(0.22rem * var(--sc-spacing));
   grid-template-columns: repeat(3, 1fr);
-  margin-top: auto;
+  align-self: end;
 }
 
 .style-card-row span {
-  height: 1.05rem;
-  border: 1px solid var(--sc-border);
+  height: 1.4rem;
+  border: var(--sc-border-width) solid var(--sc-border);
   border-radius: var(--sc-radius-sm);
   background: var(--sc-surface);
 }
