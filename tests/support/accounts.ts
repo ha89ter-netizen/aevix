@@ -1,14 +1,14 @@
 import type { Page } from "@playwright/test";
-import { createLoginToken } from "../../src/lib/auth";
+import { createLoginCode } from "../../src/lib/auth";
 import { db } from "../../src/lib/db";
 
 /**
  * Вспомогательное для тестов аккаунтов.
  *
- * Ссылка для входа берётся вызовом `createLoginToken` — той самой функции, которой пользуется
- * маршрут, — а не выковыривается из письма. Так тест проходит настоящий путь «токен → переход
- * по ссылке → сессия», минуя ровно одно звено: доставку письма Resend'ом. Читать токен из базы
- * нельзя и не нужно: там лежит его хеш, и это защита, а не помеха.
+ * Код берётся вызовом `createLoginCode` — той самой функции, которой пользуется маршрут, — а не
+ * выковыривается из письма. Так тест проходит настоящий путь «код → проверка → сессия», минуя
+ * ровно одно звено: доставку письма Resend'ом. Читать код из базы нельзя и не нужно: там лежит
+ * его подпись, и это защита, а не помеха.
  */
 
 /** Тесты работают против настоящей базы, поэтому без неё пропускают себя целиком. */
@@ -22,10 +22,18 @@ export function uniqueEmail(): string {
   return `playwright-${Date.now()}-${counter}@aevix.test`;
 }
 
-/** Проходит вход целиком и дожидается Workspace. */
+/**
+ * Проходит вход целиком и дожидается Workspace.
+ *
+ * Код отправляется тем же маршрутом, которым его отправляет форма, — из контекста страницы,
+ * чтобы cookie сессии досталась именно этому браузеру. Ровно ради этого свойства ссылка из
+ * письма и была заменена на код.
+ */
 export async function signIn(page: Page, email: string): Promise<void> {
-  const token = await createLoginToken(email);
-  await page.goto(`/api/auth/callback?token=${encodeURIComponent(token)}`);
+  const code = await createLoginCode(email);
+  const response = await page.request.post("/api/auth/verify", { data: { email, code } });
+  if (!response.ok()) throw new Error(`вход не удался: ${response.status()} ${await response.text()}`);
+  await page.goto("/app/projects");
   await page.waitForURL(/\/app\/projects/);
 }
 

@@ -7101,6 +7101,14 @@ button.workspace-card:hover {
   color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
 }
 
+/* Поле кода: цифры крупно и вразрядку, чтобы шесть штук читались как шесть, а не как число. */
+.login-code-input {
+  font-size: 1.5rem;
+  font-weight: 620;
+  letter-spacing: 0.32em;
+  text-align: center;
+}
+
 /* Состояние аккаунта: тише пунктов навигации — это сведения о том, где лежит работа, а не
    ещё одно предлагаемое действие. */
 .shell-account {

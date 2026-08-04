@@ -51,28 +51,73 @@ test.describe("аккаунты", () => {
     await expect(page.locator(NOTICE).first()).toContainText("сохраняются в аккаунт");
   });
 
-  test("ссылка одноразовая: второй переход по ней входа не даёт", async ({ page }) => {
+  test("код одноразовый: второй ввод входа не даёт", async ({ page }) => {
     const email = account();
-    // Тот же токен дважды — берём его один раз и используем повторно вручную.
-    const { createLoginToken } = await import("../src/lib/auth");
-    const token = await createLoginToken(email);
+    const { createLoginCode } = await import("../src/lib/auth");
+    const code = await createLoginCode(email);
 
-    await page.goto(`/api/auth/callback?token=${encodeURIComponent(token)}`);
-    await page.waitForURL(/\/app\/projects/);
-    await expect(page.locator(NOTICE).first()).toContainText("сохраняются в аккаунт");
+    await page.goto("/app/projects");
+    const first = await page.request.post("/api/auth/verify", { data: { email, code } });
+    expect(first.ok()).toBeTruthy();
 
-    await page.goto(`/api/auth/callback?token=${encodeURIComponent(token)}`);
-    await page.waitForURL(/\/app\/login\?error=used/);
-    await expect(page.locator(LOGIN_ERROR)).toContainText("уже использована");
+    const second = await page.request.post("/api/auth/verify", { data: { email, code } });
+    expect(second.status()).toBe(401);
+    expect((await second.json()).reason).toBe("used");
   });
 
-  test("поддельный токен не пускает и объясняет, что делать", async ({ page }) => {
-    await page.goto("/api/auth/callback?token=этого-токена-нет");
-    await page.waitForURL(/\/app\/login\?error=invalid/);
-    await expect(page.locator(LOGIN_ERROR)).toContainText("недействительна");
-    // Форма рядом с ошибкой: истёкшая ссылка — самый частый неуспех, и человеку нужна
-    // возможность запросить новую, а не только сообщение о том, что всё плохо.
-    await expect(page.getByRole("button", { name: "Получить ссылку" })).toBeVisible();
+  test("неверный код не пускает", async ({ page }) => {
+    const email = account();
+    const { createLoginCode } = await import("../src/lib/auth");
+    await createLoginCode(email);
+
+    await page.goto("/app/projects");
+    const response = await page.request.post("/api/auth/verify", { data: { email, code: "000000" } });
+    expect(response.status()).toBe(401);
+    // Хранилище не переключилось: неверный код не выдаёт сессию.
+    await page.reload();
+    await expect(page.locator(NOTICE).first()).toContainText("только на этом устройстве");
+  });
+
+  test("код сгорает после пяти неверных попыток, и верный уже не спасает", async ({ page }) => {
+    const email = account();
+    const { createLoginCode } = await import("../src/lib/auth");
+    const code = await createLoginCode(email);
+    // Заведомо неверный, но той же формы — чтобы проверялся счётчик, а не отсев по виду.
+    const wrong = code === "000000" ? "111111" : "000000";
+
+    await page.goto("/app/projects");
+    for (let i = 1; i <= 5; i++) {
+      const r = await page.request.post("/api/auth/verify", { data: { email, code: wrong } });
+      expect(r.status(), `попытка ${i}`).toBe(401);
+    }
+
+    // Шесть цифр — миллион вариантов. Без этого ограничения код подбирался бы перебором.
+    const afterBurn = await page.request.post("/api/auth/verify", { data: { email, code } });
+    expect(afterBurn.status()).toBe(401);
+    expect((await afterBurn.json()).reason).toBe("used");
+  });
+
+  test("страница входа просит код и объясняет отказ", async ({ page }) => {
+    await page.goto("/app/login");
+    await expect(page.getByRole("button", { name: "Получить код" })).toBeVisible();
+
+    const email = account();
+    const field = page.getByLabel("Почта");
+    const submit = page.getByRole("button", { name: "Получить код" });
+    // Поле управляемое: значение, вписанное до того, как React навесит onChange, стирается
+    // гидратацией, и кнопка остаётся выключенной. Тот же приём, что в createProjectViaForm —
+    // повторять ввод, пока он не закрепится.
+    await expect(async () => {
+      await field.fill(email);
+      await expect(submit).toBeEnabled({ timeout: 500 });
+    }).toPass({ timeout: 15_000 });
+    await submit.click();
+
+    // Второй шаг на той же странице: человек не уходит из вкладки, в которой начал.
+    await expect(page.getByLabel("Код из письма")).toBeVisible();
+    await page.getByLabel("Код из письма").fill("000000");
+    await page.getByRole("button", { name: "Войти" }).click();
+    await expect(page.locator(LOGIN_ERROR)).toContainText("Неверный код");
   });
 
   test("проект с устройства переходит в аккаунт, и локальная копия убирается", async ({ page }) => {

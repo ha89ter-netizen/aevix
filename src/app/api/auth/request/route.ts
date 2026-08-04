@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 import { NextResponse } from "next/server";
-import { createLoginToken, isAuthConfigured, normalizeEmail, pruneLoginTokens } from "@/lib/auth";
+import { createLoginCode, isAuthConfigured, normalizeEmail, pruneLoginTokens } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -34,40 +34,32 @@ function isRateLimited(clientId: string) {
 }
 
 /**
- * Адрес, на который будет указывать ссылка из письма.
+ * Письмо с кодом, а не со ссылкой.
  *
- * Заголовку Host намеренно не доверяем в первую очередь: он приходит от клиента, и если
- * собирать ссылку из него, то подделанным Host можно заставить нас отправить человеку письмо со
- * ссылкой на чужой домен — перейдя по ней, он отдал бы свой токен входа. Поэтому сначала явно
- * заданный адрес, потом домен, который Vercel сообщает сам, и только в последнюю очередь —
- * origin запроса (это путь для локальной разработки, где подделывать нечего и некому).
+ * Ссылки здесь больше нет намеренно — см. пояснение в src/lib/auth.ts: она уводила человека в
+ * другой браузер, а вместе с ним и сессию, оставляя проекты запертыми там, где вход начинался.
+ *
+ * Код разбит пробелом («123 456») только в тексте для глаза; вводится он как угодно, маршрут
+ * проверки убирает пробелы сам.
  */
-function appOrigin(request: Request): string {
-  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, "");
-  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
-  return new URL(request.url).origin;
-}
-
-function renderEmail(link: string) {
+function renderEmail(code: string) {
+  const spaced = `${code.slice(0, 3)} ${code.slice(3)}`;
   return {
-    subject: "Вход в AEVIX",
+    subject: `${code} — код для входа в AEVIX`,
     text: [
       "Здравствуйте!",
       "",
-      "Чтобы войти в AEVIX, перейдите по ссылке:",
-      link,
+      `Код для входа в AEVIX: ${spaced}`,
       "",
-      "Ссылка действует 15 минут и срабатывает один раз.",
+      "Введите его на странице входа. Код действует 15 минут и срабатывает один раз.",
       "Если вход запрашивали не вы — просто удалите это письмо, ничего не произойдёт.",
     ].join("\n"),
     html: `
       <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px;line-height:1.6;color:#111">
         <p>Здравствуйте!</p>
-        <p>Чтобы войти в AEVIX, нажмите кнопку:</p>
-        <p style="margin:24px 0">
-          <a href="${link}" style="background:#111;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;display:inline-block">Войти в AEVIX</a>
-        </p>
-        <p style="color:#666;font-size:13px">Ссылка действует 15 минут и срабатывает один раз.<br>
+        <p>Код для входа в AEVIX:</p>
+        <p style="margin:24px 0;font-size:32px;font-weight:700;letter-spacing:0.18em">${spaced}</p>
+        <p style="color:#666;font-size:13px">Введите его на странице входа. Код действует 15 минут и срабатывает один раз.<br>
         Если вход запрашивали не вы — просто удалите это письмо, ничего не произойдёт.</p>
       </div>
     `,
@@ -103,20 +95,19 @@ export async function POST(request: Request) {
 
   try {
     void pruneLoginTokens();
-    const token = await createLoginToken(email);
-    const link = `${appOrigin(request)}/api/auth/callback?token=${encodeURIComponent(token)}`;
+    const code = await createLoginCode(email);
     const apiKey = process.env.RESEND_API_KEY;
 
     if (!apiKey) {
-      // Ключа нет — письмо отправить нечем. Ссылка печатается в консоль сервера: это позволяет
+      // Ключа нет — письмо отправить нечем. Код печатается в консоль сервера: это позволяет
       // работать и проверять вход локально. На проде без ключа войти будет невозможно, поэтому
-      // ответ честно сообщает, каким способом «доставлена» ссылка, а не притворяется успехом.
-      console.warn(`[auth] RESEND_API_KEY не настроен. Ссылка для входа ${email}:\n${link}`);
+      // ответ честно сообщает, каким способом «доставлен» код, а не притворяется успехом.
+      console.warn(`[auth] RESEND_API_KEY не настроен. Код для входа ${email}: ${code}`);
       return NextResponse.json({ sent: true, delivery: "console" });
     }
 
     const resend = new Resend(apiKey);
-    const message = renderEmail(link);
+    const message = renderEmail(code);
     const { error } = await resend.emails.send({
       from: process.env.LEAD_EMAIL_FROM || DEFAULT_FROM,
       to: email,
@@ -129,13 +120,13 @@ export async function POST(request: Request) {
       // В отличие от заявки с лендинга, здесь письмо — единственный путь: не дошло, значит
       // человек не войдёт. Молчаливое {sent:false} превратилось бы в «нажимаю, ничего не
       // происходит», поэтому отвечаем ошибкой.
-      console.error("[auth] Не удалось отправить письмо со ссылкой", error);
+      console.error("[auth] Не удалось отправить письмо с кодом", error);
       return NextResponse.json({ error: "Не удалось отправить письмо. Попробуйте ещё раз." }, { status: 502 });
     }
 
     return NextResponse.json({ sent: true, delivery: "email" });
   } catch (error) {
-    console.error("[auth] Запрос ссылки для входа не удался", error);
+    console.error("[auth] Запрос кода для входа не удался", error);
     return NextResponse.json({ error: "Не удалось выполнить вход. Попробуйте ещё раз." }, { status: 500 });
   }
 }

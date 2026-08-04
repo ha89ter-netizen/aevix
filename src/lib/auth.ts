@@ -1,11 +1,21 @@
-import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHmac, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { db } from "./db";
 
 /**
- * Вход по ссылке на почту и сессия.
+ * Вход по коду подтверждения и сессия.
  *
  * Пароля нет намеренно: нечего хранить, нечего утекать, нечего восстанавливать. Человек вводит
- * почту, получает одноразовую ссылку, переход по ней выдаёт сессию.
+ * почту, получает шестизначный код и вводит его на той же странице.
+ *
+ * Раньше здесь была ссылка из письма, и её пришлось убрать по осязаемой причине. Ссылка
+ * открывается в том браузере, который выбрал почтовый клиент, а не в том, где человек начал
+ * вход: заказ с ноутбука, письмо открыто на телефоне — сессия достаётся телефону. Обычно это
+ * неудобство, но у нас перенос проектов в аккаунт читает `localStorage` ТОГО браузера, где
+ * случился вход. Значит вход не в том браузере оставляет проекты запертыми в первом, и человек
+ * их в аккаунте уже не увидит. Код никуда не уводит: человек остаётся во вкладке, где начал.
+ *
+ * Побочно это лечит и корпоративные почтовые сканеры, которые «прощёлкивают» ссылки заранее и
+ * тем сжигают одноразовый токен до того, как до него доберётся адресат.
  *
  * Написано руками, а не через библиотеку авторизации. Причина та же, по которой AI-дизайнер не
  * обёртка над чатом: задача узкая и полностью укладывается в три таблицы и две операции, а
@@ -19,8 +29,10 @@ import { db } from "./db";
 const SESSION_COOKIE = "aevix_session";
 /** Тридцать дней: достаточно, чтобы не просить почту при каждом возвращении. */
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-/** Пятнадцать минут на переход по ссылке — обычная практика для одноразовых ссылок входа. */
+/** Пятнадцать минут на ввод кода — хватает дойти до почты и вернуться. */
 const LOGIN_TOKEN_TTL_MS = 15 * 60 * 1000;
+/** Неверных вводов на один код. Шесть цифр — миллион вариантов, и без потолка их можно перебрать. */
+const MAX_CODE_ATTEMPTS = 5;
 
 export type SessionUser = { id: string; email: string };
 
@@ -119,58 +131,100 @@ export function expiredSessionCookie() {
   return { ...sessionCookie({ id: "", email: "" }), value: "", maxAge: 0 };
 }
 
-function hashToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
+/**
+ * HMAC, а не обычный хеш. У шестизначного кода миллион значений, поэтому SHA-256 от него
+ * восстанавливается перебором по дампу базы за секунды. HMAC на серверном ключе делает такой
+ * перебор невозможным без самого ключа. Почта входит в подпись, чтобы один и тот же код у
+ * разных людей давал разные значения.
+ */
+function hashCode(email: string, code: string): string {
+  return createHmac("sha256", secret()).update(`${email}:${code}`).digest("hex");
+}
+
+/** Шесть цифр. randomInt — равномерный источник; остаток от деления случайных байт дал бы
+ * перекос в сторону младших кодов. */
+function generateCode(): string {
+  return String(randomInt(0, 1_000_000)).padStart(6, "0");
 }
 
 /**
- * Создаёт одноразовую ссылку входа и возвращает сырой токен — он существует только в этот
- * момент и в письме; в базе лежит лишь его хеш.
+ * Создаёт одноразовый код входа и возвращает его — он существует только в этот момент и в
+ * письме; в базе лежит лишь подпись.
  */
-export async function createLoginToken(email: string): Promise<string> {
-  const token = randomBytes(32).toString("base64url");
+export async function createLoginCode(email: string): Promise<string> {
+  const code = generateCode();
   const expiresAt = new Date(Date.now() + LOGIN_TOKEN_TTL_MS);
   const sql = db();
-  // Прошлые неиспользованные ссылки для этого адреса гасятся: запросив новую, человек ожидает,
-  // что старая больше не работает, и обычно именно потому, что первая ушла не туда.
+  // Прошлые неиспользованные коды для этого адреса гасятся: запросив новый, человек ожидает,
+  // что старый больше не работает.
   await sql`delete from login_tokens where email = ${email} and used_at is null`;
   await sql`
     insert into login_tokens (token_hash, email, expires_at)
-    values (${hashToken(token)}, ${email}, ${expiresAt.toISOString()})
+    values (${hashCode(email, code)}, ${email}, ${expiresAt.toISOString()})
   `;
-  return token;
+  return code;
 }
 
 export type ConsumeResult =
   | { ok: true; user: SessionUser }
-  | { ok: false; reason: "invalid" | "expired" | "used" };
+  | { ok: false; reason: "invalid" | "expired" | "used" | "attempts" };
 
 /**
- * Проверяет токен из ссылки, гасит его и выдаёт пользователя, заводя аккаунт при первом входе.
+ * Проверяет код, гасит его и выдаёт пользователя, заводя аккаунт при первом входе.
  *
- * Токен одноразовый: пометка used_at ставится условием самого UPDATE, поэтому два одновременных
- * перехода по одной ссылке не могут оба оказаться успешными — второй не найдёт строку.
+ * Код одноразовый: пометка used_at ставится условием самого UPDATE, поэтому два одновременных
+ * ввода одного кода не могут оба оказаться успешными — второй не найдёт строку.
+ *
+ * Неверный код увеличивает счётчик попыток у ЖИВОГО кода этой почты, и на пятой промашке код
+ * сгорает. Без этого шесть цифр перебирались бы за миллион запросов.
  */
-export async function consumeLoginToken(token: unknown): Promise<ConsumeResult> {
-  if (typeof token !== "string" || !token) return { ok: false, reason: "invalid" };
+export async function consumeLoginCode(email: string, code: unknown): Promise<ConsumeResult> {
+  if (typeof code !== "string" || !/^\d{6}$/.test(code.trim())) {
+    await registerFailedAttempt(email);
+    return { ok: false, reason: "invalid" };
+  }
+
   const sql = db();
+  const hash = hashCode(email, code.trim());
   const rows = (await sql`
-    select email, expires_at, used_at from login_tokens where token_hash = ${hashToken(token)}
-  `) as Array<{ email: string; expires_at: string; used_at: string | null }>;
+    select email, expires_at, used_at, attempts from login_tokens where token_hash = ${hash}
+  `) as Array<{ email: string; expires_at: string; used_at: string | null; attempts: number }>;
 
   const row = rows[0];
-  if (!row) return { ok: false, reason: "invalid" };
+  if (!row) {
+    // Код не подошёл. Промашка засчитывается живому коду этой почты, иначе счётчик никогда бы
+    // не рос: у неверного кода своей строки в базе нет.
+    const burned = await registerFailedAttempt(email);
+    return { ok: false, reason: burned ? "attempts" : "invalid" };
+  }
   if (row.used_at) return { ok: false, reason: "used" };
   if (new Date(row.expires_at).getTime() < Date.now()) return { ok: false, reason: "expired" };
 
   const claimed = (await sql`
     update login_tokens set used_at = now()
-    where token_hash = ${hashToken(token)} and used_at is null
+    where token_hash = ${hash} and used_at is null
     returning email
   `) as Array<{ email: string }>;
   if (!claimed[0]) return { ok: false, reason: "used" };
 
   return { ok: true, user: await findOrCreateUser(row.email) };
+}
+
+/** Засчитывает неверный ввод. Возвращает true, если код после этого сгорел. */
+async function registerFailedAttempt(email: string): Promise<boolean> {
+  const sql = db();
+  const rows = (await sql`
+    update login_tokens set attempts = attempts + 1
+    where email = ${email} and used_at is null
+    returning attempts
+  `) as Array<{ attempts: number }>;
+
+  const attempts = rows[0]?.attempts ?? 0;
+  if (attempts < MAX_CODE_ATTEMPTS) return false;
+
+  // Исчерпан — гасим так же, как использованный: строка остаётся, чтобы ответить внятно.
+  await sql`update login_tokens set used_at = now() where email = ${email} and used_at is null`;
+  return true;
 }
 
 async function findOrCreateUser(email: string): Promise<SessionUser> {
