@@ -1,4 +1,4 @@
-import { createHmac, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, randomInt, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { db } from "./db";
 
 /**
@@ -34,7 +34,49 @@ const LOGIN_TOKEN_TTL_MS = 15 * 60 * 1000;
 /** Неверных вводов на один код. Шесть цифр — миллион вариантов, и без потолка их можно перебрать. */
 const MAX_CODE_ATTEMPTS = 5;
 
-export type SessionUser = { id: string; email: string };
+export type SessionUser = { id: string; email: string; name?: string };
+
+/**
+ * Пароли.
+ *
+ * scrypt из стандартного модуля, а не bcrypt или argon2 из пакета: он для того и сделан —
+ * намеренно медленный и требовательный к памяти, поэтому перебор дорог. Новой зависимости при
+ * этом не появляется, а зависимость в цепочке аутентификации — это лишняя поверхность.
+ *
+ * Соль своя у каждого пароля и лежит рядом с хешем в одной строке: одинаковые пароли у разных
+ * людей дают разные хеши, поэтому радужная таблица бесполезна.
+ */
+const SCRYPT_KEYLEN = 64;
+
+export function hashPassword(password: string): string {
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(password, salt, SCRYPT_KEYLEN).toString("hex");
+  return `scrypt:${salt}:${hash}`;
+}
+
+export function verifyPassword(password: string, stored: string | null): boolean {
+  if (!stored) return false;
+  const [scheme, salt, hash] = stored.split(":");
+  if (scheme !== "scrypt" || !salt || !hash) return false;
+  const actual = scryptSync(password, salt, SCRYPT_KEYLEN);
+  const expected = Buffer.from(hash, "hex");
+  if (actual.length !== expected.length) return false;
+  // Сравнение постоянного времени: обычное `===` по времени ответа подсказывает, сколько байт
+  // хеша угадано.
+  return timingSafeEqual(actual, expected);
+}
+
+/**
+ * Требования к паролю. Намеренно скромные: длина решает больше, чем обязательный спецсимвол,
+ * а вычурные правила гонят людей к «Password1!» и к записке под клавиатурой.
+ */
+export function passwordProblem(password: string): string | null {
+  if (password.length < 8) return "Пароль должен быть не короче 8 символов.";
+  if (password.length > 200) return "Пароль слишком длинный.";
+  if (!/[a-zA-Zа-яА-Я]/.test(password)) return "Добавьте хотя бы одну букву.";
+  if (!/[0-9]/.test(password)) return "Добавьте хотя бы одну цифру.";
+  return null;
+}
 
 function secret(): string {
   const value = process.env.AUTH_SECRET;
@@ -75,10 +117,10 @@ function signatureMatches(expected: string, actual: string): boolean {
  * не требует обращения к базе. Плата за это — досрочно отозвать одну сессию нельзя, только
  * сменить AUTH_SECRET и разлогинить всех. При нынешнем размере продукта это верный размен.
  */
-type SessionPayload = { uid: string; email: string; exp: number };
+type SessionPayload = { uid: string; email: string; name?: string; exp: number };
 
 function encodeSession(user: SessionUser): string {
-  const payload: SessionPayload = { uid: user.id, email: user.email, exp: Date.now() + SESSION_TTL_MS };
+  const payload: SessionPayload = { uid: user.id, email: user.email, name: user.name, exp: Date.now() + SESSION_TTL_MS };
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
   return `${body}.${sign(body)}`;
 }
@@ -92,7 +134,7 @@ function decodeSession(value: string | undefined): SessionUser | null {
     const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as SessionPayload;
     if (typeof payload.exp !== "number" || payload.exp < Date.now()) return null;
     if (typeof payload.uid !== "string" || typeof payload.email !== "string") return null;
-    return { id: payload.uid, email: payload.email };
+    return { id: payload.uid, email: payload.email, name: payload.name };
   } catch {
     return null;
   }
@@ -229,7 +271,7 @@ async function registerFailedAttempt(email: string): Promise<boolean> {
 
 async function findOrCreateUser(email: string): Promise<SessionUser> {
   const sql = db();
-  const existing = (await sql`select id, email from users where email = ${email}`) as SessionUser[];
+  const existing = (await sql`select id, email, name from users where email = ${email}`) as SessionUser[];
   if (existing[0]) return existing[0];
 
   const id = randomUUID();
@@ -238,9 +280,71 @@ async function findOrCreateUser(email: string): Promise<SessionUser> {
   const inserted = (await sql`
     insert into users (id, email) values (${id}, ${email})
     on conflict (email) do update set email = excluded.email
-    returning id, email
+    returning id, email, name
   `) as SessionUser[];
   return inserted[0];
+}
+
+export type RegisterResult = { ok: true; user: SessionUser } | { ok: false; reason: "duplicate" };
+
+/**
+ * Регистрация. Занятый адрес — отдельный ответ, а не общая ошибка: иначе человек не поймёт,
+ * что у него уже есть аккаунт, и будет пробовать снова.
+ *
+ * Занятость проверяется вставкой с `on conflict do nothing`, а не отдельным запросом «есть
+ * ли такой»: между проверкой и вставкой помещается чужая регистрация того же адреса, и тогда
+ * второй запрос падал бы на уникальном индексе. Здесь решает сама база.
+ */
+export async function registerUser(email: string, name: string, password: string): Promise<RegisterResult> {
+  const sql = db();
+  const id = randomUUID();
+  const inserted = (await sql`
+    insert into users (id, email, name, password)
+    values (${id}, ${email}, ${name}, ${hashPassword(password)})
+    on conflict (email) do nothing
+    returning id, email, name
+  `) as SessionUser[];
+
+  if (!inserted[0]) return { ok: false, reason: "duplicate" };
+  return { ok: true, user: inserted[0] };
+}
+
+export type SignInResult =
+  | { ok: true; user: SessionUser }
+  | { ok: false; reason: "unknown" | "wrong" | "no-password" };
+
+/**
+ * Вход по паролю.
+ *
+ * «Нет пароля» — отдельный исход, а не «неверный пароль»: у аккаунтов, заведённых до появления
+ * паролей, проверять нечего, и честный ответ ведёт их к входу по коду, а не в тупик с
+ * повторным вводом.
+ */
+export async function signInWithPassword(email: string, password: string): Promise<SignInResult> {
+  const sql = db();
+  const rows = (await sql`
+    select id, email, name, password from users where email = ${email}
+  `) as Array<SessionUser & { password: string | null }>;
+
+  const row = rows[0];
+  if (!row) return { ok: false, reason: "unknown" };
+  if (!row.password) return { ok: false, reason: "no-password" };
+  if (!verifyPassword(password, row.password)) return { ok: false, reason: "wrong" };
+  return { ok: true, user: { id: row.id, email: row.email, name: row.name } };
+}
+
+/** Задать или сменить пароль — после входа по коду и из настроек. */
+export async function setPassword(userId: string, password: string): Promise<void> {
+  await db()`update users set password = ${hashPassword(password)} where id = ${userId}`;
+}
+
+/** Профиль для страницы аккаунта: то, что о человеке вообще известно. */
+export async function getProfile(userId: string): Promise<{ id: string; email: string; name: string | null; createdAt: string; hasPassword: boolean } | null> {
+  const rows = (await db()`
+    select id, email, name, created_at, (password is not null) as has_password from users where id = ${userId}
+  `) as Array<{ id: string; email: string; name: string | null; created_at: string; has_password: boolean }>;
+  const row = rows[0];
+  return row ? { id: row.id, email: row.email, name: row.name, createdAt: row.created_at, hasPassword: row.has_password } : null;
 }
 
 /** Убирает просроченные и использованные ссылки. Вызывается попутно при запросе новой. */

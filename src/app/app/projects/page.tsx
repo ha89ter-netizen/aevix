@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Cloud, Copy, FolderKanban, MoreVertical, Pencil, Plus, Smartphone, Trash2, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProjects, getProjectStatus, type Project } from "@/lib/projects";
+import { useAuth } from "@/lib/auth-context";
+import { displayNameOf } from "@/components/shell/shell-header-account";
 import { WorkspacePageHeader } from "@/components/workspace/page-header";
 import { projectHref } from "@/components/shell/shell-nav";
 import { formatProjectDate } from "@/components/workspace/project-meta";
@@ -141,6 +143,7 @@ function ProjectCard({
 
 export default function ProjectsPage() {
   const { projects, isLoaded, rename, duplicate, remove, generation, storage, loadError, migrationError } = useProjects();
+  const { user } = useAuth();
   const [pendingDelete, setPendingDelete] = useState<Project | null>(null);
 
   return (
@@ -155,7 +158,9 @@ export default function ProjectsPage() {
       {storage === "account" ? (
         <p className="workspace-storage-notice">
           <Cloud className="h-3.5 w-3.5" />
-          Проекты сохраняются в аккаунт и доступны с любого устройства.
+          {/* Чьи именно проекты — сказано прямо. «Сохраняются в аккаунт» не отвечало на этот
+              вопрос, и на общем компьютере это была настоящая двусмысленность. */}
+          {user ? `Проекты аккаунта ${displayNameOf(user)} — доступны с любого устройства.` : "Проекты сохраняются в аккаунт."}
         </p>
       ) : (
         <p className="workspace-storage-notice">

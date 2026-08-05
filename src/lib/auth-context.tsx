@@ -11,7 +11,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
  * чтобы этот запрос не делал каждый компонент отдельно.
  */
 
-export type AuthUser = { id: string; email: string };
+export type AuthUser = { id: string; email: string; name?: string };
 
 type AuthContextValue = {
   user: AuthUser | null;

@@ -8591,3 +8591,290 @@ a.shell-account:hover {
     transform: none;
   }
 }
+
+/* ---- Аккаунт: личность, меню, формы ---- */
+
+/* Две кнопки вместо одной: человек без аккаунта должен видеть, куда ему. Регистрация тише
+   консультации и заметнее входа — она важнее для нового посетителя. */
+.shell-header-auth {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.shell-header-signup {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.45);
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.08);
+  padding: 0.55rem 0.9rem;
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+  font-size: 0.82rem;
+  font-weight: 620;
+  white-space: nowrap;
+  transition: background var(--motion-base) var(--ease-premium);
+}
+
+.shell-header-signup:hover {
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.16);
+}
+
+.shell-account-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Аватар с инициалами: имя рядом на широком экране, один кружок на узком. */
+.shell-avatar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  padding: 0.3rem 0.7rem 0.3rem 0.3rem;
+  transition: border-color var(--motion-base) var(--ease-premium), background var(--motion-base) var(--ease-premium);
+}
+
+.shell-avatar:hover,
+.shell-avatar.is-open {
+  border-color: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.5);
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.06);
+}
+
+.shell-avatar-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  background: #111214;
+  color: #fafaf8;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.shell-avatar-name {
+  max-width: 9rem;
+  overflow: hidden;
+  color: rgba(9, 8, 7, 0.78);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-menu {
+  position: absolute;
+  z-index: 70;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  display: grid;
+  min-width: 13.5rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 0.35rem;
+  box-shadow: 0 20px 46px rgba(9, 8, 7, 0.16);
+  animation: menu-in var(--motion-fast) var(--ease-premium);
+}
+
+@keyframes menu-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+.shell-menu-head {
+  display: grid;
+  gap: 0.1rem;
+  border-bottom: 1px solid var(--line);
+  padding: 0.5rem 0.6rem 0.6rem;
+  margin-bottom: 0.25rem;
+}
+
+.shell-menu-name {
+  font-size: 0.86rem;
+  font-weight: 640;
+  overflow-wrap: anywhere;
+}
+
+.shell-menu-email {
+  color: rgba(9, 8, 7, 0.5);
+  font-size: 0.74rem;
+  overflow-wrap: anywhere;
+}
+
+.shell-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.6rem;
+  color: rgba(9, 8, 7, 0.78);
+  font-size: 0.86rem;
+  font-weight: 560;
+  text-align: left;
+  transition: background var(--motion-fast) var(--ease-premium), color var(--motion-fast) var(--ease-premium);
+}
+
+.shell-menu-item:hover {
+  background: rgba(9, 8, 7, 0.05);
+  color: #111214;
+}
+
+.shell-menu-item.is-exit:hover {
+  background: rgba(185, 28, 28, 0.08);
+  color: #b91c1c;
+}
+
+/* Вкладки входа и регистрации */
+.auth-tabs {
+  display: flex;
+  gap: 0.3rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  padding: 0.25rem;
+  margin-bottom: 1.1rem;
+  width: fit-content;
+}
+
+.auth-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: var(--radius-pill);
+  padding: 0.5rem 1rem;
+  color: rgba(9, 8, 7, 0.55);
+  font-size: 0.86rem;
+  font-weight: 620;
+  transition: background var(--motion-base) var(--ease-premium), color var(--motion-base) var(--ease-premium);
+}
+
+.auth-tab.is-active {
+  background: #111214;
+  color: #fafaf8;
+}
+
+/* Ошибка поля: рамка у самого поля, а не только текст внизу — иначе непонятно, что править. */
+.workspace-field.is-invalid input {
+  border-color: #b91c1c;
+}
+
+.auth-error {
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(185, 28, 28, 0.28);
+  background: rgba(185, 28, 28, 0.06);
+  padding: 0.6rem 0.75rem;
+  color: #b91c1c;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.auth-success {
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(21, 128, 61, 0.28);
+  background: rgba(21, 128, 61, 0.06);
+  padding: 0.6rem 0.75rem;
+  color: #15803d;
+  font-size: 0.85rem;
+}
+
+.auth-alt {
+  color: rgba(9, 8, 7, 0.55);
+  font-size: 0.82rem;
+  font-weight: 560;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.auth-alt:hover {
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+}
+
+/* Ожидание: кнопка сообщает, что запрос идёт, а не просто гаснет. */
+.auth-spinner {
+  display: inline-block;
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: auth-spin 0.7s linear infinite;
+}
+
+@keyframes auth-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Профиль */
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.profile-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.6rem;
+  height: 3.6rem;
+  border-radius: 50%;
+  background: #111214;
+  color: #fafaf8;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.profile-name {
+  font-size: 1.35rem;
+  font-weight: 680;
+  overflow-wrap: anywhere;
+}
+
+.profile-email {
+  color: rgba(9, 8, 7, 0.55);
+  font-size: 0.9rem;
+}
+
+.profile-facts {
+  display: grid;
+  gap: 0.7rem;
+  max-width: 34rem;
+}
+
+.profile-facts > div {
+  display: grid;
+  grid-template-columns: 13rem 1fr;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.profile-facts dt {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: rgba(9, 8, 7, 0.48);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.profile-facts dd {
+  font-size: 0.9rem;
+  font-weight: 560;
+}
+
+@media (max-width: 600px) {
+  .profile-facts > div { grid-template-columns: 1fr; }
+  .shell-avatar-name { display: none; }
+  .shell-header-signup span { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-menu { animation: none; }
+  .auth-spinner { animation-duration: 2s; }
+}

@@ -98,11 +98,14 @@ test.describe("аккаунты", () => {
   });
 
   test("страница входа просит код и объясняет отказ", async ({ page }) => {
+    // Вход по коду стал восстановлением и живёт за ссылкой «Забыли пароль?»: основной путь
+    // теперь пароль.
     await page.goto("/app/login");
+    await page.getByRole("button", { name: /Забыли пароль/ }).click();
     await expect(page.getByRole("button", { name: "Получить код" })).toBeVisible();
 
     const email = account();
-    const field = page.getByLabel("Почта");
+    const field = page.getByLabel("Почта", { exact: true });
     const submit = page.getByRole("button", { name: "Получить код" });
     // Поле управляемое: значение, вписанное до того, как React навесит onChange, стирается
     // гидратацией, и кнопка остаётся выключенной. Тот же приём, что в createProjectViaForm —
@@ -116,8 +119,8 @@ test.describe("аккаунты", () => {
     // Второй шаг на той же странице: человек не уходит из вкладки, в которой начал.
     await expect(page.getByLabel("Код из письма")).toBeVisible();
     await page.getByLabel("Код из письма").fill("000000");
-    await page.getByRole("button", { name: "Войти" }).click();
-    await expect(page.locator(LOGIN_ERROR)).toContainText("Неверный код");
+    await page.getByRole("button", { name: /Подтвердить код/ }).click();
+    await expect(page.locator(".auth-error")).toContainText("Неверный код");
   });
 
   test("проект с устройства переходит в аккаунт, и локальная копия убирается", async ({ page }) => {
@@ -207,7 +210,8 @@ test.describe("аккаунты", () => {
 
     // Кнопка стоит вплотную к навигации, и цена промаха несимметрична: выйти — секунда,
     // вернуться — новый код из письма.
-    await page.getByRole("button", { name: "Выйти из аккаунта" }).click();
+    await page.locator(".shell-avatar").click();
+    await page.getByRole("menuitem", { name: "Выйти" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText("Выйти из аккаунта?");
@@ -222,7 +226,8 @@ test.describe("аккаунты", () => {
   test("подтверждение выхода действительно выводит", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "desktop", "кнопка выхода живёт в закреплённой панели");
     await signIn(page, account());
-    await page.getByRole("button", { name: "Выйти из аккаунта" }).click();
+    await page.locator(".shell-avatar").click();
+    await page.getByRole("menuitem", { name: "Выйти" }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Подтвердить выход" }).click();
 
     await expect(page.locator(NOTICE).first()).toContainText("только на этом устройстве");
@@ -257,6 +262,7 @@ test.describe("аккаунты · сайдбар", () => {
     // откуда посетитель может войти.
     await page.goto("/");
     await expect(page.getByRole("link", { name: "Войти в аккаунт" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Регистрация/ })).toBeVisible();
 
     await signIn(page, email);
 

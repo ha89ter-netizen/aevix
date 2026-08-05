@@ -8,8 +8,18 @@ create table if not exists users (
   -- Всегда в нижнем регистре: почта — это идентификатор входа, и «Ivan@» с «ivan@» обязаны
   -- быть одним человеком, иначе один и тот же адрес заведёт два аккаунта с разными проектами.
   email       text unique not null,
+  -- Отображаемое имя. Пусто у аккаунтов, заведённых до регистрации с именем: интерфейс в этом
+  -- случае показывает почту, а не пустоту.
+  name        text,
+  -- scrypt: соль и хеш в одной строке. Пусто у аккаунтов, заведённых до появления паролей —
+  -- они входят по коду из письма и задают пароль в настройках.
+  password    text,
   created_at  timestamptz not null default now()
 );
+
+-- Для баз, созданных до имени и пароля.
+alter table users add column if not exists name text;
+alter table users add column if not exists password text;
 
 create table if not exists projects (
   id          text primary key,
