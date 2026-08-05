@@ -94,7 +94,16 @@ export type Project = {
    * под заявки, даже когда бизнесу нужна запись.
    */
   goals: ConceptGoal[];
-  sections: ConceptSectionType[];
+  /**
+   * Подтверждённая человеком структура сайта: упорядоченный список разделов с названиями.
+   *
+   * Раньше это был просто набор галочек `ConceptSectionType[]`. Порядок и название появились,
+   * когда мастер стал предлагать структуру, а человек — её править: без них «переставить» и
+   * «переименовать» были бы обманом, правка не пережила бы сохранение.
+   *
+   * Старая форма (массив строк) читается нормализацией как прежде — см. project-schema.
+   */
+  sections: ProjectSection[];
   /** Свободные пожелания к характеру сайта — уходят в запрос к модели как есть. */
   wishes: string;
   /** When the automatic first generation finished. Null while a project has never been generated
@@ -119,6 +128,9 @@ export type Project = {
   pricing: ProjectPricing | null;
 };
 
+/** Один раздел подтверждённой структуры. */
+export type ProjectSection = { type: ConceptSectionType; title: string };
+
 export type CreateProjectInput = {
   name: string;
   businessType: string;
@@ -127,7 +139,7 @@ export type CreateProjectInput = {
   preferredStyleIds?: ConceptStyleId[];
   preferredColorIds?: ConceptColorId[];
   goals?: ConceptGoal[];
-  sections?: ConceptSectionType[];
+  sections?: ProjectSection[];
   wishes?: string;
 };
 

@@ -55,7 +55,8 @@ export type ProjectBrief = {
   /** Пустые массивы — проект, созданный до того, как об этом начали спрашивать. Умолчания ниже
    * ровно те, что подставлялись жёстко, поэтому такие проекты генерируются как прежде. */
   goals?: ConceptGoal[];
-  sections?: ConceptSectionType[];
+  /** Подтверждённая структура: типы разделов и названия, которые человек мог переписать. */
+  sections?: Array<{ type: ConceptSectionType; title: string }>;
   wishes?: string;
 };
 
@@ -130,7 +131,9 @@ function conceptInputFrom(brief: ProjectBrief): WebsiteConceptInput {
     businessName: brief.name,
     styleIds: brief.styleIds,
     styleId: brief.styleIds[0] ?? knowledge.styles[0] ?? "minimal",
-    colorIds: brief.colorIds.length ? brief.colorIds : ["black", "gold"],
+    // Выбор человека всегда главнее. Без выбора берём палитру ниши, а не общий чёрно-золотой:
+    // он одинаково красил салон красоты, стоматологию и автосервис.
+    colorIds: brief.colorIds.length ? brief.colorIds : knowledge.colors,
     customColors: "",
     // Задача идёт из брифа, а не подставляется: от неё зависит, потребует ли маршрут концепта
     // секцию записи или секцию цен, то есть под что вообще строится сайт.
@@ -138,7 +141,12 @@ function conceptInputFrom(brief: ProjectBrief): WebsiteConceptInput {
     // демонстрационный адрес ниши, а он всегда алматинский.
     city: brief.city,
     goals: brief.goals?.length ? brief.goals : DEFAULT_GOALS,
-    sections: brief.sections?.length ? brief.sections : DEFAULT_SECTIONS,
+    sections: brief.sections?.length ? brief.sections.map((section) => section.type) : DEFAULT_SECTIONS,
+    // Названия разделов уходят вместе с типами: без них «переименовать» в мастере было бы
+    // украшением — правка не дошла бы до сайта.
+    sectionTitles: brief.sections?.length
+      ? Object.fromEntries(brief.sections.map((section) => [section.type, section.title]))
+      : undefined,
     // Пожелания и описание — разные вещи: первое про характер сайта, второе про бизнес. Пока
     // спрашивали только описание, оно шло и туда; теперь склеиваем, если есть оба.
     wishes: [brief.wishes, brief.description].filter(Boolean).join(". "),

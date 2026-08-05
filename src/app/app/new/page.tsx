@@ -1,18 +1,23 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useProjects } from "@/lib/projects";
+import { useProjects, type ProjectSection } from "@/lib/projects";
+import { businessKnowledgeFor } from "@/lib/business-knowledge";
+import { recommendStructure } from "@/lib/project-structure";
 import { projectHref } from "@/components/shell/shell-nav";
-import { StyleCard } from "@/components/workspace/style-card";
 import {
-  conceptBusinessTypes,
+  BusinessStep,
+  ConfirmationStep,
+  GoalsStep,
+  MAX_STYLES,
+  StructureStep,
+  VisualStyleStep,
+} from "@/components/workspace/wizard-steps";
+import {
   conceptColors,
-  conceptGoals,
-  conceptSectionOptions,
-  conceptStyles,
   MAX_CONCEPT_COLORS,
   type ConceptColorId,
   type ConceptGoal,
@@ -20,74 +25,113 @@ import {
   type ConceptStyleId,
 } from "@/lib/website-concept";
 
-const MAX_STYLES = 3;
 // A light default so the STRUCTURAL differences between styles (radius, weight, tracking,
 // shadow, density) are what the eye compares. A dark default made every card read as "dark".
 const DEFAULT_PREVIEW_COLORS: ConceptColorId[] = ["blue"];
 
+const STEPS = ["Бизнес", "Задача", "Структура", "Вид", "Готово"] as const;
+
 /**
- * A short briefing, not a configuration screen. Four facts about the business, up to three
- * visual directions chosen by eye, and one button that starts the AI working — the project is
- * never handed over empty for the visitor to assemble themselves.
+ * Бриф в пять шагов.
+ *
+ * Раньше это была одна страница с девятью группами полей и тридцатью с лишним элементами выбора
+ * до первого действия AEVIX. Половина вопросов повторяла другую половину: пять из семи задач
+ * прямо называли раздел («Показывать услуги» ↔ раздел «Услуги»), разделы при этом всё равно
+ * перекрывались обязательным набором в маршруте генерации, а описание бизнеса и пожелания к
+ * сайту склеивались в одну строку ещё до отправки модели.
+ *
+ * Теперь спрашивается только то, что нельзя вывести: чем занимается бизнес и чего владелец
+ * хочет от сайта. Категория выводится из описания, структура предлагается по нише и задачам,
+ * стиль и палитра предзаполнены по нише. Всё предложенное правится.
+ *
+ * Порядок не случаен: цвета и стиль стоят ПОСЛЕ структуры. Выбирать палитру, пока неизвестно,
+ * что за сайт получится, — решение вслепую.
+ *
+ * Состояние живёт здесь, а разметка шагов — в wizard-steps: у шагов нет своего состояния, иначе
+ * возврат назад терял бы введённое.
  */
 export default function CreateProjectPage() {
   const router = useRouter();
   const { create, generateAll } = useProjects();
 
+  const [step, setStep] = useState(0);
   const [name, setName] = useState("");
-  const [businessType, setBusinessType] = useState<string>("");
   const [city, setCity] = useState("");
   const [description, setDescription] = useState("");
+  /** Пусто — категория берётся из описания. Непусто — человек поправил догадку вручную. */
+  const [typeOverride, setTypeOverride] = useState("");
+  const [goals, setGoals] = useState<ConceptGoal[]>([]);
+  const [structure, setStructure] = useState<ProjectSection[]>([]);
   const [styleIds, setStyleIds] = useState<ConceptStyleId[]>([]);
   const [colorIds, setColorIds] = useState<ConceptColorId[]>([]);
-  // Задача и разделы предзаполнены разумным набором, а не пусты: бриф должен идти быстро, а
-  // человек, которому всё равно, не должен упереться в обязательный выбор.
-  const [goals, setGoals] = useState<ConceptGoal[]>(["Получать заявки"]);
-  const [sections, setSections] = useState<ConceptSectionType[]>([
-    "services",
-    "pricing",
-    "about",
-    "gallery",
-    "reviews",
-    "booking",
-    "contacts",
-    "faq",
-  ]);
-  const [wishes, setWishes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const previewColors = colorIds.length ? colorIds : DEFAULT_PREVIEW_COLORS;
+  /**
+   * Категория, выведенная из описания и названия тем же сопоставлением ниш, что и генерация.
+   * Отдельным вопросом её больше не задают: человек уже написал, чем занимается.
+   */
+  const knowledge = useMemo(
+    () => businessKnowledgeFor(typeOverride || description || name, name),
+    [typeOverride, description, name],
+  );
+  const businessType = typeOverride || (knowledge.id === "generic" ? "" : knowledge.label);
 
-  const toggleStyle = (id: ConceptStyleId) => {
+  const previewColors = colorIds.length ? colorIds : DEFAULT_PREVIEW_COLORS;
+  /** Что покажет сводка, если человек не выбрал цвета: имена реальной палитры ниши. */
+  const nichePalette = knowledge.colors
+    .map((id) => conceptColors.find((color) => color.id === id)?.label ?? id)
+    .join(" + ");
+
+  /**
+   * Структура пересобирается, когда меняется то, из чего она выведена, — и только тогда.
+   * Иначе возврат на шаг назад стирал бы правки человека без спроса.
+   */
+  const signature = `${businessType}|${goals.join(",")}`;
+  const builtFor = useRef<string | null>(null);
+  const enterStructure = () => {
+    if (builtFor.current !== signature) {
+      setStructure(recommendStructure(businessType, name, goals));
+      builtFor.current = signature;
+    }
+    setStep(2);
+  };
+
+  const toggleGoal = (goal: ConceptGoal) =>
+    setGoals((current) => (current.includes(goal) ? current.filter((item) => item !== goal) : [...current, goal]));
+
+  const toggleStyle = (id: ConceptStyleId) =>
     setStyleIds((current) => {
       if (current.includes(id)) return current.filter((styleId) => styleId !== id);
       if (current.length >= MAX_STYLES) return current;
       return [...current, id];
     });
-  };
 
-  const toggleColor = (id: ConceptColorId) => {
+  const toggleColor = (id: ConceptColorId) =>
     setColorIds((current) => {
       if (current.includes(id)) return current.filter((colorId) => colorId !== id);
       if (current.length >= MAX_CONCEPT_COLORS) return current;
       return [...current, id];
     });
-  };
 
-  const toggleGoal = (goal: ConceptGoal) => {
-    setGoals((current) => (current.includes(goal) ? current.filter((item) => item !== goal) : [...current, goal]));
-  };
+  const removeSection = (index: number) => setStructure((current) => current.filter((_, i) => i !== index));
+  const renameSection = (index: number, title: string) =>
+    setStructure((current) => current.map((section, i) => (i === index ? { ...section, title } : section)));
+  const moveSection = (index: number, delta: number) =>
+    setStructure((current) => {
+      const next = [...current];
+      const target = index + delta;
+      if (target < 0 || target >= next.length) return current;
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  const addSection = (type: ConceptSectionType, title: string) =>
+    setStructure((current) => [...current, { type, title }]);
 
-  const toggleSection = (id: ConceptSectionType) => {
-    setSections((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
-  };
+  const canLeaveBusiness = name.trim().length > 0;
+  const canLeaveGoals = goals.length > 0;
+  const canSubmit = canLeaveBusiness && canLeaveGoals && structure.length > 0 && !submitting;
 
-  // Те же пороги, что были у мастера на лендинге: без задачи сайт не под что строить, а меньше
-  // трёх разделов — это не сайт, а визитка.
-  const canSubmit = name.trim().length > 0 && goals.length > 0 && sections.length >= 3 && !submitting;
-
-  const handleSubmit = (event: FormEvent) => {
-    event.preventDefault();
+  const start = () => {
     if (!canSubmit) return;
     setSubmitting(true);
     const project = create({
@@ -98,8 +142,7 @@ export default function CreateProjectPage() {
       preferredStyleIds: styleIds,
       preferredColorIds: colorIds,
       goals,
-      sections,
-      wishes: wishes.trim(),
+      sections: structure,
     });
     // Generation runs on the provider, so navigating to the project immediately does not
     // interrupt it — the project page picks the run up and shows its progress.
@@ -110,183 +153,113 @@ export default function CreateProjectPage() {
   return (
     <div className="workspace-page">
       <header className="brief-header">
-        <p className="brief-eyebrow">Бриф для AI</p>
-        <h2 className="brief-title">Расскажите о бизнесе</h2>
-        <p className="brief-lead">
-          Расскажите о бизнесе, выберите задачу сайта и его характер — дальше AEVIX соберёт анализ, сайт, процесс и
-          стоимость самостоятельно.
-        </p>
+        <p className="brief-eyebrow">Бриф для AEVIX</p>
+        <h2 className="brief-title">{step === 4 ? "Всё готово" : "Расскажите о бизнесе"}</h2>
+        <ol className="brief-steps" aria-label={`Шаг ${step + 1} из ${STEPS.length}`}>
+          {STEPS.map((label, index) => (
+            <li key={label} className={cn("brief-step", index === step && "is-active", index < step && "is-done")}>
+              <span className="brief-step-dot">{index < step ? <Check className="h-3 w-3" /> : index + 1}</span>
+              {label}
+            </li>
+          ))}
+        </ol>
       </header>
 
-      <form className="workspace-create-form" onSubmit={handleSubmit}>
-        <div className="brief-grid">
-          <label className="workspace-field">
-            <span className="workspace-field-label">Название бизнеса *</span>
-            <input
-              type="text"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Например: Барбершоп FORMA"
-              maxLength={80}
-              required
-            />
-          </label>
-
-          <label className="workspace-field">
-            <span className="workspace-field-label">Город</span>
-            <input
-              type="text"
-              value={city}
-              onChange={(event) => setCity(event.target.value)}
-              placeholder="Например: Алматы"
-              maxLength={60}
-            />
-          </label>
-        </div>
-
-        <div className="workspace-field">
-          <span className="workspace-field-label">Категория</span>
-          <div className="workspace-chip-row" role="group" aria-label="Категория бизнеса">
-            {conceptBusinessTypes.map((type) => (
-              <button
-                key={type}
-                type="button"
-                className={cn("workspace-chip", businessType === type && "is-active")}
-                aria-pressed={businessType === type}
-                onClick={() => setBusinessType((current) => (current === type ? "" : type))}
-              >
-                {type}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <label className="workspace-field">
-          <span className="workspace-field-label">Коротко о бизнесе</span>
-          <textarea
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            placeholder="Чем занимаетесь, кто клиенты, что сейчас отнимает больше всего времени…"
-            rows={3}
-            maxLength={600}
+      <div className="workspace-create-form">
+        {step === 0 ? (
+          <BusinessStep
+            name={name}
+            city={city}
+            description={description}
+            businessType={businessType}
+            onName={setName}
+            onCity={setCity}
+            onDescription={setDescription}
+            onType={(type) => setTypeOverride((current) => (current === type ? "" : type))}
           />
-          <span className="workspace-field-hint">Чем конкретнее описание, тем точнее AI соберёт проект.</span>
-        </label>
+        ) : null}
 
-        <div className="workspace-field">
-          <span className="workspace-field-label">
-            Визуальное направление{" "}
-            <em>
-              {styleIds.length}/{MAX_STYLES}
-            </em>
-          </span>
-          <span className="workspace-field-hint">Выберите от одного до трёх — превью показывает реальный результат.</span>
-          <div className="style-card-grid" role="group" aria-label="Визуальный стиль">
-            {conceptStyles.map((style) => (
-              <StyleCard
-                key={style.id}
-                styleId={style.id}
-                label={style.label}
-                colorIds={previewColors}
-                selected={styleIds.includes(style.id)}
-                disabled={styleIds.length >= MAX_STYLES}
-                onToggle={() => toggleStyle(style.id)}
-              />
-            ))}
-          </div>
-        </div>
+        {step === 1 ? <GoalsStep goals={goals} onToggle={toggleGoal} /> : null}
 
-        <div className="workspace-field">
-          <span className="workspace-field-label">
-            Цвета бренда{" "}
-            <em>
-              {colorIds.length}/{MAX_CONCEPT_COLORS}
-            </em>
-          </span>
-          <div className="workspace-swatch-grid" role="group" aria-label="Цвета">
-            {conceptColors.map((color) => {
-              const selected = colorIds.includes(color.id);
-              return (
-                <button
-                  key={color.id}
-                  type="button"
-                  className={cn("workspace-swatch", selected && "is-active")}
-                  aria-pressed={selected}
-                  title={color.label}
-                  aria-label={color.label}
-                  onClick={() => toggleColor(color.id)}
-                >
-                  <i style={{ background: color.swatch }} />
-                  {selected ? <Check className="h-3 w-3" /> : null}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Задача сайта. Раньше её не спрашивали здесь вовсе, а подставляли «Получать заявки» —
-            и каждый проект из Workspace строился под заявки, даже когда бизнесу нужна запись.
-            От этого выбора зависит, потребует ли генерация секцию записи или секцию цен. */}
-        <div className="workspace-field">
-          <span className="workspace-field-label">Задача сайта *</span>
-          <div className="workspace-chip-row" role="group" aria-label="Задача сайта">
-            {conceptGoals.map((goal) => (
-              <button
-                key={goal}
-                type="button"
-                className={cn("workspace-chip", goals.includes(goal) && "is-active")}
-                aria-pressed={goals.includes(goal)}
-                onClick={() => toggleGoal(goal)}
-              >
-                {goals.includes(goal) ? <Check className="h-3 w-3" /> : null}
-                {goal}
-              </button>
-            ))}
-          </div>
-          <p className="workspace-field-hint">Можно выбрать несколько — от этого зависит структура сайта.</p>
-        </div>
-
-        <div className="workspace-field">
-          <span className="workspace-field-label">
-            Разделы сайта <em>{sections.length}</em>
-          </span>
-          <div className="workspace-chip-row" role="group" aria-label="Разделы сайта">
-            {conceptSectionOptions.map((section) => (
-              <button
-                key={section.id}
-                type="button"
-                className={cn("workspace-chip", sections.includes(section.id) && "is-active")}
-                aria-pressed={sections.includes(section.id)}
-                onClick={() => toggleSection(section.id)}
-              >
-                {sections.includes(section.id) ? <Check className="h-3 w-3" /> : null}
-                {section.label}
-              </button>
-            ))}
-          </div>
-          <p className="workspace-field-hint">Не меньше трёх. AI сам решит, на каких страницах их разместить.</p>
-        </div>
-
-        <label className="workspace-field">
-          <span className="workspace-field-label">Пожелания к сайту</span>
-          <textarea
-            value={wishes}
-            onChange={(event) => setWishes(event.target.value)}
-            placeholder="Что важно передать в характере сайта? Например: больше воздуха, тёплые акценты"
-            maxLength={700}
-            rows={3}
+        {step === 2 ? (
+          <StructureStep
+            name={name}
+            city={city}
+            businessType={businessType}
+            goals={goals}
+            structure={structure}
+            onRename={renameSection}
+            onRemove={removeSection}
+            onMove={moveSection}
+            onAdd={addSection}
           />
-          <span className="workspace-field-hint">Необязательно. Это про характер сайта, а не про бизнес.</span>
-        </label>
+        ) : null}
 
-        <button type="submit" className="workspace-create-submit" disabled={!canSubmit}>
-          <Sparkles className="h-4 w-4" />
-          {submitting ? "Запускаем AI…" : "Создать проект"}
-        </button>
-        <p className="workspace-storage-notice">
-          AEVIX сразу соберёт анализ, сайт, процесс и стоимость — открывать пустой проект не придётся.
-        </p>
-      </form>
+        {step === 3 ? (
+          <VisualStyleStep
+            styleIds={styleIds}
+            colorIds={colorIds}
+            previewColors={previewColors}
+            onToggleStyle={toggleStyle}
+            onToggleColor={toggleColor}
+          />
+        ) : null}
+
+        {step === 4 ? (
+          <ConfirmationStep
+            name={name}
+            city={city}
+            businessType={businessType}
+            goals={goals}
+            structure={structure}
+            styleIds={styleIds}
+            colorIds={colorIds}
+            nichePalette={nichePalette}
+          />
+        ) : null}
+
+        <div className="brief-nav">
+          {step > 0 ? (
+            <button type="button" className="brief-back" onClick={() => setStep((current) => current - 1)}>
+              <ArrowLeft className="h-4 w-4" /> Назад
+            </button>
+          ) : (
+            <span />
+          )}
+
+          {step === 0 ? (
+            <button type="button" className="workspace-create-submit" disabled={!canLeaveBusiness} onClick={() => setStep(1)}>
+              Дальше <ArrowRight className="h-4 w-4" />
+            </button>
+          ) : null}
+          {step === 1 ? (
+            <button type="button" className="workspace-create-submit" disabled={!canLeaveGoals} onClick={enterStructure}>
+              Показать структуру <ArrowRight className="h-4 w-4" />
+            </button>
+          ) : null}
+          {step === 2 ? (
+            <button
+              type="button"
+              className="workspace-create-submit"
+              disabled={!structure.length}
+              onClick={() => setStep(3)}
+            >
+              Дальше <ArrowRight className="h-4 w-4" />
+            </button>
+          ) : null}
+          {step === 3 ? (
+            <button type="button" className="workspace-create-submit" onClick={() => setStep(4)}>
+              Дальше <ArrowRight className="h-4 w-4" />
+            </button>
+          ) : null}
+          {step === 4 ? (
+            <button type="button" className="workspace-create-submit" disabled={!canSubmit} onClick={start}>
+              <Sparkles className="h-4 w-4" />
+              {submitting ? "Запускаем AI…" : "Создать проект"}
+            </button>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }

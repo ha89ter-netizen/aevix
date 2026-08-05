@@ -7962,3 +7962,195 @@ a.shell-account:hover {
   margin-top: -0.9rem;
   justify-content: center;
 }
+
+/* ---- Мастер создания проекта: шаги, структура, сводка ---- */
+
+.brief-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.1rem;
+  margin-top: 0.9rem;
+}
+
+.brief-step {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: rgba(9, 8, 7, 0.38);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.brief-step.is-active {
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+}
+
+.brief-step.is-done {
+  color: rgba(9, 8, 7, 0.62);
+}
+
+.brief-step-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  font-size: 0.7rem;
+}
+
+.brief-step.is-active .brief-step-dot {
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.12);
+}
+
+/* Догадка о категории: подсказка, а не приговор — рядом стоят кнопки, чтобы поправить. */
+.brief-detected {
+  color: rgba(9, 8, 7, 0.62);
+  font-size: 0.86rem;
+}
+
+.brief-structure {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.3rem;
+}
+
+.brief-structure-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 0.45rem 0.6rem;
+}
+
+.brief-structure-order {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.brief-structure-order button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  padding: 0.1rem;
+  color: rgba(9, 8, 7, 0.45);
+}
+
+.brief-structure-order button:hover:not(:disabled) {
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+}
+
+.brief-structure-order button:disabled {
+  opacity: 0.3;
+}
+
+/* Название редактируется на месте: отдельный режим правки был бы лишним шагом. */
+.brief-structure-title {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  font-size: 0.92rem;
+  font-weight: 560;
+}
+
+.brief-structure-title:focus-visible {
+  outline: 2px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.5);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.brief-structure-remove {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  padding: 0.3rem;
+  color: rgba(9, 8, 7, 0.42);
+}
+
+.brief-structure-remove:hover {
+  background: rgba(185, 28, 28, 0.08);
+  color: #b91c1c;
+}
+
+.brief-summary {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.3rem;
+}
+
+.brief-summary > div {
+  display: grid;
+  gap: 0.15rem;
+  grid-template-columns: 9rem 1fr;
+  align-items: baseline;
+}
+
+.brief-summary dt {
+  color: rgba(9, 8, 7, 0.45);
+  font-size: 0.78rem;
+  font-weight: 620;
+}
+
+.brief-summary dd {
+  font-size: 0.9rem;
+}
+
+@media (max-width: 600px) {
+  .brief-summary > div {
+    grid-template-columns: 1fr;
+  }
+}
+
+.brief-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+
+.brief-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  padding: 0.55rem 1rem;
+  color: rgba(9, 8, 7, 0.7);
+  font-size: 0.86rem;
+  font-weight: 620;
+}
+
+.brief-back:hover {
+  border-color: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.5);
+}
+
+/* Кнопка «дальше» в мастере — не на всю ширину: рядом с ней стоит «назад». */
+.brief-nav .workspace-create-submit {
+  width: auto;
+}
+
+/* Блок понимания на шаге структуры: что AEVIX принял во внимание, прежде чем предлагать. */
+.brief-understanding {
+  display: grid;
+  gap: 0.6rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.22);
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.06);
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.brief-understanding-lead {
+  color: rgba(9, 8, 7, 0.72);
+  font-size: 0.86rem;
+  font-weight: 560;
+}

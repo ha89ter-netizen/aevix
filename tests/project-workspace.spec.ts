@@ -61,22 +61,28 @@ async function mockAnalysis(page: Page) {
 }
 
 /**
- * Creates a project through the real /app/new form and returns its URL. The controlled name
- * input can swallow a .fill() that lands before hydration settles (React resets the DOM value
- * on its first render) — the submit button enables only once React state actually has the name,
- * so retry the fill until that happens.
+ * Проходит мастер целиком и возвращает URL проекта.
+ *
+ * Мастер стал пятишаговым, поэтому помощник ведёт по шагам, а не заполняет одну форму.
+ * Управляемое поле имени по-прежнему может проглотить ввод до гидратации — отсюда повтор.
  */
-async function createProjectViaForm(page: Page, name: string) {
+async function completeWizard(page: Page, name: string, goal = "Получать заявки") {
   await page.goto("/app/new");
   const field = page.getByPlaceholder("Например: Барбершоп FORMA");
-  const submit = page.getByRole("button", { name: "Создать проект" });
+  const next = page.getByRole("button", { name: /Дальше/ });
   await expect(async () => {
     await field.fill(name);
-    await expect(submit).toBeEnabled({ timeout: 500 });
+    await expect(next).toBeEnabled({ timeout: 500 });
   }).toPass({ timeout: 15_000 });
-  await submit.click();
-  await page.waitForURL(/\/app\/projects\/.+/);
-  // Generation runs on arrival; callers assume a settled project.
+  await next.click();
+
+  await page.getByRole("button", { name: goal, exact: true }).click();
+  await page.getByRole("button", { name: /Показать структуру/ }).click();
+  await expect(page.locator(".brief-structure-row").first()).toBeVisible();
+  await page.getByRole("button", { name: /Дальше/ }).click();   // структура -> вид
+  await page.getByRole("button", { name: /Дальше/ }).click();   // вид -> подтверждение
+  await page.getByRole("button", { name: /Создать проект/ }).click();
+  await page.waitForURL(/\/app\/projects\/[^/]+$/);
   await expect(page.locator(".overview-card-grid")).toBeVisible({ timeout: 20_000 });
   return page.url();
 }
@@ -148,58 +154,148 @@ test.describe("navigation surface", () => {
 });
 
 test.describe("project creation", () => {
-  test("the Create Project form creates, saves and opens the project", async ({ page }) => {
+  test("мастер собирает проект за пять шагов, без повторяющихся вопросов", async ({ page }) => {
     await page.goto("/app/new");
     const field = page.getByPlaceholder("Например: Барбершоп FORMA");
+    const next = page.getByRole("button", { name: /Дальше/ });
     await expect(async () => {
       await field.fill("Барбершоп на Абая");
-      await expect(page.getByRole("button", { name: "Создать проект" })).toBeEnabled({ timeout: 500 });
+      await expect(next).toBeEnabled({ timeout: 500 });
     }).toPass({ timeout: 15_000 });
-    await page.getByRole("button", { name: "Барбершоп", exact: true }).click();
-    await page.getByPlaceholder("Например: Алматы").fill("Алматы");
-    await page.getByRole("button", { name: "Минимализм", exact: true }).click();
-    await page.getByRole("button", { name: "Чёрный", exact: true }).click();
-    await page.getByRole("button", { name: "Золотой", exact: true }).click();
-    await page.getByRole("button", { name: "Создать проект" }).click();
+    await page.getByPlaceholder("Например: Астана").fill("Астана");
+    await page.getByPlaceholder(/Чем занимаетесь/).fill("Барбершоп на три кресла, запись вручную");
+
+    // Категория выводится из описания, а не спрашивается отдельным вопросом.
+    await expect(page.locator(".brief-detected")).toContainText("Барбершоп");
+    await next.click();
+
+    // Разделы на шаге задач НЕ спрашиваются: это был тот же вопрос другими словами.
+    await expect(page.getByRole("button", { name: "Галерея", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Записывать клиентов", exact: true }).click();
+    await page.getByRole("button", { name: /Показать структуру/ }).click();
+
+    // Структура зависит от ниши и задач: у барбершопа нет меню, но есть запись.
+    const titles = await page.locator(".brief-structure-title").evaluateAll((els) =>
+      els.map((el) => (el as HTMLInputElement).value),
+    );
+    expect(titles).toContain("Запись");
+    expect(titles.join(" ")).not.toContain("Меню");
+
+    // Честность формулировок: модель на этом шаге не вызывается, и обещать её нельзя.
+    const text = await page.locator(".workspace-create-form").innerText();
+    // Согласованная формулировка: модель на этом шаге не вызывается, поэтому «сформировал
+    // рекомендации», а не «проанализировал».
+    expect(text).toContain("AEVIX сформировал рекомендации");
+    expect(text).not.toMatch(/AI (понял|проанализировал|создал)/);
+
+    await page.getByRole("button", { name: /Дальше/ }).click();
+    await page.getByRole("button", { name: /Дальше/ }).click();
+    await page.getByRole("button", { name: /Создать проект/ }).click();
 
     await page.waitForURL(/\/app\/projects\/.+/);
-    // Creating a project now starts generation, and the Overview shows the generation screen
-    // until it finishes. Waiting for the finished layout first stops the assertions below from
-    // racing that work with their default 5s budget.
     await expect(page.locator(".overview-card-grid")).toBeVisible({ timeout: 20_000 });
     await expect(page.locator(".workspace-project-name")).toHaveText("Барбершоп на Абая");
-    await expect(page.locator(".overview-facts")).toContainText("Барбершоп");
-    await expect(page.locator(".overview-facts")).toContainText("Алматы");
-
-    // Visible on the dashboard with the collected fields, via a FULL page load (not client-side
-    // navigation) — proves the project was persisted, not just held in memory. Retried because
-    // the form's router.push can still be settling when this goto starts.
-    await expect(async () => {
-      await page.goto("/app/projects");
-    }).toPass({ timeout: 15_000 });
-    const card = page.locator(".workspace-project-card");
-    await expect(card).toHaveCount(1);
-    await expect(card.locator(".workspace-project-card-name")).toHaveText("Барбершоп на Абая");
-    await expect(card.locator(".workspace-project-card-type")).toContainText("Барбершоп · Алматы");
-    // Creation now generates everything up front, so a brand-new project is already complete.
-    await expect(card.locator(".workspace-status-badge")).toHaveText("Готов");
   });
 
-  test("submit is disabled until a business name is entered", async ({ page }) => {
+  test("без выбора цветов проект получает палитру ниши, а не общий чёрно-золотой", async ({ page }) => {
+    // Раньше на этот случай стоял один `["black", "gold"]` на все ниши: салон красоты,
+    // стоматология и автосервис получали одинаковый сайт.
     await page.goto("/app/new");
-    const submit = page.getByRole("button", { name: "Создать проект" });
-    await expect(submit).toBeDisabled();
+    const field = page.getByPlaceholder("Например: Барбершоп FORMA");
+    const next = page.getByRole("button", { name: /Дальше/ });
     await expect(async () => {
-      await page.getByPlaceholder("Например: Барбершоп FORMA").fill("X");
-      await expect(submit).toBeEnabled({ timeout: 500 });
+      await field.fill("LUMIERE");
+      await expect(next).toBeEnabled({ timeout: 500 });
     }).toPass({ timeout: 15_000 });
-  });
-});
+    await page.getByPlaceholder(/Чем занимаетесь/).fill("Салон красоты, уход и окрашивание");
+    await next.click();
+    await page.getByRole("button", { name: "Получать заявки", exact: true }).click();
+    await page.getByRole("button", { name: /Показать структуру/ }).click();
+    await page.getByRole("button", { name: /Дальше/ }).click();
+    await page.getByRole("button", { name: /Дальше/ }).click();
 
-test.describe("saving module state into a project", () => {
+    // Сводка называет реальную палитру, а не обещает «что-нибудь подберём».
+    await expect(page.locator(".brief-summary")).toContainText("палитра ниши");
+    await page.getByRole("button", { name: /Создать проект/ }).click();
+    await page.waitForURL(/\/app\/projects\/.+/);
+    await expect(page.locator(".overview-card-grid")).toBeVisible({ timeout: 20_000 });
+
+    const colors = await page.evaluate(() => {
+      const raw = window.localStorage.getItem("aevix.projects");
+      return raw ? JSON.parse(raw).projects[0].design?.colorIds : null;
+    });
+    expect(colors).not.toEqual(["black", "gold"]);
+    expect(colors).toContain("pink");
+  });
+
+  test("блок понимания на шаге структуры показывает собранное и обновляется при возврате", async ({ page }) => {
+    await page.goto("/app/new");
+    const field = page.getByPlaceholder("Например: Барбершоп FORMA");
+    const next = page.getByRole("button", { name: /Дальше/ });
+    await expect(async () => {
+      await field.fill("LUMIERE");
+      await expect(next).toBeEnabled({ timeout: 500 });
+    }).toPass({ timeout: 15_000 });
+    await page.getByPlaceholder("Например: Астана").fill("Астана");
+    await page.getByPlaceholder(/Чем занимаетесь/).fill("Салон красоты, уход и окрашивание");
+    await next.click();
+    await page.getByRole("button", { name: "Записывать клиентов", exact: true }).click();
+    await page.getByRole("button", { name: /Показать структуру/ }).click();
+
+    const block = page.locator(".brief-understanding");
+    await expect(block).toContainText("LUMIERE");
+    await expect(block).toContainText("Салон красоты");
+    await expect(block).toContainText("Астана");
+    await expect(block).toContainText("Записывать клиентов");
+    // Модель на этом шаге не вызывается — обещать её анализ нельзя.
+    await expect(block).toContainText("сформировал рекомендации");
+    await expect(block).not.toContainText("проанализировал");
+
+    // Возврат и правка города обязаны отразиться в блоке.
+    await page.getByRole("button", { name: /Назад/ }).click();
+    await page.getByRole("button", { name: /Назад/ }).click();
+    await page.getByPlaceholder("Например: Астана").fill("Алматы");
+    await page.getByRole("button", { name: /Дальше/ }).click();
+    await page.getByRole("button", { name: /Показать структуру/ }).click();
+    await expect(page.locator(".brief-understanding")).toContainText("Алматы");
+  });
+
+  test("правки структуры доходят до проекта", async ({ page }) => {
+    await page.goto("/app/new");
+    const field = page.getByPlaceholder("Например: Барбершоп FORMA");
+    const next = page.getByRole("button", { name: /Дальше/ });
+    await expect(async () => {
+      await field.fill("LUMIERE");
+      await expect(next).toBeEnabled({ timeout: 500 });
+    }).toPass({ timeout: 15_000 });
+    await page.getByPlaceholder(/Чем занимаетесь/).fill("Салон красоты, уход и окрашивание");
+    await next.click();
+    await page.getByRole("button", { name: "Записывать клиентов", exact: true }).click();
+    await page.getByRole("button", { name: /Показать структуру/ }).click();
+
+    const before = await page.locator(".brief-structure-row").count();
+    // Удаляем раздел и переименовываем первый оставшийся — обе правки должны пережить создание.
+    await page.locator(".brief-structure-remove").last().click();
+    await expect(page.locator(".brief-structure-row")).toHaveCount(before - 1);
+    await page.locator(".brief-structure-title").first().fill("Наши мастера");
+
+    await page.getByRole("button", { name: /Дальше/ }).click();
+    await page.getByRole("button", { name: /Дальше/ }).click();
+    await page.getByRole("button", { name: /Создать проект/ }).click();
+    await page.waitForURL(/\/app\/projects\/.+/);
+    await expect(page.locator(".overview-card-grid")).toBeVisible({ timeout: 20_000 });
+
+    const saved = await page.evaluate(() => {
+      const raw = window.localStorage.getItem("aevix.projects");
+      return raw ? JSON.parse(raw).projects[0].sections : null;
+    });
+    expect(saved).toHaveLength(before - 1);
+    expect(saved[0].title).toBe("Наши мастера");
+  });
+
   test("an AI Consultant result is saved and shown on Overview without regenerating", async ({ page }) => {
     await mockAnalysis(page);
-    const projectUrl = await createProjectViaForm(page, "AI Test Project");
+    const projectUrl = await completeWizard(page, "AI Test Project");
 
     await page.goto(`${projectUrl}/ai-consultant`);
 
@@ -459,7 +555,7 @@ test.describe("saving module state into a project", () => {
   });
 
   test("pricing selections and calculated result persist across a reload", async ({ page }) => {
-    const projectUrl = await createProjectViaForm(page, "Pricing Test Project");
+    const projectUrl = await completeWizard(page, "Pricing Test Project");
 
     await page.goto(`${projectUrl}/pricing`);
     await page.getByRole("button", { name: "Открыть калькулятор" }).click();
@@ -490,14 +586,14 @@ test.describe("project card actions", () => {
       await route.continue();
     });
 
-    await createProjectViaForm(page, "Создан во время проверки входа");
+    await completeWizard(page, "Создан во время проверки входа");
     await expect(page.locator(".workspace-project-name")).toHaveText("Создан во время проверки входа");
   });
 
   test("renaming through the three-dot menu updates immediately", async ({ page }) => {
     // Created through the UI, not seeded — addInitScript re-applies its seed on every reload,
     // which would silently undo the rename before the persistence assertion below.
-    await createProjectViaForm(page, "Old Name");
+    await completeWizard(page, "Old Name");
     await page.goto("/app/projects");
 
     await page.getByRole("button", { name: /Действия с проектом/ }).click();
@@ -539,7 +635,7 @@ test.describe("project card actions", () => {
   test("delete requires confirmation and removes the project", async ({ page }) => {
     // Created through the UI, not seeded — addInitScript would re-seed the deleted project on
     // reload and break the "stays gone after refresh" assertion.
-    await createProjectViaForm(page, "To Delete");
+    await completeWizard(page, "To Delete");
     await page.goto("/app/projects");
     await expect(page.locator(".workspace-project-card")).toHaveCount(1);
 

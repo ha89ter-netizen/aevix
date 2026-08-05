@@ -27,6 +27,10 @@ const knownStyleIds = new Set<string>(conceptStyles.map((style) => style.id));
 const knownColorIds = new Set<string>(conceptColors.map((color) => color.id));
 const knownGoals = new Set<string>(conceptGoals);
 const knownSectionTypes = new Set<string>(conceptSectionOptions.map((option) => option.id));
+/** Названия по умолчанию для разделов, поднятых из старой формы записи. */
+const DEFAULT_SECTION_TITLES = Object.fromEntries(
+  conceptSectionOptions.map((option) => [option.id, option.label]),
+) as Record<ConceptSectionType, string>;
 
 /**
  * Normalizing instead of strictly validating: id/name/timestamps are required (a project without
@@ -60,8 +64,28 @@ export function normalizeProject(value: unknown): Project | null {
   const goals = Array.isArray(value.goals)
     ? (value.goals.filter((goal): goal is ConceptGoal => typeof goal === "string" && knownGoals.has(goal)))
     : [];
-  const sections = Array.isArray(value.sections)
-    ? (value.sections.filter((type): type is ConceptSectionType => typeof type === "string" && knownSectionTypes.has(type)))
+  /**
+   * Разделы читаются в двух формах. Старая — просто массив типов, какой писали, пока структуру
+   * не спрашивали, а отмечали галочками. Новая — упорядоченный список с названиями, появившийся
+   * вместе с правкой структуры в мастере.
+   *
+   * Старая форма поднимается до новой с названием по умолчанию, а не отбрасывается: у проекта,
+   * созданного вчера, разделы должны остаться на месте.
+   */
+  const sections: Project["sections"] = Array.isArray(value.sections)
+    ? value.sections
+        .map((item) => {
+          if (typeof item === "string") {
+            return knownSectionTypes.has(item)
+              ? { type: item as ConceptSectionType, title: DEFAULT_SECTION_TITLES[item as ConceptSectionType] }
+              : null;
+          }
+          if (!isRecord(item) || typeof item.type !== "string" || !knownSectionTypes.has(item.type)) return null;
+          const type = item.type as ConceptSectionType;
+          const title = typeof item.title === "string" && item.title.trim() ? item.title.trim().slice(0, 60) : DEFAULT_SECTION_TITLES[type];
+          return { type, title };
+        })
+        .filter((section): section is Project["sections"][number] => section !== null)
     : [];
 
   return {

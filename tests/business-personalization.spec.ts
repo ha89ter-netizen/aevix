@@ -61,7 +61,10 @@ test.describe("recommended badge", () => {
     await page.addStyleTag({ content: "[data-reveal]{opacity:1!important;visibility:visible!important;transform:none!important}" });
 
     const cards = page.locator(".pricing-scene article.is-recommended");
-    await expect(cards.first()).toBeVisible();
+    // Щедрое ожидание: карточка появляется только после того, как персонализация уложится, а под
+    // нагрузкой полного прогона это дольше стандартных пяти секунд. Ждём настоящий признак, а не
+    // прикрываемся повтором.
+    await expect(cards.first()).toBeVisible({ timeout: 15_000 });
     const count = await cards.count();
     expect(count).toBeGreaterThan(0);
 

@@ -181,12 +181,24 @@ export async function POST(request: Request) {
   const knowledge = businessKnowledgeFor(input.businessType, input.businessName);
   const client = new OpenAI({ apiKey });
 
-  const requiredTypes: ConceptSectionType[] = [
+  /**
+   * Что маршрут обязан увидеть в ответе модели.
+   *
+   * Раньше этот набор был константой, и она перекрывала человека: раздел, убранный в мастере,
+   * возвращался обратно, потому что ответ без него отбраковывался. «Структуру можно править»
+   * оказывалось неправдой.
+   *
+   * Теперь берём пересечение с подтверждённой структурой. Убрал человек цены — их больше не
+   * требуем. Оставил всё — требование ровно прежнее, поэтому доля успешных генераций не падает.
+   */
+  const coreTypes: ConceptSectionType[] = [
     "services",
     "about",
     "contacts",
     input.goals.includes("Записывать клиентов") ? "booking" : "pricing",
   ];
+  const confirmed = new Set(input.sections);
+  const requiredTypes = coreTypes.filter((type) => confirmed.has(type));
 
   const startedAt = Date.now();
   /** Чего не хватило в прошлой попытке — уходит в подсказку следующей. */

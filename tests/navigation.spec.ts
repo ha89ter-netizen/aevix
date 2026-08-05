@@ -22,22 +22,31 @@ async function openNav(page: Page) {
   await expect(page.locator(SIDEBAR)).toBeVisible();
 }
 
-async function createProject(page: Page, name: string) {
+/**
+ * Проходит мастер целиком и возвращает URL проекта.
+ *
+ * Мастер стал пятишаговым, поэтому помощник ведёт по шагам, а не заполняет одну форму.
+ * Управляемое поле имени по-прежнему может проглотить ввод до гидратации — отсюда повтор.
+ */
+async function createProject(page: Page, name: string, goal = "Получать заявки") {
   await page.goto("/app/new");
   const field = page.getByPlaceholder("Например: Барбершоп FORMA");
-  const submit = page.getByRole("button", { name: "Создать проект" });
+  const next = page.getByRole("button", { name: /Дальше/ });
   await expect(async () => {
     await field.fill(name);
-    await expect(submit).toBeEnabled({ timeout: 500 });
+    await expect(next).toBeEnabled({ timeout: 500 });
   }).toPass({ timeout: 15_000 });
-  await submit.click();
+  await next.click();
+
+  await page.getByRole("button", { name: goal, exact: true }).click();
+  await page.getByRole("button", { name: /Показать структуру/ }).click();
+  await expect(page.locator(".brief-structure-row").first()).toBeVisible();
+  await page.getByRole("button", { name: /Дальше/ }).click();   // структура -> вид
+  await page.getByRole("button", { name: /Дальше/ }).click();   // вид -> подтверждение
+  await page.getByRole("button", { name: /Создать проект/ }).click();
   await page.waitForURL(/\/app\/projects\/[^/]+$/);
-  // The project generates on arrival; every caller here navigates afterwards and would
-  // otherwise be clicking through a screen that is about to be replaced.
-  // 20s, not more: the per-test timeout is 45s, so anything above it is a budget that can
-  // never be spent. Generation is local under the stubbed AI and settles in well under a second.
   await expect(page.locator(".overview-card-grid")).toBeVisible({ timeout: 20_000 });
-}
+  }
 
 test.describe("one header, one job per zone", () => {
   test("the right side carries one call to action, plus a quieter way in", async ({ page }) => {

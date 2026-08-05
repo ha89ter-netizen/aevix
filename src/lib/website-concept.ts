@@ -126,6 +126,11 @@ export type WebsiteConceptInput = {
   wishes: string;
   /** Город, названный человеком. Необязателен: концепт с лендинга его не спрашивает. */
   city?: string;
+  /**
+   * Названия разделов, если человек их переписал в мастере. Уходит в запрос к модели вместе с
+   * остальным входом, поэтому она видит, как владелец назвал разделы своего сайта.
+   */
+  sectionTitles?: Partial<Record<ConceptSectionType, string>>;
 };
 
 export type ConceptOffer = { name: string; price: string };
@@ -248,7 +253,20 @@ export function validateWebsiteConceptInput(value: unknown): WebsiteConceptInput
     // Город приходит только из брифа Workspace; с лендинга его не спрашивают, и пустое
     // значение здесь — норма, а не потеря данных.
     city: cleanOptionalText(candidate.city, 80) || undefined,
+    sectionTitles: cleanSectionTitles(candidate.sectionTitles),
   };
+}
+
+/** Названия разделов от клиента: только известные типы, только непустые строки. */
+function cleanSectionTitles(value: unknown): Partial<Record<ConceptSectionType, string>> | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const result: Partial<Record<ConceptSectionType, string>> = {};
+  for (const [key, title] of Object.entries(value as Record<string, unknown>)) {
+    if (!conceptSectionTypes.includes(key as ConceptSectionType)) continue;
+    if (typeof title !== "string" || !title.trim()) continue;
+    result[key as ConceptSectionType] = title.trim().slice(0, 60);
+  }
+  return Object.keys(result).length ? result : undefined;
 }
 
 function cleanStringArray(value: unknown, maxItems: number, maxLength: number) {
