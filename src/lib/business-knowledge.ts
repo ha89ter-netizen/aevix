@@ -1,4 +1,4 @@
-import type { ConceptLayoutId, ConceptStyleId } from "./website-concept";
+import type { ConceptColorId, ConceptLayoutId, ConceptStyleId } from "./website-concept";
 
 /**
  * The knowledge layer behind every generated concept: instead of inventing a business niche
@@ -61,6 +61,16 @@ export type BusinessKnowledge = {
   layouts: ConceptLayoutId[];
   /** Visual styles that suit the niche, used when the user hasn't insisted on one. */
   styles: ConceptStyleId[];
+  /**
+   * Палитра по умолчанию для ниши — используется, когда человек не выбрал цвета сам.
+   *
+   * Раньше на этот случай стоял общий `["black", "gold"]`: салон красоты, стоматология и
+   * автосервис получали одинаковый чёрно-золотой сайт. Стиль при этом уже подбирался по нише
+   * (`styles` выше), а цвет — нет, и это была единственная часть облика, оставшаяся общей.
+   *
+   * Первый цвет задаёт светлую или тёмную основу сайта, поэтому порядок значим.
+   */
+  colors: ConceptColorId[];
 };
 
 const KNOWLEDGE: BusinessKnowledge[] = [
@@ -151,6 +161,8 @@ const KNOWLEDGE: BusinessKnowledge[] = [
     imageKeywords: ["coffee shop interior", "barista", "latte art", "croissant dessert", "cafe exterior", "coffee beans"],
     layouts: ["editorial", "classic", "showcase"],
     styles: ["elegant", "minimal", "organic"],
+    /** тёплое зерно и молоко */
+    colors: ["brown", "beige"],
   },
   {
     id: "restaurant",
@@ -241,6 +253,8 @@ const KNOWLEDGE: BusinessKnowledge[] = [
     imageKeywords: ["restaurant dining room", "chef plating", "gourmet dish", "restaurant table setting", "open kitchen"],
     layouts: ["showcase", "editorial", "classic"],
     styles: ["elegant", "luxury", "editorial"],
+    /** вечерний зал и сервировка */
+    colors: ["burgundy", "gold"],
   },
   {
     id: "barbershop",
@@ -318,6 +332,8 @@ const KNOWLEDGE: BusinessKnowledge[] = [
     imageKeywords: ["barbershop interior", "barber haircut", "beard trim", "barber tools", "mens grooming"],
     layouts: ["classic", "showcase", "editorial"],
     styles: ["minimal", "brutalist", "bold"],
+    /** графика бритвы, тёмная база */
+    colors: ["black", "gold"],
   },
   {
     id: "beauty",
@@ -393,6 +409,8 @@ const KNOWLEDGE: BusinessKnowledge[] = [
     imageKeywords: ["beauty salon interior", "manicure", "hair styling", "makeup artist", "spa treatment"],
     layouts: ["showcase", "classic", "editorial"],
     styles: ["soft", "elegant", "premium"],
+    /** мягкий уход, светлая база */
+    colors: ["pink", "beige"],
   },
   {
     id: "dental",
@@ -471,6 +489,8 @@ const KNOWLEDGE: BusinessKnowledge[] = [
     imageKeywords: ["dental clinic interior", "dentist patient", "dental equipment", "smile teeth"],
     layouts: ["classic", "editorial", "showcase"],
     styles: ["minimal", "premium", "modern"],
+    /** чистота и доверие клиники */
+    colors: ["blue", "white"],
   },
   {
     id: "fitness",
@@ -547,6 +567,8 @@ const KNOWLEDGE: BusinessKnowledge[] = [
     imageKeywords: ["gym interior", "personal trainer", "workout", "yoga class", "fitness equipment"],
     layouts: ["showcase", "classic", "editorial"],
     styles: ["tech", "bold", "modern"],
+    /** энергия на тёмном */
+    colors: ["black", "orange"],
   },
   {
     id: "hotel",
@@ -621,6 +643,8 @@ const KNOWLEDGE: BusinessKnowledge[] = [
     imageKeywords: ["hotel lobby", "hotel room", "hotel breakfast", "hotel exterior", "reception desk"],
     layouts: ["showcase", "editorial", "classic"],
     styles: ["luxury", "premium", "elegant"],
+    /** гостеприимство и статус */
+    colors: ["navy", "gold"],
   },
   {
     id: "flowers",
@@ -699,6 +723,8 @@ const KNOWLEDGE: BusinessKnowledge[] = [
     imageKeywords: ["flower shop", "florist bouquet", "roses arrangement", "flower delivery", "floral studio"],
     layouts: ["showcase", "editorial", "classic"],
     styles: ["soft", "organic", "elegant"],
+    /** зелень и бутон */
+    colors: ["green", "pink"],
   },
   {
     id: "perfume",
@@ -776,6 +802,8 @@ const KNOWLEDGE: BusinessKnowledge[] = [
     imageKeywords: ["perfume store", "perfume bottles", "fragrance testing", "luxury boutique interior"],
     layouts: ["editorial", "showcase", "classic"],
     styles: ["luxury", "elegant", "editorial"],
+    /** парфюмерная роскошь */
+    colors: ["purple", "gold"],
   },
   {
     id: "auto",
@@ -851,6 +879,8 @@ const KNOWLEDGE: BusinessKnowledge[] = [
     imageKeywords: ["car service garage", "mechanic working", "car lift", "auto diagnostics"],
     layouts: ["classic", "showcase", "editorial"],
     styles: ["tech", "modern", "bold"],
+    /** техничность и металл */
+    colors: ["navy", "gray"],
   },
   {
     id: "realestate",
@@ -922,6 +952,8 @@ const KNOWLEDGE: BusinessKnowledge[] = [
     imageKeywords: ["modern apartment interior", "real estate agent", "city buildings", "apartment keys handover"],
     layouts: ["classic", "editorial", "showcase"],
     styles: ["premium", "minimal", "modern"],
+    /** надёжность и тёплый камень */
+    colors: ["navy", "beige"],
   },
   {
     id: "shop",
@@ -1000,6 +1032,8 @@ const KNOWLEDGE: BusinessKnowledge[] = [
     imageKeywords: ["clothing store interior", "fashion boutique", "clothes rack", "fitting room"],
     layouts: ["editorial", "showcase", "classic"],
     styles: ["editorial", "minimal", "modern"],
+    /** нейтральная витрина */
+    colors: ["blue", "gray"],
   },
   {
     id: "construction",
@@ -1071,6 +1105,8 @@ const KNOWLEDGE: BusinessKnowledge[] = [
     imageKeywords: ["construction site", "home renovation", "interior finishing", "architect blueprint"],
     layouts: ["classic", "editorial", "showcase"],
     styles: ["brutalist", "tech", "minimal"],
+    /** материалы и площадка */
+    colors: ["olive", "sand"],
   },
 ];
 
@@ -1129,6 +1165,8 @@ const GENERIC: BusinessKnowledge = {
   imageKeywords: ["modern office", "team meeting", "workspace"],
   layouts: ["classic", "editorial", "showcase"],
   styles: ["minimal", "modern", "premium"],
+  /** безопасный нейтральный по умолчанию */
+  colors: ["navy", "gray"],
 };
 
 /**
@@ -1164,8 +1202,34 @@ const ORDERED_KNOWLEDGE = MATCH_ORDER.map((id) => KNOWLEDGE.find((entry) => entr
 export function businessKnowledgeFor(businessType: string, extraHint = ""): BusinessKnowledge {
   const haystacks = [businessType.toLowerCase(), `${businessType} ${extraHint}`.toLowerCase()];
   for (const haystack of haystacks) {
-    const match = ORDERED_KNOWLEDGE.find((entry) => entry.keywords.some((word) => haystack.includes(word)));
+    const match = bestMatch(haystack);
     if (match) return match;
   }
   return GENERIC;
+}
+
+/**
+ * Ниша с НАИБОЛЬШИМ числом совпавших ключей, а не первая попавшаяся.
+ *
+ * Раньше побеждало первое совпадение по порядку, и короткий ключ внутри длинного слова уводил
+ * в чужую нишу: «Ресторан авторской кухни» распознавался как автосервис, потому что «авто»
+ * лежит внутри «авторской». Ресторан при этом совпадает дважды — «ресторан» и «кухн», — и счёт
+ * решает спор правильно.
+ *
+ * При равном счёте по-прежнему решает MATCH_ORDER: он выстроен от частных ниш к общим, и это
+ * осмысленный разрыв ничьей.
+ */
+function bestMatch(haystack: string): BusinessKnowledge | null {
+  let best: BusinessKnowledge | null = null;
+  let bestScore = 0;
+  for (const entry of ORDERED_KNOWLEDGE) {
+    let score = 0;
+    for (const word of entry.keywords) if (haystack.includes(word)) score += 1;
+    // Строго больше: при равенстве остаётся тот, кто раньше в MATCH_ORDER.
+    if (score > bestScore) {
+      best = entry;
+      bestScore = score;
+    }
+  }
+  return best;
 }
