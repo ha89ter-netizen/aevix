@@ -769,10 +769,40 @@ export function WebsiteConceptExperience({
     return () => document.removeEventListener("fullscreenchange", sync);
   }, []);
 
-  // Reports every generated/edited concept upward (covers regeneration, palette/style cycling —
-  // anything that calls setConcept) so a project can persist the latest version.
+  /**
+   * Обмен концептом с проектом — в обе стороны, через одну точку.
+   *
+   * Раньше связь была односторонней: превью сообщало проекту о своих изменениях, но не слушало
+   * чужих. А правки AI-дизайнера приходят именно снаружи — панель пишет их прямо в хранилище.
+   * Состояние превью засевалось из `initialConcept` один раз при монтировании и после этого жило
+   * отдельно, поэтому правка сохранялась, попадала в историю, но на экране не появлялась до F5.
+   *
+   * Здесь лежит ровно тот объект, о котором превью и проект уже договорились. Он и отличает
+   * «пришло снаружи» от «изменили внутри»: сравнение по ссылке, а не по содержимому, потому что
+   * `saveDesign` кладёт концепт в проект как есть и возвращает его тем же объектом. Сравнение по
+   * содержимому здесь было бы и дороже, и ненадёжнее — две правки могут дать равные по значению,
+   * но разные концепты.
+   */
+  const exchangedRef = useRef<WebsiteConcept | null>(initialConcept);
+
+  // Снаружи внутрь: правка AI-дизайнера, отмена и повтор меняют `project.design`, и превью
+  // обязано показать именно её. Лента раскрытия сайта завязана на `generationId`, а не на
+  // концепт, поэтому подстановка перерисовывает содержимое, не проигрывая сборку заново и не
+  // сбрасывая открытую страницу.
   useEffect(() => {
-    if (concept) onConceptSaved?.(concept);
+    if (initialConcept === exchangedRef.current) return;
+    exchangedRef.current = initialConcept;
+    setConcept(initialConcept);
+  }, [initialConcept]);
+
+  // Изнутри наружу: перегенерация, смена палитры, стиля, макета и названия. Пришедшее снаружи
+  // обратно не отправляется — иначе каждая правка сохранялась бы вторично и без нужды двигала
+  // «Изменён». Обнуление концепта («Изменить параметры») наружу тоже не уходит: проект хранит
+  // сделанную работу, а не текущий экран.
+  useEffect(() => {
+    if (!concept || concept === exchangedRef.current) return;
+    exchangedRef.current = concept;
+    onConceptSaved?.(concept);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [concept]);
 

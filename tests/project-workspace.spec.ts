@@ -293,6 +293,40 @@ test.describe("project creation", () => {
     expect(saved[0].title).toBe("Наши мастера");
   });
 
+  test("предложенные разделы не повторяют друг друга по смыслу", async ({ page }) => {
+    // Салону предлагались рядом «Услуги» и «Цены и услуги»: одно и то же слово в двух строках
+    // подряд, и человек не понимал, чем разделы отличаются. Проверяется общее свойство, а не
+    // конкретная пара строк, — иначе следующая такая же пара проедет мимо теста.
+    await page.goto("/app/new");
+    const field = page.getByPlaceholder("Например: Барбершоп FORMA");
+    const next = page.getByRole("button", { name: /Дальше/ });
+    await expect(async () => {
+      await field.fill("LUMIERE");
+      await expect(next).toBeEnabled({ timeout: 500 });
+    }).toPass({ timeout: 15_000 });
+    await page.getByPlaceholder(/Чем занимаетесь/).fill("Салон красоты, уход и окрашивание");
+    await next.click();
+    await page.getByRole("button", { name: "Записывать клиентов", exact: true }).click();
+    await page.getByRole("button", { name: /Показать структуру/ }).click();
+    await expect(page.locator(".brief-structure-row").first()).toBeVisible();
+
+    const titles = await page.locator(".brief-structure-title").evaluateAll((nodes) =>
+      nodes.map((node) => (node as HTMLInputElement).value),
+    );
+    expect(titles.length).toBeGreaterThan(3);
+
+    // Ни одно название не должно целиком содержаться в другом: «Услуги» внутри «Цены и услуги»
+    // — ровно тот случай.
+    const words = titles.map((title) => title.toLowerCase().split(/[^а-яёa-z]+/).filter(Boolean));
+    for (let i = 0; i < words.length; i++) {
+      for (let j = 0; j < words.length; j++) {
+        if (i === j) continue;
+        const shared = words[i].filter((word) => words[j].includes(word));
+        expect(shared, `«${titles[i]}» и «${titles[j]}» делят слово`).toEqual([]);
+      }
+    }
+  });
+
   test("an AI Consultant result is saved and shown on Overview without regenerating", async ({ page }) => {
     await mockAnalysis(page);
     const projectUrl = await completeWizard(page, "AI Test Project");
@@ -658,6 +692,156 @@ test.describe("project card actions", () => {
   });
 });
 
+/**
+ * Правка AI-дизайнера обязана быть видна сразу.
+ *
+ * Панель пишет правку прямо в проект, а превью держало собственную копию концепта, засеянную
+ * один раз при монтировании. Правка сохранялась, попадала в историю — и не появлялась на экране
+ * до перезагрузки. Для человека это выглядит как «AI-дизайнер не работает».
+ *
+ * Проверки написаны так, чтобы падать именно на рассинхронизации: заголовок читается из превью
+ * БЕЗ перезагрузки, и только потом отдельно проверяется, что он же сохранился.
+ */
+test.describe("AI-дизайнер: превью и проект идут в ногу", () => {
+  const designWithHeading = (title: string) => ({
+    businessName: "FORMA",
+    businessType: "Барбершоп",
+    colorIds: ["purple", "gold"],
+    styleId: "minimal",
+    navigation: [{ label: "Главная", pageId: "home" }],
+    pages: [
+      {
+        id: "home",
+        name: "Главная",
+        hero: { eyebrow: "Барбершоп", title, subtitle: "Тест", primaryCta: "Записаться", secondaryCta: "Услуги" },
+        sections: [{ type: "services", title: "Услуги", items: [] }],
+      },
+    ],
+  });
+
+  // Именно заголовок героя на самом сайте, а не название бизнеса в шапке окна
+  // (`#website-concept-title`) — правка «замени заголовок» меняет первый, и проверять надо его.
+  const HEADING = ".concept-hero-copy h2";
+
+  /**
+   * Посев, который переживает перезагрузку.
+   *
+   * `seedStorage` кладёт данные через `addInitScript`, а он выполняется при каждой загрузке — и
+   * после F5 вернул бы исходный проект поверх сделанной правки. Проверять сохранение таким
+   * посевом нельзя: тест был бы зелёным и с полностью сломанной записью. Здесь посев ставится
+   * только если хранилище пустое, поэтому дальше работает то, что записало само приложение.
+   */
+  async function seedOnce(page: Page, projects: unknown[]) {
+    await page.addInitScript(
+      ([key, value]) => {
+        if (!window.localStorage.getItem(key as string)) window.localStorage.setItem(key as string, value as string);
+      },
+      [STORAGE_KEY, JSON.stringify({ version: 1, projects })],
+    );
+  }
+
+  async function openDesigner(page: Page, id: string) {
+    await seedOnce(page, [seededProject({ id, businessType: "Барбершоп", design: designWithHeading("FORMA") })]);
+    await page.goto(`/app/projects/${id}/design`);
+    await expect(page.locator(".concept-preview-stage")).toBeVisible();
+    await expect(page.locator(HEADING)).toHaveText("FORMA");
+    await page.locator(".designer-fab").click();
+    await expect(page.locator(".designer-panel")).toBeVisible();
+  }
+
+  async function ask(page: Page, request: string) {
+    await page.locator(".designer-input input").fill(request);
+    await page.locator(".designer-input button[type=submit]").click();
+  }
+
+  test("правка появляется на превью без перезагрузки, и переживает её", async ({ page }) => {
+    await openDesigner(page, "designer-live");
+    await ask(page, "Замени заголовок на «Стрижка за 30 минут»");
+
+    // Главное: без reload. Здесь тест и падал до правки — заголовок оставался прежним.
+    await expect(page.locator(HEADING)).toHaveText("Стрижка за 30 минут");
+
+    await page.reload();
+    await expect(page.locator(HEADING)).toHaveText("Стрижка за 30 минут");
+  });
+
+  test("отмена возвращает прежний заголовок сразу, без перезагрузки", async ({ page }) => {
+    await openDesigner(page, "designer-undo");
+    await ask(page, "Замени заголовок на «Стрижка за 30 минут»");
+    await expect(page.locator(HEADING)).toHaveText("Стрижка за 30 минут");
+
+    // Именно кнопки панели: «Вернуть» встречается на странице и вне её.
+    await page.locator(".designer-panel button[aria-label='Отменить']").click();
+    await expect(page.locator(HEADING)).toHaveText("FORMA");
+
+    await page.locator(".designer-panel button[aria-label='Вернуть']").click();
+    await expect(page.locator(HEADING)).toHaveText("Стрижка за 30 минут");
+  });
+
+  test("две правки подряд по одному полю: побеждает последняя, и записей ровно две", async ({ page }) => {
+    await openDesigner(page, "designer-twice");
+    await ask(page, "Замени заголовок на «Первый вариант»");
+    await expect(page.locator(HEADING)).toHaveText("Первый вариант");
+    await ask(page, "Замени заголовок на «Второй вариант»");
+    await expect(page.locator(HEADING)).toHaveText("Второй вариант");
+
+    // Двойное применение выдало бы себя здесь: на две правки — ровно две записи в истории.
+    const entries = await page.evaluate((key) => {
+      const raw = JSON.parse(window.localStorage.getItem(key as string) ?? "{}") as {
+        projects?: Array<{ id: string; editHistory?: unknown[]; designerLog?: unknown[] }>;
+      };
+      const project = raw.projects?.find((item) => item.id === "designer-twice");
+      return { edits: project?.editHistory?.length ?? 0, log: project?.designerLog?.length ?? 0 };
+    }, STORAGE_KEY);
+    expect(entries).toEqual({ edits: 2, log: 2 });
+  });
+
+  test("переход в другой раздел проекта и обратно не теряет правку", async ({ page }) => {
+    await openDesigner(page, "designer-nav");
+    await ask(page, "Замени заголовок на «Стрижка за 30 минут»");
+    await expect(page.locator(HEADING)).toHaveText("Стрижка за 30 минут");
+
+    await page.goto("/app/projects/designer-nav/pricing");
+    await expect(page.locator(".workspace-page")).toBeVisible();
+    await page.goto("/app/projects/designer-nav/design");
+    await expect(page.locator(HEADING)).toHaveText("Стрижка за 30 минут");
+  });
+
+  test("медленный ответ модели: правка приходит на превью одна и целиком", async ({ page }) => {
+    // Формулировку, которую локальный разборщик не знает, панель отправляет модели. Ответ здесь
+    // намеренно медленный: пока он в пути, превью обязано остаться прежним, а когда придёт —
+    // примениться ровно один раз.
+    await page.route("**/api/designer-intent", async (route: Route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ intent: { id: "edit-heading", text: "Через модель" } }),
+      });
+    });
+
+    await openDesigner(page, "designer-slow");
+    await ask(page, "Оживи первый экран как-нибудь по-своему");
+
+    // Пока ответа нет — ни правки, ни возможности отправить вторую.
+    await expect(page.locator(".designer-steps")).toContainText("Разбираем запрос");
+    await expect(page.locator(HEADING)).toHaveText("FORMA");
+    await expect(page.locator(".designer-input input")).toBeDisabled();
+
+    await expect(page.locator(HEADING)).toHaveText("Через модель");
+    await expect(page.locator(".designer-history-item")).toHaveCount(1);
+  });
+
+  test("цвет и скругления тоже применяются сразу", async ({ page }) => {
+    await openDesigner(page, "designer-style");
+    const before = await page.locator(".concept-site").evaluate((el) => getComputedStyle(el).getPropertyValue("--concept-accent"));
+    await ask(page, "Сделай темнее");
+    await expect
+      .poll(() => page.locator(".concept-site").evaluate((el) => getComputedStyle(el).getPropertyValue("--concept-accent")))
+      .not.toBe(before);
+  });
+});
+
 test.describe("project navigation responsiveness", () => {
   test("project tab bar has no horizontal page overflow on mobile", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "mobile", "mobile-specific viewport check");
@@ -666,6 +850,53 @@ test.describe("project navigation responsiveness", () => {
 
     const overflowX = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     expect(overflowX).toBe(false);
+  });
+
+  test("страница «Дизайн» не едет вбок на телефоне, и панель инструментов помещается", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "mobile", "проверка узкого экрана");
+    // `.workspace-page` — grid, а grid-элемент не сжимается уже своей min-content ширины: встроенный
+    // рабочий стол концепта распирал страницу до 533px при экране 390. Проверяется и причина
+    // (ширина самого блока), и следствие (прокрутка страницы) — одного следствия мало: его можно
+    // спрятать через `overflow-x: hidden`, оставив вёрстку сломанной.
+    await seedStorage(page, [
+      seededProject({
+        id: "narrow-design",
+        design: {
+          businessName: "FORMA",
+          businessType: "Барбершоп",
+          colorIds: ["purple"],
+          styleId: "minimal",
+          navigation: [{ label: "Главная", pageId: "home" }],
+          pages: [
+            {
+              id: "home",
+              name: "Главная",
+              hero: { eyebrow: "Барбершоп", title: "FORMA", subtitle: "Тест", primaryCta: "Записаться", secondaryCta: "Услуги" },
+              sections: [{ type: "services", title: "Услуги", items: [] }],
+            },
+          ],
+        },
+      }),
+    ]);
+    await page.goto("/app/projects/narrow-design/design");
+    await expect(page.locator(".concept-preview-stage")).toBeVisible();
+
+    const fits = await page.evaluate(() => {
+      const doc = document.documentElement;
+      const embedded = document.querySelector(".concept-embedded") as HTMLElement | null;
+      return {
+        pageOverflow: doc.scrollWidth - doc.clientWidth,
+        embeddedWidth: Math.round(embedded?.getBoundingClientRect().width ?? 0),
+        viewport: doc.clientWidth,
+      };
+    });
+    expect(fits.pageOverflow).toBeLessThanOrEqual(1);
+    expect(fits.embeddedWidth).toBeLessThanOrEqual(fits.viewport);
+
+    // Управление размером превью остаётся доступным, а не уезжает под обрезку.
+    for (const label of ["Desktop", "Tablet", "Mobile"]) {
+      await expect(page.locator(`.concept-mode-switch button[title="${label}"]`)).toBeInViewport();
+    }
   });
 
   test("project tab bar and sidebar render with no console errors on desktop", async ({ page }, testInfo) => {

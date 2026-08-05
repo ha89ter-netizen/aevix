@@ -83,14 +83,18 @@ export function recommendStructure(
     add("services", knowledge.servicesTitle);
   } else {
     add("services", knowledge.servicesTitle);
-    add("pricing", "Цены и услуги");
+    // Просто «Цены»: раздел услуг здесь уже есть и стоит строкой выше, поэтому «Цены и услуги»
+    // повторяло его слово в слово — человек видел в структуре два почти одинаковых названия и
+    // не понимал, чем они отличаются. Названия должны различаться по смыслу: что делаем —
+    // «Услуги», сколько стоит — «Цены».
+    add("pricing", "Цены");
   }
 
   // Цели поверх основы.
   if (has("Записывать клиентов")) add("booking");
   if (has("Показывать услуги")) add("services", knowledge.servicesTitle);
   if (has("Показывать каталог") || has("Продавать товары")) {
-    add("pricing", hasProducts ? knowledge.productsPageName ?? "Каталог" : "Цены и услуги");
+    add("pricing", hasProducts ? knowledge.productsPageName ?? "Каталог" : "Цены");
   }
   if (has("Вызывать доверие")) {
     add("reviews");

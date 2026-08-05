@@ -44,6 +44,18 @@ async function gotoEcosystem3D(page: Page) {
   // dynamically-imported three.js chunk has necessarily finished downloading) — real DOM, real
   // click targets, not dependent on the WebGL canvas having actually painted anything.
   await expect(page.locator(".ecosystem-canvas-wrap .sr-only button")).toHaveCount(5, { timeout: 10_000 });
+  /**
+   * И отдельно — сама сцена.
+   *
+   * Кнопок мало: они появляются раньше сцены, и клик по ним в этом промежутке пропадает
+   * впустую — панели не будет. Измерено на программном рендеринге (SwiftShader), на котором
+   * гоняется CI: кнопки на 5-й секунде, canvas — на 10-й. Отсюда и бралась «мигающая» тройка
+   * 3D-тестов: на разогретой машине чанк успевал, под нагрузкой — нет.
+   *
+   * Ждать здесь именно canvas правильно, а не удобно: все проверки ниже про 3D-сцену, и без неё
+   * им нечего проверять. Запас времени больше обычного — three.js тянется отдельным чанком.
+   */
+  await expect(page.locator(".ecosystem-canvas-wrap canvas")).toBeVisible({ timeout: 30_000 });
 }
 
 /**
@@ -208,8 +220,22 @@ test.describe("ecosystem visualisation (3D scene, motion allowed)", () => {
   // covers that screen coordinate (the canvas), not the clipped button underneath. Keyboard/
   // screen-reader activation doesn't go through pointer coordinates at all, so dispatching the
   // click event directly on the element is what actually matches real usage here.
-  async function clickHidden(locator: ReturnType<Page["locator"]>) {
-    await locator.dispatchEvent("click");
+  /**
+   * Клик повторяется до тех пор, пока не появится ожидаемое, — как у `openNode` для CSS-варианта.
+   *
+   * Ожидания canvas оказалось мало: сцена уже нарисована, а обработчик узла навешивается позже,
+   * и одиночный клик в этот промежуток проходит вхолостую. Измерено: без повтора тест «Escape
+   * закрывает панель» падал 5 раз из 5, с одним лишь ожиданием canvas — 3 из 5.
+   *
+   * Повтор безопасен по той же причине, что и у `openNode`: обработчик выбирает узел, а не
+   * переключает его, поэтому второй клик оставляет панель открытой с тем же содержимым.
+   */
+  async function clickHidden(
+    page: Page,
+    locator: ReturnType<Page["locator"]>,
+    expected: () => Promise<void>,
+  ) {
+    await clickUntil(page, () => locator.dispatchEvent("click"), expected);
   }
 
   test("mounts a real WebGL canvas with persistent, always-visible node labels — not the CSS fallback", async ({ page }) => {
@@ -227,22 +253,25 @@ test.describe("ecosystem visualisation (3D scene, motion allowed)", () => {
     await gotoEcosystem3D(page);
     const buttons = page.locator(".ecosystem-canvas-wrap .sr-only button");
 
-    await clickHidden(buttons.nth(0));
-    await expect(page.locator(".ecosystem-3d-panel h3")).toHaveText("Ручные ответы");
+    await clickHidden(page, buttons.nth(0), () =>
+      expect(page.locator(".ecosystem-3d-panel h3")).toHaveText("Ручные ответы"),
+    );
     await expect(page.locator(".ecosystem-3d-panel-highlight")).toContainText("Главный риск");
     await expect(page.locator(".ecosystem-3d-panel-stem")).toBeVisible();
 
     await page.locator(".ecosystem-3d-panel-close").click();
     await expect(page.locator(".ecosystem-3d-panel")).toHaveCount(0);
 
-    await clickHidden(buttons.nth(1));
-    await expect(page.locator(".ecosystem-3d-panel h3")).toHaveText("Потерянные заявки");
+    await clickHidden(page, buttons.nth(1), () =>
+      expect(page.locator(".ecosystem-3d-panel h3")).toHaveText("Потерянные заявки"),
+    );
   });
 
   test("Escape closes the 3D detail panel", async ({ page }) => {
     await gotoEcosystem3D(page);
-    await clickHidden(page.locator(".ecosystem-canvas-wrap .sr-only button").nth(2));
-    await expect(page.locator(".ecosystem-3d-panel")).toBeVisible();
+    await clickHidden(page, page.locator(".ecosystem-canvas-wrap .sr-only button").nth(2), () =>
+      expect(page.locator(".ecosystem-3d-panel")).toBeVisible(),
+    );
 
     await page.keyboard.press("Escape");
     await expect(page.locator(".ecosystem-3d-panel")).toHaveCount(0, { timeout: 5000 });
@@ -305,7 +334,9 @@ test.describe("ecosystem visualisation (3D scene, motion allowed)", () => {
     await page.locator(".ecosystem-arrow").nth(1).click();
     await page.getByRole("button", { name: "После AEVIX" }).click();
     await page.waitForTimeout(2600); // let the ignition transition run to completion (1.8-2.5s)
-    await clickHidden(page.locator(".ecosystem-canvas-wrap .sr-only button").first());
+    await clickHidden(page, page.locator(".ecosystem-canvas-wrap .sr-only button").first(), () =>
+      expect(page.locator(".ecosystem-3d-panel")).toBeVisible(),
+    );
     await page.keyboard.press("Escape");
 
     expect(errors).toEqual([]);

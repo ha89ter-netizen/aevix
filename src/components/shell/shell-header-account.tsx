@@ -61,7 +61,11 @@ export function ShellHeaderAccount() {
   if (!user) {
     return (
       <div className="shell-header-auth">
-        <Link href="/app/login?mode=signup" className="shell-header-signup">
+        {/* aria-label обязателен: на узком экране подпись скрыта (`.shell-header-signup span`
+            уходит в `display: none`), и без него ссылка остаётся вовсе без доступного имени —
+            с экранного диктора это просто «ссылка». У соседней «Войти» подпись есть, здесь её
+            просто забыли. */}
+        <Link href="/app/login?mode=signup" className="shell-header-signup" aria-label="Регистрация">
           <UserPlus className="h-4 w-4" />
           <span>Регистрация</span>
         </Link>

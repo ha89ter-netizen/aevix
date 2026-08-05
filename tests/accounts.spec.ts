@@ -9,7 +9,7 @@ import {
 } from "./support/accounts";
 
 /**
- * Аккаунты: вход по ссылке, переход проектов с устройства в аккаунт и изоляция чужих.
+ * Аккаунты: вход по коду, переход проектов с устройства в аккаунт и изоляция чужих.
  *
  * Единственный набор, которому нужна настоящая база. Это осознанное исключение из правила,
  * по которому основной набор ни от чего внешнего не зависит: база — наша инфраструктура, а не
@@ -42,13 +42,18 @@ test.describe("аккаунты", () => {
     for (const email of created) await deleteAccount(email);
   });
 
-  test("вход по ссылке переводит хранилище с устройства в аккаунт", async ({ page }) => {
+  test("вход переводит хранилище с устройства в аккаунт и называет его", async ({ page }) => {
     await page.goto("/app/projects");
     await expect(page.locator(NOTICE).first()).toContainText("только на этом устройстве");
 
-    await signIn(page, account());
+    const email = account();
+    await signIn(page, email);
 
-    await expect(page.locator(NOTICE).first()).toContainText("сохраняются в аккаунт");
+    // Плашка теперь называет владельца поимённо. Это не косметика: на общем компьютере «проекты
+    // сохраняются в аккаунт» не отвечало на вопрос, в чей именно, — поэтому и проверяется, что
+    // адрес виден, а не только факт входа.
+    await expect(page.locator(NOTICE).first()).toContainText("Проекты аккаунта");
+    await expect(page.locator(NOTICE).first()).toContainText(email);
   });
 
   test("код одноразовый: второй ввод входа не даёт", async ({ page }) => {
@@ -204,9 +209,10 @@ test.describe("аккаунты", () => {
   });
 
   test("выход спрашивает подтверждение, и отказ оставляет в аккаунте", async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== "desktop", "кнопка выхода живёт в закреплённой панели");
-    await signIn(page, account());
-    await expect(page.locator(NOTICE).first()).toContainText("сохраняются в аккаунт");
+    test.skip(testInfo.project.name !== "desktop", "меню аккаунта раскрывается на широком экране");
+    const email = account();
+    await signIn(page, email);
+    await expect(page.locator(NOTICE).first()).toContainText(email);
 
     // Кнопка стоит вплотную к навигации, и цена промаха несимметрична: выйти — секунда,
     // вернуться — новый код из письма.
@@ -220,7 +226,7 @@ test.describe("аккаунты", () => {
     await expect(dialog).toHaveCount(0);
     // Сессия цела: отказ ничего не сделал.
     await page.reload();
-    await expect(page.locator(NOTICE).first()).toContainText("сохраняются в аккаунт");
+    await expect(page.locator(NOTICE).first()).toContainText(email);
   });
 
   test("подтверждение выхода действительно выводит", async ({ page }, testInfo) => {
@@ -235,8 +241,9 @@ test.describe("аккаунты", () => {
   });
 
   test("выход возвращает хранилище на устройство", async ({ page }) => {
-    await signIn(page, account());
-    await expect(page.locator(NOTICE).first()).toContainText("сохраняются в аккаунт");
+    const email = account();
+    await signIn(page, email);
+    await expect(page.locator(NOTICE).first()).toContainText(email);
 
     const response = await page.request.delete("/api/auth/session");
     expect(response.ok()).toBeTruthy();
@@ -272,7 +279,7 @@ test.describe("аккаунты · сайдбар", () => {
     await expect(page.getByRole("link", { name: "Войти в аккаунт" })).toHaveCount(0);
   });
 
-  test("показывает почту вошедшего и кнопку выхода", async ({ page }, testInfo) => {
+  test("сайдбар показывает вошедшего, а выход живёт в меню аватара и работает", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "desktop", "боковая панель закреплена только на десктопе");
     const email = uniqueEmail();
     created.push(email);
@@ -282,7 +289,19 @@ test.describe("аккаунты · сайдбар", () => {
 
     await signIn(page, email);
 
+    // В сайдбаре — кто вошёл. Второй кнопки выхода здесь больше нет намеренно: одно действие
+    // должно жить в одном месте, иначе его дважды можно нажать по ошибке.
     await expect(page.locator(".shell-account")).toContainText(email);
-    await expect(page.getByRole("button", { name: "Выйти из аккаунта" })).toBeVisible();
+    await expect(page.locator(".shell-account button")).toHaveCount(0);
+
+    // Выход переехал в меню аватара — и проверяется он целиком, до последствия, а не по факту
+    // существования кнопки: иначе тест зеленел бы и с меню, которое ничего не делает.
+    await page.locator(".shell-avatar").click();
+    await expect(page.getByRole("menuitem", { name: "Профиль" })).toBeVisible();
+    await page.getByRole("menuitem", { name: "Выйти" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Подтвердить выход" }).click();
+
+    await expect(page.locator(NOTICE).first()).toContainText("только на этом устройстве");
+    expect((await page.request.get("/api/projects")).status()).toBe(401);
   });
 });
