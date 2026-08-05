@@ -134,6 +134,9 @@ function conceptInputFrom(brief: ProjectBrief): WebsiteConceptInput {
     customColors: "",
     // Задача идёт из брифа, а не подставляется: от неё зависит, потребует ли маршрут концепта
     // секцию записи или секцию цен, то есть под что вообще строится сайт.
+    // Город — то, что человек назвал в брифе. Без него отрисовка контактов подставляла
+    // демонстрационный адрес ниши, а он всегда алматинский.
+    city: brief.city,
     goals: brief.goals?.length ? brief.goals : DEFAULT_GOALS,
     sections: brief.sections?.length ? brief.sections : DEFAULT_SECTIONS,
     // Пожелания и описание — разные вещи: первое про характер сайта, второе про бизнес. Пока
@@ -241,6 +244,9 @@ export async function runProjectGeneration(
     colorIds: brief.colorIds.length ? brief.colorIds : concept.colorIds,
     styleId: brief.styleIds[0] ?? concept.styleId,
     layoutId: resolveConceptLayout({ businessType: brief.businessType, businessName: brief.name }),
+    // Город с брифа, а не из ответа маршрута: даже если концепт пришёл по запасному пути или
+    // от модели, названный человеком город остаётся главнее.
+    city: brief.city || concept.city,
     // Copied out of the knowledge base and onto the project, so the price list becomes editable.
     offers: concept.offers ?? { products: [...knowledge.products], services: [...knowledge.services] },
   };

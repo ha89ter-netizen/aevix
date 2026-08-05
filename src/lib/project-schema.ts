@@ -1,6 +1,8 @@
 import type { Project } from "./projects";
+import { businessKnowledgeFor } from "./business-knowledge";
 import {
   conceptColors,
+  dedupeConceptSections,
   conceptGoals,
   conceptSectionOptions,
   conceptStyles,
@@ -85,12 +87,23 @@ export function normalizeProject(value: unknown): Project | null {
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
     analysis: isRecord(value.analysis) ? (value.analysis as Project["analysis"]) : null,
-    design: isRecord(value.design) ? (value.design as Project["design"]) : null,
+    // Концепт чистится от повторов и при чтении, а не только при создании: проекты, созданные
+    // до появления правила, иначе таскали бы дубль вечно — он пережил бы и перезагрузку, и
+    // отмену правки. Чистка идемпотентна, поэтому лишний прогон ничего не портит.
+    design: isRecord(value.design) ? normalizeDesign(value.design as NonNullable<Project["design"]>) : null,
     pricing: isRecord(value.pricing) ? (value.pricing as Project["pricing"]) : null,
     // Older projects have no stored history; they simply start with an empty stack.
     editHistory: Array.isArray(value.editHistory) ? (value.editHistory as Project["editHistory"]).slice(-20) : [],
     redoHistory: Array.isArray(value.redoHistory) ? (value.redoHistory as Project["redoHistory"]).slice(-20) : [],
   };
+}
+
+/** Убирает из сохранённого концепта повторяющиеся по смыслу секции. */
+function normalizeDesign(design: NonNullable<Project["design"]>): NonNullable<Project["design"]> {
+  if (!Array.isArray(design.pages)) return design;
+  const knowledge = businessKnowledgeFor(design.businessType ?? "", design.businessName ?? "");
+  const hasProducts = (design.offers?.products ?? knowledge.products).length > 0;
+  return dedupeConceptSections(design, hasProducts);
 }
 
 /** Нормализует список, отбрасывая то, что проектом не является. */

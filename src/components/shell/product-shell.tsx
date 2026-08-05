@@ -59,6 +59,58 @@ export function ProductShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [sidebarOpen]);
 
+  /**
+   * Пока выдвижная панель открыта, страница под ней не прокручивается.
+   *
+   * Прежнее значение возвращается из замыкания, а не затирается пустой строкой: если прокрутку
+   * когда-нибудь запретит кто-то ещё, слепое обнуление молча отменило бы чужой запрет.
+   *
+   * На десктопе панель закреплена и не является выдвижной — там блокировать нечего, поэтому
+   * эффект смотрит на ширину окна.
+   */
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    if (window.matchMedia("(min-width: 1024px)").matches) return;
+    /**
+     * `overflow: hidden` тут недостаточно по двум причинам сразу. На лендинге прокруткой правит
+     * Lenis и двигает окно программно; а Safari на iOS просто игнорирует `overflow` на html и
+     * body как способ запретить прокрутку — проверено, тест на мобильном WebKit это ловил.
+     *
+     * Работает единственный надёжный приём: увести body в `position: fixed`, сдвинув его вверх
+     * на текущую прокрутку. Тогда страница физически не может уехать, а картинка не прыгает.
+     * При закрытии позиция восстанавливается ровно там, где была.
+     */
+    const root = document.documentElement;
+    const body = document.body;
+    const offset = window.scrollY;
+    const previous = {
+      rootOverflow: root.style.overflow,
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+    };
+
+    root.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${offset}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+
+    return () => {
+      root.style.overflow = previous.rootOverflow;
+      body.style.position = previous.position;
+      body.style.top = previous.top;
+      body.style.left = previous.left;
+      body.style.right = previous.right;
+      body.style.width = previous.width;
+      // Без этого страница отскочила бы наверх: пока body был fixed, окно стояло на нуле.
+      window.scrollTo(0, offset);
+    };
+  }, [sidebarOpen]);
+
   // Highlights the section currently in view, but only on the landing where sections exist.
   useEffect(() => {
     if (mode !== "landing") return;
@@ -104,6 +156,11 @@ export function ProductShell({ children }: { children: ReactNode }) {
 
   /** The logo's single job: back to the Hero, wherever the visitor currently is. */
   const goHome = useCallback(() => {
+    if (mode === "landing" && sidebarOpen) {
+      pendingScroll.current = `#${HOME_SECTION}`;
+      setSidebarOpen(false);
+      return;
+    }
     setSidebarOpen(false);
     if (mode === "landing") {
       scrollToSection(`#${HOME_SECTION}`);
@@ -112,17 +169,45 @@ export function ProductShell({ children }: { children: ReactNode }) {
     pendingHome.current = true;
     // Client-side: the shell, providers and any described business all stay mounted.
     router.push("/");
-  }, [mode, router, scrollToSection]);
+  }, [mode, router, scrollToSection, sidebarOpen]);
+
+  /**
+   * Куда прокрутить, когда выдвижная панель закроется.
+   *
+   * Пока панель открыта, страница заперта: body уведён в `position: fixed`. Прокручивать в этот
+   * момент бессмысленно — прокрутки нет, — а снятие замка вдобавок возвращает прежнюю позицию и
+   * отменило бы переход. Поэтому цель запоминается и отрабатывает после закрытия.
+   */
+  const pendingScroll = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (sidebarOpen || !pendingScroll.current) return;
+    const href = pendingScroll.current;
+    pendingScroll.current = null;
+    // Кадром позже: к этому моменту замок снят и позиция восстановлена, так что прокрутка
+    // ложится поверх, а не под неё.
+    const frame = requestAnimationFrame(() => {
+      if (scrollToSection(href)) return;
+      pendingHome.current = false;
+      router.push(`/${href}` as never);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [sidebarOpen, router, scrollToSection]);
 
   const navigateSection = useCallback(
     (href: string) => {
-      setSidebarOpen(false);
+      if (sidebarOpen) {
+        // Панель открыта — сначала закрыть и снять замок, прокрутка следом.
+        pendingScroll.current = href;
+        setSidebarOpen(false);
+        return;
+      }
       if (scrollToSection(href)) return;
       // Landing section requested from a non-landing route — go there, then scroll.
       pendingHome.current = false;
       router.push(`/${href}` as never);
     },
-    [router, scrollToSection],
+    [router, scrollToSection, sidebarOpen],
   );
 
   return (

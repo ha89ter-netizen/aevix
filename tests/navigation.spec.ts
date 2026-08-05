@@ -162,6 +162,51 @@ test.describe("routing has no dead ends", () => {
   });
 });
 
+test.describe("выдвижная панель прокручивается", () => {
+  test("на низком экране доступен последний пункт, а фон заперт", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === "desktop", "на десктопе панель закреплена, а не выдвижная");
+    // Панель была колонкой на всю высоту без overflow: на коротком окне нижние пункты просто
+    // не существовали на экране и добраться до них было нечем.
+    await page.setViewportSize({ width: 360, height: 320 });
+    await page.goto("/");
+    await openNav(page);
+
+    const scroll = page.locator(".shell-sidebar-scroll");
+    await expect(scroll).toBeVisible();
+    const metrics = await scroll.evaluate((el) => ({ scrollable: el.scrollHeight > el.clientHeight + 1 }));
+    expect(metrics.scrollable, "области прокрутки нечего прокручивать — проверка бессмысленна").toBe(true);
+
+    // Низ с выходом и аккаунтом виден всегда: до него не надо долистывать.
+    const foot = await page.locator(".shell-sidebar-foot").boundingBox();
+    expect(foot!.y + foot!.height).toBeLessThanOrEqual(320 + 1);
+
+    // Последний пункт достижим прокруткой.
+    await scroll.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+    await expect(page.locator(".shell-sidebar .shell-nav-item").last()).toBeVisible();
+
+    // Страница под панелью не едет. Проверяем попыткой прокрутить окно программно, а не
+    // колесом: колеса нет в мобильном WebKit, а замок должен держать любой способ.
+    const before = await page.evaluate(() => window.scrollY);
+    await page.evaluate(() => window.scrollTo(0, 800));
+    await page.waitForTimeout(300);
+    expect(await page.evaluate(() => window.scrollY)).toBe(before);
+
+    // И возвращается к обычному поведению после закрытия.
+    await page.locator(".shell-sidebar-close").click();
+    await expect(page.locator(".shell-sidebar")).not.toHaveClass(/is-open/);
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflow)).not.toBe("hidden");
+  });
+
+  test("панель не создаёт горизонтальной прокрутки", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === "desktop", "проверка для узких экранов");
+    await page.setViewportSize({ width: 320, height: 480 });
+    await page.goto("/");
+    await openNav(page);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+    expect(overflow, "панель вылезает за ширину экрана").toBe(false);
+  });
+});
+
 test.describe("responsive sidebar", () => {
   test("desktop pins the sidebar open with no hamburger", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "desktop", "desktop-only behaviour");

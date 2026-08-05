@@ -304,6 +304,137 @@ test.describe("saving module state into a project", () => {
     await expect(page.locator(".concept-section-piece").first()).not.toHaveClass(/is-selected/);
   });
 
+  test("город из брифа виден в контактах, а не демо-адрес чужого города", async ({ page }) => {
+    // Адреса в базе знаний привязаны к Алматы. Пока город не доходил до концепта, проект с
+    // «Астаной» показывал «Микрорайон Самал-2, 58, Алматы» — улицу чужого города.
+    await seedStorage(page, [
+      seededProject({
+        id: "city-astana",
+        city: "Астана",
+        design: {
+          businessName: "LUMIERE",
+          businessType: "Салон красоты",
+          city: "Астана",
+          colorIds: ["purple"],
+          styleId: "minimal",
+          navigation: [{ label: "Контакты", pageId: "home" }],
+          pages: [
+            {
+              id: "home",
+              name: "Контакты",
+              hero: { eyebrow: "Салон", title: "LUMIERE", subtitle: "Тест", primaryCta: "Записаться", secondaryCta: "Услуги" },
+              sections: [{ type: "contacts", title: "Наши контакты", items: [] }],
+            },
+          ],
+        },
+      }),
+    ]);
+    await page.goto("/app/projects/city-astana/design");
+    await expect(page.locator(".concept-preview-stage")).toBeVisible();
+
+    const address = page.locator(".concept-contacts address strong");
+    await expect(address).toContainText("Астана");
+    await expect(address).not.toContainText("Алматы");
+    // Подпись на карте — второе место, где адрес печатался, и его тоже забывали.
+    await expect(page.locator(".concept-map-caption")).toContainText("Астана");
+    await expect(page.locator(".concept-map-caption")).not.toContainText("Алматы");
+  });
+
+  test("без города остаётся демо-адрес ниши, как было", async ({ page }) => {
+    // Обратная сторона: концепты с лендинга города не знают, и им нельзя ломать контакты.
+    await seedStorage(page, [
+      seededProject({
+        id: "city-none",
+        design: {
+          businessName: "FORMA",
+          businessType: "Салон красоты",
+          colorIds: ["purple"],
+          styleId: "minimal",
+          navigation: [{ label: "Контакты", pageId: "home" }],
+          pages: [
+            {
+              id: "home",
+              name: "Контакты",
+              hero: { eyebrow: "Салон", title: "FORMA", subtitle: "Тест", primaryCta: "Записаться", secondaryCta: "Услуги" },
+              sections: [{ type: "contacts", title: "Наши контакты", items: [] }],
+            },
+          ],
+        },
+      }),
+    ]);
+    await page.goto("/app/projects/city-none/design");
+    await expect(page.locator(".concept-preview-stage")).toBeVisible();
+    await expect(page.locator(".concept-contacts address strong")).toContainText("Алматы");
+  });
+
+  test("повторяющиеся секции убираются при чтении проекта", async ({ page }) => {
+    // Модель наблюдалась с двумя секциями одного типа на странице («О нас: about, about»).
+    // Чистка идёт по типу секции — устойчивому смысловому признаку, а не по позиции в массиве.
+    await seedStorage(page, [
+      seededProject({
+        id: "dupe-about",
+        design: {
+          businessName: "FORMA",
+          businessType: "Салон красоты",
+          colorIds: ["purple"],
+          styleId: "minimal",
+          navigation: [{ label: "О нас", pageId: "home" }],
+          pages: [
+            {
+              id: "home",
+              name: "О нас",
+              hero: { eyebrow: "Салон", title: "FORMA", subtitle: "Тест", primaryCta: "Записаться", secondaryCta: "Услуги" },
+              sections: [
+                { type: "about", title: "История FORMA", items: [] },
+                { type: "about", title: "История FORMA", items: [] },
+              ],
+            },
+          ],
+        },
+      }),
+    ]);
+    await page.goto("/app/projects/dupe-about/design");
+    await expect(page.locator(".concept-preview-stage")).toBeVisible();
+    await expect(page.locator(".concept-section.concept-about-page")).toHaveCount(1);
+
+    // И повтор не возвращается после перезагрузки: чистка живёт в чтении проекта, а не в вёрстке.
+    await page.reload();
+    await expect(page.locator(".concept-preview-stage")).toBeVisible();
+    await expect(page.locator(".concept-section.concept-about-page")).toHaveCount(1);
+  });
+
+  test("законная пара «цены + услуги» у бизнеса с товарами сохраняется", async ({ page }) => {
+    // У кофейни есть товары: `pricing` — меню, `services` — сервисы вокруг него. Это разные
+    // секции, и чистка обязана их не трогать.
+    await seedStorage(page, [
+      seededProject({
+        id: "keep-pair",
+        businessType: "Кофейня",
+        design: {
+          businessName: "ROAST",
+          businessType: "Кофейня",
+          colorIds: ["purple"],
+          styleId: "minimal",
+          navigation: [{ label: "Меню", pageId: "home" }],
+          pages: [
+            {
+              id: "home",
+              name: "Меню",
+              hero: { eyebrow: "Кофейня", title: "ROAST", subtitle: "Тест", primaryCta: "Заказать", secondaryCta: "Меню" },
+              sections: [
+                { type: "pricing", title: "Меню и цены", items: [] },
+                { type: "services", title: "Не только меню", items: [] },
+              ],
+            },
+          ],
+        },
+      }),
+    ]);
+    await page.goto("/app/projects/keep-pair/design");
+    await expect(page.locator(".concept-preview-stage")).toBeVisible();
+    await expect(page.locator(".concept-section")).toHaveCount(2);
+  });
+
   test("restores selected colors and visual style when reopening the Design tab", async ({ page }) => {
     const design = {
       businessName: "FORMA",

@@ -1279,9 +1279,13 @@ body::before {
   transition: color var(--motion-ambient) var(--ease-premium), background-color var(--motion-ambient) var(--ease-premium);
 }
 
+/* Высота не задаётся: плашка растёт под свой текст, поэтому перевод на вторую строку её не
+   ломает и не обрезает. Раньше она стояла абсолютом в углу карточки и налезала на кнопку
+   «Сценарий», стоявшую там же в потоке. */
 .hero-recommend-badge {
   display: inline-flex;
   align-items: center;
+  max-width: 100%;
   border-radius: var(--radius-pill);
   border: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.28);
   background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.12);
@@ -1289,7 +1293,11 @@ body::before {
   color: #5d45cc;
   font-size: 0.66rem;
   font-weight: 650;
+  line-height: 1.25;
   letter-spacing: 0.02em;
+  /* Переносится по словам, а не рвётся посреди слова и не вылезает за карточку. */
+  overflow-wrap: anywhere;
+  text-align: center;
 }
 
 .pricing-scene article.is-recommended {
@@ -6975,6 +6983,14 @@ button.workspace-card:hover {
 
 /* ---- Sidebar ---- */
 
+/**
+ * Панель — колонка на всю высоту из трёх областей: шапка, прокручиваемая середина и низ с
+ * выходом и аккаунтом. Прокрутки не было вовсе: колонка фиксирована по высоте экрана, а
+ * `overflow` не задавался — на коротком окне нижние пункты становились недостижимы.
+ *
+ * Прокручивается именно середина, а не вся панель: шапка с кнопкой закрытия и низ с аккаунтом
+ * должны оставаться на месте, иначе на телефоне до выхода придётся долистывать.
+ */
 .shell-sidebar {
   position: fixed;
   z-index: 60;
@@ -6983,15 +6999,44 @@ button.workspace-card:hover {
   left: 0;
   display: flex;
   width: 16.5rem;
+  max-width: 100vw;
   flex-direction: column;
   gap: 0.35rem;
+  /* min-height вместо height: на iOS адресная строка меняет 100vh на лету, и жёсткая высота
+     оставляла бы низ панели под ней. */
+  min-height: 100%;
+  overflow: hidden;
   border-right: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.92);
-  padding: 1.1rem 0.85rem 1.25rem;
+  /* Безопасные отступы — под «чёлку» и домашний индикатор. */
+  padding: max(1.1rem, env(safe-area-inset-top)) 0.85rem max(1.25rem, env(safe-area-inset-bottom));
   backdrop-filter: blur(18px);
   transform: translateX(-100%);
   visibility: hidden;
   transition: transform var(--motion-slow) var(--ease-premium), visibility var(--motion-slow);
+}
+
+/* Середина: занимает остаток высоты и прокручивается сама. */
+.shell-sidebar-scroll {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.35rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  /* Инерционная прокрутка в Safari на iOS. */
+  -webkit-overflow-scrolling: touch;
+  /* Прокрутка панели не «пробивается» на страницу под ней, когда список кончился. */
+  overscroll-behavior: contain;
+}
+
+/* Длинные подписи переносятся, а не растягивают панель вбок. */
+.shell-sidebar .shell-nav-item,
+.shell-sidebar .shell-sidebar-exit,
+.shell-sidebar .shell-account-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .shell-sidebar.is-open {
@@ -7015,6 +7060,7 @@ button.workspace-card:hover {
 }
 
 .shell-sidebar-head {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -7075,9 +7121,13 @@ button.workspace-card:hover {
   font-weight: 640;
 }
 
-.shell-sidebar-spacer {
-  flex: 1;
-  min-height: 0.75rem;
+/* Низ панели: аккаунт и выход. Вне области прокрутки — до выхода не надо долистывать. */
+.shell-sidebar-foot {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-top: 0.5rem;
 }
 
 .shell-back {

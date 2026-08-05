@@ -56,6 +56,8 @@ export function ShellSidebar({
 
         {mode === "landing" ? (
           <>
+            {/* Середина прокручивается сама; шапка и низ остаются на месте. */}
+            <div className="shell-sidebar-scroll" data-lenis-prevent>
             <nav className="shell-nav" aria-label="Разделы сайта">
               {landingNavItems.map((item) => (
                 <button
@@ -79,18 +81,20 @@ export function ShellSidebar({
                 </button>
               </div>
             ) : null}
+            </div>
 
-            <div className="shell-sidebar-spacer" />
-
-            <Link href={shellCrossLinks.toWorkspace.href} className="shell-sidebar-exit" onClick={onClose}>
-              <shellCrossLinks.toWorkspace.icon className="h-4 w-4" />
-              {shellCrossLinks.toWorkspace.label}
-            </Link>
+            <div className="shell-sidebar-foot">
+              <Link href={shellCrossLinks.toWorkspace.href} className="shell-sidebar-exit" onClick={onClose}>
+                <shellCrossLinks.toWorkspace.icon className="h-4 w-4" />
+                {shellCrossLinks.toWorkspace.label}
+              </Link>
+            </div>
           </>
         ) : null}
 
         {mode === "workspace" ? (
           <>
+            <div className="shell-sidebar-scroll" data-lenis-prevent>
             <nav className="shell-nav" aria-label="Разделы Workspace">
               {workspaceNavItems.map((item) => {
                 const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -108,15 +112,15 @@ export function ShellSidebar({
                 );
               })}
             </nav>
+            </div>
 
-            <div className="shell-sidebar-spacer" />
-
-            <ShellAccount onNavigate={onClose} />
-
-            <Link href={shellCrossLinks.toSite.href} className="shell-sidebar-exit" onClick={onClose}>
-              <shellCrossLinks.toSite.icon className="h-4 w-4" />
-              {shellCrossLinks.toSite.label}
-            </Link>
+            <div className="shell-sidebar-foot">
+              <ShellAccount onNavigate={onClose} />
+              <Link href={shellCrossLinks.toSite.href} className="shell-sidebar-exit" onClick={onClose}>
+                <shellCrossLinks.toSite.icon className="h-4 w-4" />
+                {shellCrossLinks.toSite.label}
+              </Link>
+            </div>
           </>
         ) : null}
 
@@ -124,6 +128,7 @@ export function ShellSidebar({
           <>
             {/* The way back out of a project is the first thing in the panel, so "how do I get
                 back?" is answered before the visitor has to look for it. */}
+            <div className="shell-sidebar-scroll" data-lenis-prevent>
             <Link href={shellCrossLinks.toProjects.href} className="shell-back" onClick={onClose}>
               <shellCrossLinks.toProjects.icon className="h-4 w-4" />
               {shellCrossLinks.toProjects.label}
@@ -148,13 +153,14 @@ export function ShellSidebar({
                 );
               })}
             </nav>
+            </div>
 
-            <div className="shell-sidebar-spacer" />
-
-            <Link href={shellCrossLinks.toSite.href} className="shell-sidebar-exit" onClick={onClose}>
-              <shellCrossLinks.toSite.icon className="h-4 w-4" />
-              {shellCrossLinks.toSite.label}
-            </Link>
+            <div className="shell-sidebar-foot">
+              <Link href={shellCrossLinks.toSite.href} className="shell-sidebar-exit" onClick={onClose}>
+                <shellCrossLinks.toSite.icon className="h-4 w-4" />
+                {shellCrossLinks.toSite.label}
+              </Link>
+            </div>
           </>
         ) : null}
       </aside>

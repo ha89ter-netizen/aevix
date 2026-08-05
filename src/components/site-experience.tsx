@@ -2334,16 +2334,20 @@ function ModulesPricingScene() {
                   recommended && "is-recommended",
                 )}
               >
-                {recommended ? (
-                  <span className="hero-recommend-badge absolute right-4 top-4">Рекомендуем</span>
-                ) : null}
-                <div className="flex items-start justify-between gap-3">
-                  <Icon className="h-6 w-6 text-violet" />
-                  {linkedModule ? (
-                    <button type="button" className="capability-demo" onClick={() => setScenarioId(linkedModule.id)}>
-                      <Zap className="h-3.5 w-3.5" /> Сценарий
-                    </button>
-                  ) : null}
+                {/* Плашка «Рекомендуем» стоит В ПОТОКЕ, а не абсолютом в правом верхнем углу.
+                    Абсолют накладывался на кнопку «Сценарий», которая живёт в том же углу, и
+                    два слова читались как одна нечитаемая надпись. Ряд переносится, поэтому
+                    длинный текст уходит на вторую строку вместо наложения. */}
+                <div className="card-head flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+                  <Icon className="h-6 w-6 shrink-0 text-violet" />
+                  <div className="card-head-tags flex min-w-0 flex-wrap items-center justify-end gap-2">
+                    {recommended ? <span className="hero-recommend-badge">Рекомендуем</span> : null}
+                    {linkedModule ? (
+                      <button type="button" className="capability-demo" onClick={() => setScenarioId(linkedModule.id)}>
+                        <Zap className="h-3.5 w-3.5" /> Сценарий
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
                 <h3 className="mt-6 text-2xl font-semibold">{service.title}</h3>
                 <p className="mt-2 text-base leading-7 text-ink/58">{service.description}</p>

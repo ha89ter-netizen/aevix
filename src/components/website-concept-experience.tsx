@@ -31,6 +31,7 @@ import { SECTION_LABELS, useDesignerSelection } from "@/components/workspace/des
 import { motionTransition } from "@/lib/motion";
 import {
   buildFallbackWebsiteConcept,
+  conceptAddress,
   conceptBusinessTypes,
   conceptColors,
   conceptGoals,
@@ -189,9 +190,12 @@ function ConceptSection({
   knowledge,
   offers,
   businessName,
+  city,
 }: {
   section: WebsiteConceptSection;
   isHomePage: boolean;
+  /** Город проекта. Пусто — отрисовка ведёт себя как прежде и печатает демо-адрес ниши. */
+  city?: string;
   onDemoAction: () => void;
   imagery: ConceptImagery;
   knowledge: BusinessKnowledge;
@@ -316,7 +320,7 @@ function ConceptSection({
               ))}
             </div>
             <address>
-              <strong>{knowledge.contact.address}</strong>
+              <strong>{conceptAddress(city, knowledge.contact.address)}</strong>
               <span>{knowledge.contact.phone}</span>
               <span>hello@{slug}.kz</span>
               <span>@{slug}</span>
@@ -330,7 +334,7 @@ function ConceptSection({
           <button type="button" className="concept-map" onClick={onDemoAction} aria-label="Демонстрационная карта">
             <span className="concept-map-grid" aria-hidden="true" />
             <span className="concept-map-pin" aria-hidden="true" />
-            <span className="concept-map-caption">{knowledge.contact.address}</span>
+            <span className="concept-map-caption">{conceptAddress(city, knowledge.contact.address)}</span>
           </button>
         </div>
       </section>
@@ -685,6 +689,7 @@ function ConceptPreview({
                       knowledge={knowledge}
                       offers={concept.offers}
                       businessName={concept.businessName}
+                      city={concept.city}
                     />
                   </div>
                 );

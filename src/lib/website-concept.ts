@@ -124,6 +124,8 @@ export type WebsiteConceptInput = {
   goals: ConceptGoal[];
   sections: ConceptSectionType[];
   wishes: string;
+  /** Город, названный человеком. Необязателен: концепт с лендинга его не спрашивает. */
+  city?: string;
 };
 
 export type ConceptOffer = { name: string; price: string };
@@ -153,6 +155,15 @@ export type WebsiteConceptPage = {
 export type WebsiteConcept = {
   businessName: string;
   businessType: string;
+  /**
+   * Город бизнеса, как его назвал человек. Хранится НА КОНЦЕПТЕ, а не берётся из базы знаний
+   * при отрисовке: адреса в базе знаний — демонстрационные и жёстко привязаны к Алматы, из-за
+   * чего проект с городом «Астана» показывал «Микрорайон Самал-2, 58, Алматы».
+   *
+   * Пусто у концептов, созданных до этого поля, и у концептов с лендинга, где город не
+   * спрашивают, — тогда отрисовка ведёт себя как прежде.
+   */
+  city?: string;
   colorIds: ConceptColorId[];
   styleId: ConceptStyleId;
   /** Optional for backward compatibility: concepts saved before layouts existed render with
@@ -234,6 +245,9 @@ export function validateWebsiteConceptInput(value: unknown): WebsiteConceptInput
     goals,
     sections,
     wishes,
+    // Город приходит только из брифа Workspace; с лендинга его не спрашивают, и пустое
+    // значение здесь — норма, а не потеря данных.
+    city: cleanOptionalText(candidate.city, 80) || undefined,
   };
 }
 
@@ -579,6 +593,80 @@ const BOOKING_KNOWLEDGE_IDS = new Set(["barbershop", "beauty", "dental", "fitnes
  * repeats the same title/text on two pages, and the offer page shows the FULL catalogue while
  * the home page only teases it.
  */
+/**
+ * Демонстрационный адрес для контактов.
+ *
+ * Адреса в базе знаний привязаны к Алматы, и раньше они печатались как есть — проект с городом
+ * «Астана» показывал «Микрорайон Самал-2, 58, Алматы». Улица из чужого города хуже, чем её
+ * отсутствие: она выглядит настоящей и вводит в заблуждение.
+ *
+ * Поэтому правило простое. Город не назван — оставляем демо-адрес базы знаний, как было. Город
+ * назван и совпадает с городом демо-адреса — адрес годится целиком. Город назван и другой —
+ * улицу отбрасываем и показываем нейтральное «Город, Казахстан»: меньше подробностей, зато ни
+ * одной ложной.
+ */
+/**
+ * Убирает со страницы повторяющиеся по смыслу секции.
+ *
+ * Две разные беды, обе наблюдались на живой генерации.
+ *
+ * Первая: модель иногда выдаёт на одной странице две секции ОДНОГО типа — в замере попалось
+ * «О нас: about, about». Ничто этого не ловило, и человек видел один и тот же блок дважды.
+ *
+ * Вторая тоньше. У бизнеса без товаров секция `pricing` показывает список услуг с ценами, а
+ * секция `services` — те же услуги карточками. На странице, где модель поставила обе, выходит
+ * один и тот же перечень подряд. При этом у бизнеса С товарами эта пара законна и осмысленна:
+ * `pricing` — меню или каталог, `services` — сервисы вокруг него. Поэтому пара схлопывается
+ * только там, где товаров нет.
+ *
+ * Ключ — тип секции, устойчивый смысловой признак, а не позиция в массиве: порядок меняется при
+ * правках, регенерации и отмене, а тип нет. Остаётся ПЕРВАЯ секция: у `pricing` есть цены,
+ * которых у `services` нет, а порядок в концепте идёт от важного к второстепенному.
+ */
+export function dedupeConceptSections(concept: WebsiteConcept, hasProducts: boolean): WebsiteConcept {
+  let changed = false;
+  // Сколько раз каждый тип встречается на всём сайте. Нужно, чтобы схлопывание пары
+  // «услуги + цены» не унесло последнее вхождение типа: маршрут концепта требует набор
+  // обязательных секций, и потеря любой отправила бы годный концепт в запасной путь.
+  const siteWide = new Map<ConceptSectionType, number>();
+  for (const page of concept.pages) {
+    for (const section of page.sections) siteWide.set(section.type, (siteWide.get(section.type) ?? 0) + 1);
+  }
+
+  const pages = concept.pages.map((page) => {
+    const seen = new Set<ConceptSectionType>();
+    const kept = page.sections.filter((section) => {
+      // Без товаров услуги и цены рисуются из одного источника — считаем их одним слотом,
+      // но только если услуги останутся где-то ещё на сайте.
+      const collapses =
+        !hasProducts &&
+        section.type === "services" &&
+        (siteWide.get("services") ?? 0) > 1 &&
+        page.sections.some((item) => item.type === "pricing");
+      const slot: ConceptSectionType = collapses ? "pricing" : section.type;
+      if (seen.has(slot)) {
+        changed = true;
+        siteWide.set(section.type, (siteWide.get(section.type) ?? 1) - 1);
+        return false;
+      }
+      seen.add(slot);
+      return true;
+    });
+    // Страница без секций сломала бы отрисовку сильнее, чем повтор: если фильтр вычистил всё,
+    // оставляем как было.
+    return kept.length ? { ...page, sections: kept } : page;
+  });
+  return changed ? { ...concept, pages } : concept;
+}
+
+export function conceptAddress(city: string | undefined, knowledgeAddress: string): string {
+  const trimmed = city?.trim();
+  if (!trimmed) return knowledgeAddress;
+  // Сравнение по вхождению, а не по равенству: адрес — это «улица, дом, Город».
+  if (knowledgeAddress.toLowerCase().includes(trimmed.toLowerCase())) return knowledgeAddress;
+  return `${trimmed}, Казахстан`;
+}
+
 export function buildFallbackWebsiteConcept(input: WebsiteConceptInput): WebsiteConcept {
   const name = input.businessName;
   const knowledge = businessKnowledgeFor(input.businessType, name);
@@ -731,15 +819,20 @@ export function buildFallbackWebsiteConcept(input: WebsiteConceptInput): Website
     },
   ];
 
-  return {
+  const concept: WebsiteConcept = {
     businessName: name,
     businessType: input.businessType,
+    // Город остаётся на концепте: отрисовка не должна снова гадать его по базе знаний.
+    city: input.city,
     colorIds: input.colorIds,
     styleId: input.styleId,
     layoutId: resolveConceptLayout({ businessType: input.businessType, businessName: name }),
     navigation: pages.map((page) => ({ label: page.name, pageId: page.id })),
     pages,
   };
+  // Локальный генератор ставит пару «цены + услуги» на страницу предложения осознанно — но
+  // только у бизнеса с товарами. Правило ниже это учитывает и такую пару не трогает.
+  return dedupeConceptSections(concept, hasProducts);
 }
 
 export const WEBSITE_CONCEPT_SCHEMA = {

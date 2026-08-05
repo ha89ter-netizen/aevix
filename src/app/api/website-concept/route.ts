@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { businessKnowledgeFor, type BusinessKnowledge } from "@/lib/business-knowledge";
 import {
   buildFallbackWebsiteConcept,
+  dedupeConceptSections,
   resolveConceptLayout,
   type ConceptSectionType,
   validateWebsiteConcept,
@@ -231,12 +232,21 @@ export async function POST(request: Request) {
 
       // Visual identity (color + style + layout) always comes from our own side, never from the
       // model — this guarantees a consistent, always-valid identity regardless of what the AI did.
-      const concept = {
+      const raw = {
         ...content,
         colorIds: input.colorIds,
         styleId: input.styleId,
         layoutId: resolveConceptLayout({ businessType: input.businessType, businessName: input.businessName }),
+        // Город берём из запроса, а не из ответа модели: это факт, названный человеком, и
+        // выдумывать его модели незачем. Без него отрисовка контактов подставляла
+        // демонстрационный адрес базы знаний — всегда алматинский.
+        city: input.city,
       };
+
+      // Чистим повторы ДО проверки полноты, а не после: иначе можно отдать концепт, который
+      // проверку прошёл, а после чистки остался без обязательной секции. Модель наблюдалась с
+      // двумя секциями одного типа на странице («О нас: about, about»).
+      const concept = dedupeConceptSections(raw, knowledge.products.length > 0);
 
       const generatedTypes = new Set(concept.pages.flatMap((page) => page.sections.map((section) => section.type)));
       missingTypes = requiredTypes.filter((type) => !generatedTypes.has(type));

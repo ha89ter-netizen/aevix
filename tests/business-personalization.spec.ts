@@ -54,6 +54,52 @@ async function openNav(page: Page) {
   await expect(page.locator(".shell-sidebar")).toBeVisible();
 }
 
+test.describe("recommended badge", () => {
+  test("плашка «Рекомендуем» не налезает на кнопку «Сценарий» и не выходит за карточку", async ({ page }) => {
+    await analyzeBarber(page);
+    await page.locator("#стоимость").scrollIntoViewIfNeeded();
+    await page.addStyleTag({ content: "[data-reveal]{opacity:1!important;visibility:visible!important;transform:none!important}" });
+
+    const cards = page.locator(".pricing-scene article.is-recommended");
+    await expect(cards.first()).toBeVisible();
+    const count = await cards.count();
+    expect(count).toBeGreaterThan(0);
+
+    // Плашка стояла абсолютом в правом верхнем углу, ровно там же, где кнопка «Сценарий» в
+    // потоке. Слова накладывались и читались как одна нечитаемая надпись.
+    for (let i = 0; i < count; i++) {
+      const card = cards.nth(i);
+      const badge = await card.locator(".hero-recommend-badge").boundingBox();
+      const scenario = await card.locator(".capability-demo").boundingBox();
+      const title = await card.locator("h3").boundingBox();
+      const box = await card.boundingBox();
+      expect(badge, `карточка ${i}: плашка не найдена`).toBeTruthy();
+
+      const overlaps = (a: typeof badge, b: typeof badge) =>
+        Boolean(a && b && a.x + a.width > b.x && b.x + b.width > a.x && a.y + a.height > b.y && b.y + b.height > a.y);
+      expect(overlaps(badge, scenario), `карточка ${i}: плашка перекрывает «Сценарий»`).toBe(false);
+      expect(overlaps(badge, title), `карточка ${i}: плашка перекрывает заголовок`).toBe(false);
+      // И не вылезает за края карточки.
+      expect(badge!.x).toBeGreaterThanOrEqual(box!.x - 1);
+      expect(badge!.x + badge!.width).toBeLessThanOrEqual(box!.x + box!.width + 1);
+    }
+  });
+
+  test("плашка остаётся целой на узком экране", async ({ page }) => {
+    await page.setViewportSize({ width: 820, height: 900 });
+    await analyzeBarber(page);
+    await page.locator("#стоимость").scrollIntoViewIfNeeded();
+    await page.addStyleTag({ content: "[data-reveal]{opacity:1!important;visibility:visible!important;transform:none!important}" });
+    const card = page.locator(".pricing-scene article.is-recommended").first();
+    const badge = await card.locator(".hero-recommend-badge").boundingBox();
+    const scenario = await card.locator(".capability-demo").boundingBox();
+    expect(badge && scenario && !(badge.x + badge.width > scenario.x && scenario.x + scenario.width > badge.x && badge.y + badge.height > scenario.y && scenario.y + scenario.height > badge.y)).toBe(true);
+    // Текст не обрезан: видимая высота не меньше содержимого.
+    const clipped = await card.locator(".hero-recommend-badge").evaluate((el) => el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1);
+    expect(clipped, "текст плашки обрезан").toBe(false);
+  });
+});
+
 test.describe("site personalisation", () => {
   test("recognised business adapts cases and solutions", async ({ page }) => {
     await analyzeBarber(page);
