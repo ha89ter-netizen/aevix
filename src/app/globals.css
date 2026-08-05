@@ -6083,6 +6083,10 @@ button.workspace-card:hover {
    Отступы и размеры считаются от --sc-spacing и --sc-heading-scale, а не заданы числом: именно
    плотность и масштаб заголовка отличают «Роскошь» от «Брутализма». Пока они были захардкожены,
    все стили выглядели одинаково. */
+/**
+ * Каркас кадра — общий для всех тринадцати: пропорция, рамка, тень, источник токенов. Это и
+ * есть бренд AEVIX. Композиция внутри — своя у каждого семейства (см. .is-* ниже).
+ */
 .style-card-preview {
   display: grid;
   gap: calc(0.3rem * var(--sc-spacing));
@@ -6120,56 +6124,19 @@ button.workspace-card:hover {
   opacity: 1 !important;
 }
 
-.style-card-hero {
-  display: grid;
-  gap: calc(0.22rem * var(--sc-spacing));
-  justify-items: start;
-  margin-top: calc(0.32rem * var(--sc-spacing));
-}
+
 
 /* Настоящий текст, а не полоска: вес и межбуквенный интервал на прямоугольнике не видны, а
    именно они и различают стили сильнее всего. */
-.style-card-heading {
-  color: var(--sc-text);
-  font-size: calc(0.82rem * var(--sc-heading-scale));
-  font-weight: var(--sc-heading-weight);
-  letter-spacing: var(--sc-tracking);
-  line-height: 1.1;
-}
 
-.style-card-sub {
-  color: var(--sc-muted);
-  font-size: 0.46rem;
-  font-weight: var(--sc-body-weight);
-  letter-spacing: var(--sc-tracking);
-}
 
-.style-card-cta {
-  margin-top: calc(0.16rem * var(--sc-spacing));
-  border-radius: var(--sc-radius-sm);
-  background: var(--sc-accent);
-  /* Цвет фона поверх акцента: акцент строится в противоположном фону конце шкалы светлоты,
-     поэтому контраст гарантирован при любой палитре. */
-  color: var(--sc-bg);
-  padding: 0.14rem 0.42rem;
-  font-size: 0.42rem;
-  font-weight: var(--sc-body-weight);
-  letter-spacing: var(--sc-tracking);
-}
 
-.style-card-row {
-  display: grid;
-  gap: calc(0.22rem * var(--sc-spacing));
-  grid-template-columns: repeat(3, 1fr);
-  align-self: end;
-}
 
-.style-card-row span {
-  height: 1.4rem;
-  border: var(--sc-border-width) solid var(--sc-border);
-  border-radius: var(--sc-radius-sm);
-  background: var(--sc-surface);
-}
+
+
+
+
+
 
 .style-card-preview {
   transition: box-shadow var(--motion-slow) var(--ease-premium);
@@ -8153,4 +8120,474 @@ a.shell-account:hover {
   color: rgba(9, 8, 7, 0.72);
   font-size: 0.86rem;
   font-weight: 560;
+}
+
+/* ---- Карта процесса: конвейер ---- */
+
+/**
+ * Лента, а не сетка с переносом.
+ *
+ * Сначала здесь стояла auto-fit сетка, и шесть шагов легли как 4 + 2: между четвёртым и пятым
+ * связи не было нарисовано, и цепочка визуально рвалась — ровно то, чего схема автоматизации
+ * допускать не должна. Лента не переносится никогда: не помещается — прокручивается сама,
+ * страница при этом стоит на месте.
+ */
+.workflow {
+  display: grid;
+  gap: 1.6rem;
+}
+
+.workflow-pipeline {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  /* Прокручивается ЛЕНТА, а не страница. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.4rem;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.workflow-node {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.75rem;
+  width: 13.5rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 0.9rem 1rem;
+  scroll-snap-align: start;
+  /* Проявление волной — один раз при появлении, дальше покой. */
+  animation: workflow-node-in var(--motion-slow) var(--ease-premium) both;
+  transition: border-color var(--motion-base) var(--ease-premium), box-shadow var(--motion-base) var(--ease-premium);
+}
+
+.workflow-node:hover {
+  border-color: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.4);
+  box-shadow: 0 10px 26px rgba(9, 8, 7, 0.08);
+}
+
+@keyframes workflow-node-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/** Соединитель — отдельный элемент ленты, поэтому цепочка не может разъехаться с узлами. */
+.workflow-link {
+  position: relative;
+  flex: 0 0 2.4rem;
+  align-self: center;
+  height: 1px;
+  background: linear-gradient(90deg, var(--line), rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.5));
+  animation: workflow-node-in var(--motion-slow) var(--ease-premium) both;
+}
+
+/* Стрелка: направление должно читаться, а не угадываться. */
+.workflow-link::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 5px;
+  height: 5px;
+  transform: translateY(-50%) rotate(45deg);
+  border-top: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.55);
+  border-right: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.55);
+}
+
+.workflow-node-mark {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: var(--radius-md);
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.1);
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+}
+
+.workflow-node-body {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.workflow-node-step {
+  color: rgba(9, 8, 7, 0.4);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.workflow-node-title {
+  color: #111214;
+  font-size: 0.92rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/** Пояснение под лентой: зачем эта последовательность и что будет дальше. Короткое — главным
+    на странице остаётся схема, а не текст. */
+.workflow-note {
+  display: grid;
+  gap: 0.35rem;
+  max-width: 46rem;
+  border-left: 2px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.35);
+  padding-left: 0.9rem;
+}
+
+.workflow-note strong {
+  font-size: 0.9rem;
+  font-weight: 640;
+}
+
+.workflow-note span {
+  color: rgba(9, 8, 7, 0.6);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+/* На телефоне лента разворачивается в столбец: горизонтальная прокрутка на узком экране хуже,
+   чем вертикальная, а связь между шагами сохраняется той же линией. */
+@media (max-width: 700px) {
+  .workflow-pipeline {
+    flex-direction: column;
+    align-items: stretch;
+    overflow-x: visible;
+  }
+
+  .workflow-node {
+    width: auto;
+  }
+
+  .workflow-link {
+    flex: 0 0 1.5rem;
+    align-self: flex-start;
+    width: 1px;
+    height: 1.5rem;
+    margin-left: 1.9rem;
+    background: linear-gradient(180deg, var(--line), rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.5));
+  }
+
+  .workflow-link::after {
+    top: auto;
+    bottom: 0;
+    right: -2px;
+    transform: rotate(135deg);
+  }
+}
+
+/**
+ * Отступ под панель AI-дизайнера. Она `position: fixed` в правом верхнем углу и перекрывала
+ * содержимое — на «Процессе» съедала третий узел. Отступ появляется только когда панель
+ * открыта, иначе страница теряла бы 21rem ширины впустую.
+ */
+/* Порог тот же, на котором панель сама переезжает вниз (см. .designer-panel): при 1024
+   планшет оставался без отступа, хотя панель на нём ещё висит справа вверху. */
+@media (min-width: 768px) {
+  body[data-designer="open"] .workspace-project-scope {
+    padding-right: calc(21rem + clamp(0.75rem, 2vw, 1.5rem) + 1rem);
+  }
+}
+
+/**
+ * На телефоне панель прижата к низу и перекрыть содержимое может только снизу. Отступ равен её
+ * высоте с запасом, поэтому до последнего элемента страницы можно долистать — панель ничего не
+ * прячет безвозвратно. Полностью убрать пересечение здесь нельзя, не переселив панель в поток,
+ * а её устройство — отдельная задача.
+ */
+@media (max-width: 767px) {
+  body[data-designer="open"] .workspace-project-scope {
+    padding-bottom: 26rem;
+  }
+}
+
+/* Движение — украшение, а не смысл: без него страница обязана читаться так же. */
+@media (prefers-reduced-motion: reduce) {
+  .workflow-node,
+  .workflow-link {
+    animation: none;
+  }
+}
+
+/* ---- Композиции превью: четыре семейства ---- */
+
+/* Общее для всех: заголовок и подпись берут вес, трекинг и масштаб из токенов стиля. */
+.style-card-heading {
+  color: var(--sc-text);
+  font-size: calc(0.82rem * var(--sc-heading-scale));
+  font-weight: var(--sc-heading-weight);
+  letter-spacing: var(--sc-tracking);
+  line-height: 1.1;
+}
+
+.style-card-sub {
+  color: var(--sc-muted);
+  font-size: 0.46rem;
+  font-weight: var(--sc-body-weight);
+  letter-spacing: var(--sc-tracking);
+}
+
+/* --- Типографская: минимализм, редакционный, брутализм --- */
+/* Заголовок доминирует кадром — это главное выразительное средство этих стилей. Карточек нет:
+   лишние блоки съедали бы воздух, которым минимализм и держится. */
+.style-card-preview.is-typographic {
+  grid-template-rows: auto 1fr auto auto;
+  align-content: start;
+}
+
+.style-card-heading-xl {
+  align-self: center;
+  font-size: calc(1.6rem * var(--sc-heading-scale));
+  line-height: 1;
+}
+
+.style-card-rule {
+  height: var(--sc-border-width);
+  background: var(--sc-text);
+  opacity: 0.5;
+}
+
+/* --- Фотографическая: роскошь, премиум, элегантный --- */
+/* Изображение занимает большую часть кадра. Блок тональный, из палитры стиля: настоящие
+   картинки в сетке из тринадцати превью стоили бы трафика ради миниатюры. */
+.style-card-preview.is-photo {
+  grid-template-rows: 1fr auto;
+  gap: calc(0.4rem * var(--sc-spacing));
+  padding: 0;
+}
+
+.style-card-photo {
+  border-radius: var(--sc-radius) var(--sc-radius) 0 0;
+  background:
+    linear-gradient(140deg, var(--sc-accent) 0%, var(--sc-surface) 55%, var(--sc-bg) 100%);
+  /* Штрих поперёк — намёк на кадр, а не попытка выдать градиент за фотографию. */
+  box-shadow: inset 0 -1px 0 var(--sc-border);
+}
+
+.style-card-preview.is-photo .style-card-hero {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0 calc(0.55rem * var(--sc-spacing)) calc(0.55rem * var(--sc-spacing));
+}
+
+/* --- Сеточная: технологичный, футуризм, дерзкий, современный --- */
+/* Плотность и резкая геометрия: ячеек шесть против трёх карточек у прежней общей схемы. */
+.style-card-preview.is-grid {
+  grid-template-rows: auto auto 1fr;
+  gap: calc(0.28rem * var(--sc-spacing));
+}
+
+.style-card-cells {
+  display: grid;
+  gap: calc(0.18rem * var(--sc-spacing));
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  align-self: stretch;
+}
+
+.style-card-cells span {
+  border: var(--sc-border-width) solid var(--sc-border);
+  border-radius: var(--sc-radius-sm);
+  background: var(--sc-surface);
+}
+
+/* --- Слоёная: стекло, мягкий, органический --- */
+/* Плоскости перекрываются, радиусы крупные, воздуха много. */
+.style-card-preview.is-layered {
+  position: relative;
+  grid-template-rows: 1fr;
+  align-content: stretch;
+}
+
+.style-card-layer {
+  border-radius: var(--sc-radius);
+  border: var(--sc-border-width) solid var(--sc-border);
+}
+
+.style-card-layer-back {
+  position: absolute;
+  top: calc(0.7rem * var(--sc-spacing));
+  right: calc(0.5rem * var(--sc-spacing));
+  width: 62%;
+  height: 46%;
+  background: var(--sc-accent);
+  opacity: 0.22;
+}
+
+.style-card-layer-front {
+  position: relative;
+  align-self: center;
+  display: grid;
+  gap: 0.18rem;
+  width: 78%;
+  background: color-mix(in srgb, var(--sc-surface) 78%, transparent);
+  padding: calc(0.5rem * var(--sc-spacing)) calc(0.6rem * var(--sc-spacing));
+  backdrop-filter: blur(4px);
+}
+
+.style-card-preview.is-layered .style-card-cta {
+  position: absolute;
+  right: calc(0.55rem * var(--sc-spacing));
+  bottom: calc(0.55rem * var(--sc-spacing));
+  border-radius: var(--sc-radius-sm);
+  background: var(--sc-accent);
+  color: var(--sc-bg);
+  padding: 0.14rem 0.42rem;
+  font-size: 0.42rem;
+  font-weight: var(--sc-body-weight);
+  letter-spacing: var(--sc-tracking);
+}
+
+/* ---- Варианты внутри семейств ---- */
+/* Композиция семейства узнаваема, пропорции внутри разные: без этого «Роскошь», «Премиум» и
+   «Элегантный» различались только скруглением и читались как один макет. */
+
+/* Типографская */
+.style-card-preview.is-typographic.is-v1 .style-card-heading-xl { justify-self: center; }
+.style-card-preview.is-typographic.is-v1 .style-card-sub { text-align: center; }
+.style-card-preview.is-typographic.is-v2 { grid-template-columns: 1fr 1.6fr; grid-template-rows: auto 1fr auto; }
+.style-card-preview.is-typographic.is-v2 .style-card-nav { grid-column: 1 / -1; }
+.style-card-preview.is-typographic.is-v2 .style-card-heading-xl { grid-column: 1 / -1; font-size: calc(1.3rem * var(--sc-heading-scale)); }
+.style-card-preview.is-typographic.is-v2 .style-card-rule { grid-column: 1 / -1; }
+.style-card-preview.is-typographic.is-v3 .style-card-heading-xl { font-size: calc(2.1rem * var(--sc-heading-scale)); }
+.style-card-preview.is-typographic.is-v3 .style-card-rule { height: calc(var(--sc-border-width) * 3); opacity: 1; }
+
+/* Фотографическая */
+.style-card-preview.is-photo.is-v1 { grid-template-rows: 1fr; }
+.style-card-preview.is-photo.is-v1 .style-card-photo { grid-area: 1 / 1; border-radius: var(--sc-radius); }
+.style-card-preview.is-photo.is-v1 .style-card-hero { grid-area: 1 / 1; align-self: end; }
+.style-card-preview.is-photo.is-v3 { padding: calc(0.4rem * var(--sc-spacing)); }
+.style-card-preview.is-photo.is-v3 .style-card-photo { border-radius: var(--sc-radius); }
+.style-card-preview.is-photo.is-v3 .style-card-hero { padding: 0; }
+
+/* Сеточная */
+.style-card-preview.is-grid.is-v2 .style-card-cells { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(3, 1fr); }
+.style-card-preview.is-grid.is-v3 .style-card-cells { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(2, 1fr); }
+.style-card-preview.is-grid.is-v3 .style-card-cells span:nth-child(n + 5) { display: none; }
+
+/* Слоёная */
+.style-card-preview.is-layered.is-v2 .style-card-layer-back { right: auto; left: calc(0.5rem * var(--sc-spacing)); }
+.style-card-preview.is-layered.is-v2 .style-card-layer-front { justify-self: end; }
+.style-card-preview.is-layered.is-v3 .style-card-layer-back { top: auto; bottom: calc(0.7rem * var(--sc-spacing)); width: 80%; height: 38%; }
+.style-card-preview.is-layered.is-v3 .style-card-layer-front { align-self: start; width: 70%; }
+
+/* Смешанная сетка: первая ячейка во всю ширину — «Современный» иначе повторял «Технологичный»
+   в точности, а два одинаковых превью из тринадцати сводят на нет весь смысл разделения. */
+.style-card-preview.is-grid.is-v4 .style-card-cells span:first-child { grid-column: 1 / -1; }
+.style-card-preview.is-grid.is-v4 .style-card-cells { grid-template-rows: 0.8fr 1fr; }
+.style-card-preview.is-grid.is-v4 .style-card-cells span:nth-child(n + 4) { display: none; }
+
+/* ---- Отклик на выбор ---- */
+
+/**
+ * Обратная связь на действие, а не только его результат.
+ *
+ * До этого выбор отмечался статикой: у стиля — рамка и галочка, у цвета — галочка, у раздела
+ * структуры — ничего. Человек не понимал, засчиталось ли нажатие, пока не вглядывался.
+ *
+ * Движение короткое и однократное. Промт прямо предостерегает от шума, и это правильно: отклик
+ * должен подтверждать действие, а не развлекать.
+ */
+
+/* Стиль: карточка коротко «приседает» при нажатии — подтверждение приходит от самого элемента. */
+.style-card:active {
+  transform: scale(0.985);
+}
+
+.style-card.is-selected .style-card-preview {
+  animation: pick-pop var(--motion-base) var(--ease-premium);
+}
+
+@keyframes pick-pop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.035); }
+  100% { transform: scale(1); }
+}
+
+/* Цвет: кольцо вокруг образца, а не одна галочка поверх. Кольцо видно и на светлом образце,
+   и на тёмном, тогда как белая галочка на белом почти пропадала. */
+.workspace-swatch.is-active {
+  border-color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+  box-shadow: 0 0 0 3px rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.18);
+}
+
+.workspace-swatch:active {
+  transform: scale(0.94);
+}
+
+/* Раздел структуры: строка коротко подсвечивается при добавлении и перестановке — иначе
+   перемещение на одну позицию проходит незаметно и кажется, что кнопка не сработала. */
+.brief-structure-row {
+  animation: row-settle var(--motion-base) var(--ease-premium);
+}
+
+@keyframes row-settle {
+  from { background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.1); }
+  to { background: #fff; }
+}
+
+/* Кнопка «дальше»: нажатие должно ощущаться. */
+.workspace-create-submit:active:not(:disabled),
+.brief-back:active {
+  transform: translateY(1px);
+}
+
+/* ---- Иерархия ---- */
+
+/**
+ * Заголовок шага должен быть заметно крупнее подписи под ним: они стояли почти вровень, и
+ * глаз не понимал, что главное. Разводим по размеру и цвету, не добавляя ни одного элемента.
+ */
+.brief-title {
+  font-size: clamp(1.5rem, 2.4vw, 1.9rem);
+  letter-spacing: -0.02em;
+}
+
+.brief-eyebrow {
+  color: rgba(9, 8, 7, 0.42);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Подписи полей — второстепенны и должны читаться как подписи, а не как заголовки. */
+.workspace-field-hint {
+  color: rgba(9, 8, 7, 0.52);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+/* Ритм между блоками шага: одинаковый интервал везде, чтобы форма читалась как один список,
+   а не как набор случайно расставленных групп. */
+.workspace-create-form {
+  gap: 1.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .style-card.is-selected .style-card-preview,
+  .brief-structure-row {
+    animation: none;
+  }
+
+  .style-card:active,
+  .workspace-swatch:active,
+  .workspace-create-submit:active:not(:disabled),
+  .brief-back:active {
+    transform: none;
+  }
 }

@@ -56,6 +56,23 @@ export function AiDesignerPanel({ project }: { project: Project }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const selection = useDesignerSelection();
 
+  /**
+   * Сообщает странице, что панель открыта, — через атрибут на body.
+   *
+   * Панель `position: fixed` и висит поверх правого верхнего угла, где у страницы «Процесс»
+   * начинается лента: она перекрывала третий узел. Архитектуру панели не трогаем, но содержимое
+   * должно уметь под неё отступить, а для этого ему нужно знать, что она есть.
+   *
+   * Атрибут, а не общий контекст: единственный потребитель — вёрстка, и тащить ради неё
+   * состояние через дерево было бы дороже пользы.
+   */
+  useEffect(() => {
+    document.body.dataset.designer = open ? "open" : "closed";
+    return () => {
+      delete document.body.dataset.designer;
+    };
+  }, [open]);
+
   // First open is automatic and one-off; the flag is global rather than per project because it
   // marks "this person has met the designer", not "this project has".
   useEffect(() => {

@@ -14,20 +14,71 @@ import { generateVisualIdentity, type ConceptColorId, type ConceptStyleId } from
  * are literally what that style will produce. A drawn mockup would have to be kept in sync by
  * hand and would eventually start lying.
  *
- * Раньше это были серые полоски, и «Минимализм» с «Роскошью» выглядели одинаково — потому что
- * из всего набора токенов полоски способны показать только скругление и тень. Тонкая роскошь и
- * тяжёлый брутализм различаются весом, межбуквенным интервалом, масштабом заголовка и
- * плотностью, а на прямоугольнике ни вес, ни интервал не видны вовсе.
+ * КОМПОЗИЦИЯ, А НЕ ТОЛЬКО ОФОРМЛЕНИЕ. Замер тринадцати превью показывал: одна схема разметки на
+ * всех, двенадцать элементов в каждом, заголовок занимает 9–10% кадра везде, изображений нет
+ * нигде. Различались только токены — то есть поверхность. «Роскошь» и «Брутализм» имели один
+ * скелет и отличались скруглением.
  *
- * Поэтому в миниатюре теперь настоящий текст. Слово «Бренд» набрано ровно тем весом, масштабом
- * и трекингом, которые этот стиль применит к заголовкам сайта, а отступы и толщина рамок берут
- * `spacing` и `borderWidth`. Это те же самые числа — просто наконец показанные тем, на чём они
- * заметны.
+ * Поэтому стили разбиты на четыре семейства композиции. Каркас общий — та же пропорция, рамка,
+ * тень, подпись и тот же источник токенов: это и есть бренд AEVIX, разные концепции одного
+ * продукта, а не набор случайных шаблонов. Внутри кадра композиция своя у каждого семейства.
  */
 
-/** Нейтральное слово: кириллица, пять букв — достаточно, чтобы увидеть трекинг и вес, и
- * достаточно коротко, чтобы поместиться при любом масштабе. */
+/** Нейтральное слово: кириллица, пять букв — достаточно, чтобы увидеть трекинг и вес. */
 const SAMPLE_HEADING = "Бренд";
+
+type Family = "typographic" | "photo" | "grid" | "layered";
+
+/**
+ * Вариант внутри семейства.
+ *
+ * Одной композиции на семейство мало: «Роскошь», «Премиум» и «Элегантный» получались похожими
+ * до неразличимости — общий каркас, а различия только в скруглении. Вариант меняет пропорции
+ * внутри той же композиции, поэтому ни один из тринадцати не повторяет другой, а семейство
+ * при этом остаётся узнаваемым.
+ */
+const VARIANT: Partial<Record<ConceptStyleId, 1 | 2 | 3 | 4>> = {
+  // Типографская: по центру и воздушно / колонка с линией / во всю ширину и тяжело.
+  minimal: 1,
+  editorial: 2,
+  brutalist: 3,
+  // Фотографическая: кадр во весь блок / кадр сверху с текстом под ним / кадр с полями.
+  luxury: 1,
+  premium: 2,
+  elegant: 3,
+  // Сеточная: 3×2 / 2×3 / крупные 2×2 / смешанная.
+  tech: 1,
+  futuristic: 2,
+  bold: 3,
+  modern: 4,
+  // Слоёная: слой справа / слой слева / слой снизу.
+  glass: 1,
+  soft: 2,
+  organic: 3,
+};
+
+/**
+ * Какому семейству принадлежит стиль.
+ *
+ * Деление не по вкусу, а по тому, чем стиль выражает себя: у одних главное — типографика, у
+ * других — фотография, у третьих — сетка, у четвёртых — слои и прозрачность.
+ */
+const FAMILY: Record<ConceptStyleId, Family> = {
+  minimal: "typographic",
+  editorial: "typographic",
+  brutalist: "typographic",
+  luxury: "photo",
+  premium: "photo",
+  elegant: "photo",
+  tech: "grid",
+  futuristic: "grid",
+  bold: "grid",
+  modern: "grid",
+  glass: "layered",
+  soft: "layered",
+  organic: "layered",
+};
+
 export function StyleCard({
   styleId,
   label,
@@ -45,6 +96,8 @@ export function StyleCard({
 }) {
   const identity = useMemo(() => generateVisualIdentity(colorIds, styleId), [colorIds, styleId]);
   const { palette, tokens } = identity;
+  const family = FAMILY[styleId] ?? "typographic";
+  const variant = VARIANT[styleId] ?? 1;
 
   const style = {
     "--sc-bg": palette.background,
@@ -81,27 +134,78 @@ export function StyleCard({
     >
       {/* aria-hidden: для незрячего человека миниатюра — шум, название стиля ниже несёт всё
           значение. Поэтому здесь можно и нужно ставить настоящий текст ради вида. */}
-      <span className="style-card-preview" style={style} aria-hidden="true">
-        <span className="style-card-nav">
-          <i className="style-card-logo" />
-          <i />
-          <i />
-        </span>
-        <span className="style-card-hero">
-          <b className="style-card-heading">{SAMPLE_HEADING}</b>
-          <span className="style-card-sub">услуги и цены</span>
-          <span className="style-card-cta">Смотреть</span>
-        </span>
-        <span className="style-card-row">
-          <span />
-          <span />
-          <span />
-        </span>
+      <span className={cn("style-card-preview", `is-${family}`, `is-v${variant}`)} style={style} aria-hidden="true">
+        <StyleComposition family={family} />
       </span>
       <span className="style-card-label">
         {label}
         {selected ? <Check className="h-3.5 w-3.5" /> : null}
       </span>
     </button>
+  );
+}
+
+/** Композиция кадра. Разметка своя у каждого семейства — в этом и весь смысл разделения. */
+function StyleComposition({ family }: { family: Family }) {
+  if (family === "photo") {
+    // Крупное изображение решает всё: роскошь и премиум без него не читаются. Блок тональный,
+    // собран из палитры стиля — тринадцать настоящих картинок в сетке стоили бы трафика и
+    // времени загрузки ради превью размером с ладонь, и это был бы плохой размен.
+    return (
+      <>
+        <span className="style-card-photo" />
+        <span className="style-card-hero">
+          <b className="style-card-heading">{SAMPLE_HEADING}</b>
+          <span className="style-card-sub">коллекция и услуги</span>
+        </span>
+      </>
+    );
+  }
+
+  if (family === "grid") {
+    // Плотность как выразительное средство: элементов заметно больше, ячейки равные, геометрия
+    // резкая. Именно этим технологичный отличается от воздушного, а не оттенком.
+    return (
+      <>
+        <span className="style-card-nav">
+          <i className="style-card-logo" />
+          <i />
+          <i />
+        </span>
+        <b className="style-card-heading">{SAMPLE_HEADING}</b>
+        <span className="style-card-cells">
+          {Array.from({ length: 6 }, (_, index) => (
+            <span key={index} />
+          ))}
+        </span>
+      </>
+    );
+  }
+
+  if (family === "layered") {
+    // Слои и прозрачность: плоскости перекрываются, радиусы крупные, воздуха много.
+    return (
+      <>
+        <span className="style-card-layer style-card-layer-back" />
+        <span className="style-card-layer style-card-layer-front">
+          <b className="style-card-heading">{SAMPLE_HEADING}</b>
+          <span className="style-card-sub">услуги и запись</span>
+        </span>
+        <span className="style-card-cta">Смотреть</span>
+      </>
+    );
+  }
+
+  // Типографская: заголовок занимает треть кадра и больше, элементов минимум, карточек нет.
+  return (
+    <>
+      <span className="style-card-nav">
+        <i className="style-card-logo" />
+        <i />
+      </span>
+      <b className="style-card-heading style-card-heading-xl">{SAMPLE_HEADING}</b>
+      <span className="style-card-rule" />
+      <span className="style-card-sub">услуги · цены · контакты</span>
+    </>
   );
 }
