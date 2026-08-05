@@ -200,6 +200,35 @@ test.describe("аккаунты", () => {
     expect(response.status()).toBe(401);
   });
 
+  test("выход спрашивает подтверждение, и отказ оставляет в аккаунте", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop", "кнопка выхода живёт в закреплённой панели");
+    await signIn(page, account());
+    await expect(page.locator(NOTICE).first()).toContainText("сохраняются в аккаунт");
+
+    // Кнопка стоит вплотную к навигации, и цена промаха несимметрична: выйти — секунда,
+    // вернуться — новый код из письма.
+    await page.getByRole("button", { name: "Выйти из аккаунта" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("Выйти из аккаунта?");
+
+    await dialog.getByRole("button", { name: "Остаться" }).click();
+    await expect(dialog).toHaveCount(0);
+    // Сессия цела: отказ ничего не сделал.
+    await page.reload();
+    await expect(page.locator(NOTICE).first()).toContainText("сохраняются в аккаунт");
+  });
+
+  test("подтверждение выхода действительно выводит", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop", "кнопка выхода живёт в закреплённой панели");
+    await signIn(page, account());
+    await page.getByRole("button", { name: "Выйти из аккаунта" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Подтвердить выход" }).click();
+
+    await expect(page.locator(NOTICE).first()).toContainText("только на этом устройстве");
+    expect((await page.request.get("/api/projects")).status()).toBe(401);
+  });
+
   test("выход возвращает хранилище на устройство", async ({ page }) => {
     await signIn(page, account());
     await expect(page.locator(NOTICE).first()).toContainText("сохраняются в аккаунт");

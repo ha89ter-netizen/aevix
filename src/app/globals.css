@@ -7121,6 +7121,73 @@ button.workspace-card:hover {
   font-weight: 640;
 }
 
+/* Подтверждение выхода. По центру экрана и поверх выдвижной панели: сама панель имеет
+   z-index 60, поэтому окно должно быть выше неё, иначе оно окажется под ней. */
+.shell-confirm-scrim {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(9, 8, 7, 0.45);
+  backdrop-filter: blur(3px);
+}
+
+.shell-confirm {
+  display: grid;
+  gap: 0.6rem;
+  width: min(24rem, 100%);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 1.4rem;
+  box-shadow: 0 30px 70px rgba(9, 8, 7, 0.28);
+}
+
+.shell-confirm-title {
+  font-size: 1.1rem;
+  font-weight: 680;
+}
+
+.shell-confirm-text {
+  color: rgba(9, 8, 7, 0.62);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.shell-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.shell-confirm-cancel,
+.shell-confirm-ok {
+  border-radius: var(--radius-pill);
+  padding: 0.55rem 1.05rem;
+  font-size: 0.86rem;
+  font-weight: 620;
+}
+
+/* «Остаться» — предпочтительный исход, поэтому оно спокойное, а подтверждение выделено. */
+.shell-confirm-cancel {
+  border: 1px solid var(--line);
+  color: rgba(9, 8, 7, 0.72);
+}
+
+.shell-confirm-ok {
+  background: #111214;
+  color: #fafaf8;
+}
+
+.shell-confirm-ok:disabled {
+  opacity: 0.6;
+}
+
 /* Низ панели: аккаунт и выход. Вне области прокрутки — до выхода не надо долистывать. */
 .shell-sidebar-foot {
   display: flex;
