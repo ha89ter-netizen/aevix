@@ -14,4 +14,19 @@ export const kk: Dictionary = {
   "entry.hero.secondary": "Кіру / Тіркелу",
 
   "entry.scene.name": "Процестер картасы",
+
+  "eco.aria.scene": "AEVIX мүмкіндіктерінің тірі картасы. Бағыттауыш пернелермен жүріңіз.",
+  "eco.cap.ai": "AI-көмекші",
+  "eco.cap.website": "Сайт",
+  "eco.cap.analytics": "Аналитика",
+  "eco.cap.payments": "Төлем",
+  "eco.cap.bookings": "Жазылу",
+  "eco.cap.reviews": "Пікірлер",
+  "eco.cap.automation": "Автоматтандыру",
+  "eco.cap.calendar": "Күнтізбе",
+  "eco.cap.support": "Қолдау",
+  "eco.cap.email": "Пошта",
+  "eco.cap.knowledge": "Білім қоры",
+  "eco.cap.inventory": "Қойма",
+  "eco.cap.marketing": "Маркетинг",
 };

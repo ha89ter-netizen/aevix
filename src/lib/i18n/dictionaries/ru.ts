@@ -24,6 +24,21 @@ export const ru = {
   // Подпись сцены, а не заглушка: она называет поле и остаётся на месте после того, как поле
   // заполнится. Позже к ней добавится имя разобранного бизнеса.
   "entry.scene.name": "Карта процессов",
+
+  "eco.aria.scene": "Живая карта возможностей AEVIX. Стрелками — по возможностям.",
+  "eco.cap.ai": "AI-ассистент",
+  "eco.cap.website": "Сайт",
+  "eco.cap.analytics": "Аналитика",
+  "eco.cap.payments": "Оплата",
+  "eco.cap.bookings": "Запись",
+  "eco.cap.reviews": "Отзывы",
+  "eco.cap.automation": "Автоматизация",
+  "eco.cap.calendar": "Календарь",
+  "eco.cap.support": "Поддержка",
+  "eco.cap.email": "Почта",
+  "eco.cap.knowledge": "База знаний",
+  "eco.cap.inventory": "Склад",
+  "eco.cap.marketing": "Маркетинг",
 } as const;
 
 export type Dictionary = Record<keyof typeof ru, string>;

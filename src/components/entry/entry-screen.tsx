@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { LocaleProvider, useTranslation } from "@/lib/i18n/provider";
 import { publicRoutes } from "@/components/shell/shell-nav";
+import { EntryIntentProvider, useSetEntryIntent } from "./entry-intent";
 import { LanguageSwitcher } from "./language-switcher";
 import { EcosystemSlot } from "./ecosystem-slot";
 
@@ -24,6 +25,16 @@ import { EcosystemSlot } from "./ecosystem-slot";
 
 function EntryContent() {
   const { t } = useTranslation();
+  const setIntent = useSetEntryIntent();
+
+  // Наведение и фокус равноправны: система отвечает и тому, кто ведёт мышью, и тому, кто идёт
+  // с клавиатуры. Уход и потеря фокуса возвращают её к своей обычной работе.
+  const reacts = (intent: "explore" | "account") => ({
+    onMouseEnter: () => setIntent(intent),
+    onMouseLeave: () => setIntent(null),
+    onFocus: () => setIntent(intent),
+    onBlur: () => setIntent(null),
+  });
   // Заголовок хранится с переносом строки: где именно он ломается — решение типографики, а не
   // случайность ширины окна. Разбор здесь, а не <br> в словаре: перевод не должен нести разметку.
   const headline = t("entry.hero.headline").split("\n");
@@ -55,11 +66,11 @@ function EntryContent() {
           {/* Иерархия действий: смотреть продукт важнее, чем входить. Поэтому основное действие
               — заполненная кнопка, вход — контурная, и порядок в разметке тот же, что визуально. */}
           <div className="entry-actions">
-            <Link href={publicRoutes.site} className="entry-action is-primary">
+            <Link href={publicRoutes.site} className="entry-action is-primary" {...reacts("explore")}>
               <span>{t("entry.hero.primary")}</span>
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
-            <Link href="/app/login" className="entry-action is-secondary">
+            <Link href="/app/login" className="entry-action is-secondary" {...reacts("account")}>
               <span>{t("entry.hero.secondary")}</span>
             </Link>
           </div>
@@ -94,7 +105,9 @@ export function EntryScreen() {
   // пока только он, и заявлять охват шире реального нельзя.
   return (
     <LocaleProvider>
-      <EntryContent />
+      <EntryIntentProvider>
+        <EntryContent />
+      </EntryIntentProvider>
     </LocaleProvider>
   );
 }

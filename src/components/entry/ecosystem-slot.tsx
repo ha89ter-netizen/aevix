@@ -1,5 +1,17 @@
 "use client";
 
+import dynamic from "next/dynamic";
+
+/**
+ * Сцена грузится отдельно от экрана.
+ *
+ * Первый экран обязан появиться немедленно, а система — ожить следом: человек успевает прочесть
+ * заголовок раньше, чем ему становится интересна графика. Сдвинуть при этом ничего не может —
+ * место занято плоскостью с первого кадра, поэтому подгрузка происходит внутри уже готовой
+ * композиции, а не вместо неё.
+ */
+const EcosystemGraph = dynamic(() => import("./ecosystem/EcosystemGraph"), { ssr: false });
+
 /**
  * Плоскость, на которой живёт система.
  *
@@ -33,6 +45,7 @@ export function EcosystemSlot() {
         <span className="entry-plane-tick is-tr" aria-hidden="true" />
         <span className="entry-plane-tick is-bl" aria-hidden="true" />
         <span className="entry-plane-tick is-br" aria-hidden="true" />
+        <EcosystemGraph />
       </div>
     </div>
   );
