@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route } from "./support/fixtures";
+import { SITE } from "./support/routes";
 
 /**
  * Once a business is recognised it becomes the source of state for the whole page: the Hero
@@ -22,7 +23,7 @@ async function mockSuccess(page: Page, summary = "Разбор барбершо�
 }
 
 async function gotoHydrated(page: Page) {
-  await page.goto("/");
+  await page.goto(SITE);
   const field = page.locator(FIELD);
   await expect(field).toBeVisible();
   // Gate on hydration (controlled textarea wipes pre-hydration values).

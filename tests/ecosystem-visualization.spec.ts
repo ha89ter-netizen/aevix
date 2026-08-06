@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "./support/fixtures";
+import { siteSection } from "./support/routes";
 
 /**
  * The "До и после AEVIX" section — AEVIX Process Orbit. EcosystemSceneLoader picks between two
@@ -30,14 +31,14 @@ async function gotoEcosystem(page: Page) {
   // (prefers-reduced-motion: reduce) in every Chromium build — emulateMedia before navigation is
   // what actually guarantees usePrefersReducedMotion() sees it on first render.
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/#проблемы");
+  await page.goto(siteSection("#проблемы"));
   await page.addStyleTag({ content: FORCE_REVEAL_STYLE });
   await page.locator("#проблемы").scrollIntoViewIfNeeded();
   await expect(page.locator(".ecosystem-stage")).toBeVisible();
 }
 
 async function gotoEcosystem3D(page: Page) {
-  await page.goto("/#проблемы");
+  await page.goto(siteSection("#проблемы"));
   await page.addStyleTag({ content: FORCE_REVEAL_STYLE });
   await page.locator("#проблемы").scrollIntoViewIfNeeded();
   // The a11y button layer mounts as soon as the section is judged in-view (before the

@@ -1,4 +1,5 @@
 import { test, expect } from "./support/fixtures";
+import { SITE } from "./support/routes";
 import {
   accountsAvailable,
   deleteAccount,
@@ -218,7 +219,7 @@ test.describe("аккаунты", () => {
     // вернуться — новый код из письма.
     await page.locator(".shell-avatar").click();
     await page.getByRole("menuitem", { name: "Выйти" }).click();
-    const dialog = page.getByRole("dialog");
+    const dialog = page.getByRole("alertdialog");
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText("Выйти из аккаунта?");
 
@@ -229,12 +230,53 @@ test.describe("аккаунты", () => {
     await expect(page.locator(NOTICE).first()).toContainText(email);
   });
 
+  test("окно выхода — по центру экрана, а не в коробке шапки", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop", "меню аккаунта раскрывается на широком экране");
+    await signIn(page, account());
+    await page.locator(".shell-avatar").click();
+    await page.getByRole("menuitem", { name: "Выйти" }).click();
+
+    // Причина прежнего дефекта: `backdrop-filter` у шапки создавал новый содержащий блок для
+    // `position: fixed`, и «весь экран» превращался в коробку шапки. Проверяется именно это —
+    // затемнение обязано покрывать окно целиком, а окно висеть прямо в body, а не внутри шапки.
+    const scrim = page.locator(".dialog-scrim");
+    await expect(scrim).toBeVisible();
+    const cover = await scrim.evaluate((el) => {
+      const rect = el.getBoundingClientRect();
+      return {
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+        viewport: { w: window.innerWidth, h: window.innerHeight },
+        insideHeader: Boolean(el.closest(".shell-header")),
+        parentIsBody: el.parentElement === document.body,
+      };
+    });
+    expect(cover.insideHeader).toBe(false);
+    expect(cover.parentIsBody).toBe(true);
+    expect(cover.width).toBe(cover.viewport.w);
+    expect(cover.height).toBe(cover.viewport.h);
+
+    // И само окно — по центру, а не прижато к краю.
+    const panel = await page.locator(".dialog-panel").boundingBox();
+    const centreOffset = Math.abs(panel!.x + panel!.width / 2 - cover.viewport.w / 2);
+    expect(centreOffset).toBeLessThan(2);
+
+    // Фокус внутри диалога и не убегает наружу по Tab.
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Tab");
+    expect(await page.evaluate(() => Boolean(document.activeElement?.closest(".dialog-panel")))).toBe(true);
+
+    // Escape закрывает и возвращает фокус туда, откуда пришли.
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".dialog-panel")).toHaveCount(0);
+  });
+
   test("подтверждение выхода действительно выводит", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "desktop", "кнопка выхода живёт в закреплённой панели");
     await signIn(page, account());
     await page.locator(".shell-avatar").click();
     await page.getByRole("menuitem", { name: "Выйти" }).click();
-    await page.getByRole("dialog").getByRole("button", { name: "Подтвердить выход" }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Подтвердить выход" }).click();
 
     await expect(page.locator(NOTICE).first()).toContainText("только на этом устройстве");
     expect((await page.request.get("/api/projects")).status()).toBe(401);
@@ -267,7 +309,7 @@ test.describe("аккаунты · сайдбар", () => {
 
     // Лендинг: боковой панели с аккаунтом здесь нет вовсе, поэтому шапка — единственное место,
     // откуда посетитель может войти.
-    await page.goto("/");
+    await page.goto(SITE);
     await expect(page.getByRole("link", { name: "Войти в аккаунт" })).toBeVisible();
     await expect(page.getByRole("link", { name: /Регистрация/ })).toBeVisible();
 
@@ -275,7 +317,7 @@ test.describe("аккаунты · сайдбар", () => {
 
     // Вошедшему регистрироваться незачем: место освобождается, а не занимается третьей кнопкой.
     await expect(page.getByRole("link", { name: "Войти в аккаунт" })).toHaveCount(0);
-    await page.goto("/");
+    await page.goto(SITE);
     await expect(page.getByRole("link", { name: "Войти в аккаунт" })).toHaveCount(0);
   });
 
@@ -299,7 +341,7 @@ test.describe("аккаунты · сайдбар", () => {
     await page.locator(".shell-avatar").click();
     await expect(page.getByRole("menuitem", { name: "Профиль" })).toBeVisible();
     await page.getByRole("menuitem", { name: "Выйти" }).click();
-    await page.getByRole("dialog").getByRole("button", { name: "Подтвердить выход" }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Подтвердить выход" }).click();
 
     await expect(page.locator(NOTICE).first()).toContainText("только на этом устройстве");
     expect((await page.request.get("/api/projects")).status()).toBe(401);

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { FolderKanban, LogIn, LogOut, Settings, User, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth, type AuthUser } from "@/lib/auth-context";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 /**
  * Личность в правом верхнем углу.
@@ -133,32 +134,22 @@ export function ShellHeaderAccount() {
         </div>
       ) : null}
 
-      {confirming ? (
-        <div
-          className="shell-confirm-scrim"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="shell-confirm-title"
-          onClick={() => setConfirming(false)}
-        >
-          <div className="shell-confirm" onClick={(event) => event.stopPropagation()}>
-            <h2 id="shell-confirm-title" className="shell-confirm-title">
-              Выйти из аккаунта?
-            </h2>
-            <p className="shell-confirm-text">
-              Проекты останутся в аккаунте — вы увидите их снова после входа.
-            </p>
-            <div className="shell-confirm-actions">
-              <button type="button" className="shell-confirm-cancel" onClick={() => setConfirming(false)} autoFocus>
-                Остаться
-              </button>
-              <button type="button" className="shell-confirm-ok" onClick={confirm} disabled={leaving}>
-                {leaving ? "Выходим…" : "Подтвердить выход"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {/* Через общий примитив, а не своей разметкой. Своя разметка здесь и подвела: затемнение
+          объявлялось во весь экран, но `backdrop-filter` у шапки создавал для `position: fixed`
+          новый содержащий блок, и окно прижималось к правому краю шапки, обрезанное сверху.
+          В портале у `document.body` предки на него больше не влияют. */}
+      <ConfirmDialog
+        open={confirming}
+        icon={<LogOut className="h-5 w-5" />}
+        title="Выйти из аккаунта?"
+        description="Проекты останутся в аккаунте — вы увидите их снова после входа."
+        cancelLabel="Остаться"
+        confirmLabel="Подтвердить выход"
+        busy={leaving}
+        busyLabel="Выходим…"
+        onCancel={() => setConfirming(false)}
+        onConfirm={confirm}
+      />
     </div>
   );
 }

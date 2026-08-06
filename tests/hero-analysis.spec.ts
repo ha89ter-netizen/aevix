@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route } from "./support/fixtures";
+import { SITE } from "./support/routes";
 
 /**
  * Hero business-analysis field.
@@ -15,7 +16,7 @@ const GHOST = ".hero-placeholder-ghost";
 const BARBER_TEXT = "У меня барбершоп на 3 мастера, запись вручную";
 
 async function gotoHero(page: Page) {
-  await page.goto("/");
+  await page.goto(SITE);
   const field = page.locator(FIELD);
   await expect(field).toBeVisible();
 
@@ -45,7 +46,7 @@ function successResponse(summary: string) {
 test.describe("hero analysis field", () => {
   test("starts empty", async ({ page }) => {
     // Bare load (no hydration probe) so this asserts the genuine initial value.
-    await page.goto("/");
+    await page.goto(SITE);
     await expect(page.locator(FIELD)).toBeVisible();
     await expect(page.locator(FIELD)).toHaveValue("");
   });

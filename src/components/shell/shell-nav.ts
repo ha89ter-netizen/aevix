@@ -25,7 +25,29 @@ import type { Route } from "next";
  * with the route, and the three sets can never appear at once.
  */
 
-export type ShellMode = "landing" | "workspace" | "project";
+/**
+ * Публичный слой состоит из двух разных опытов, а не из одной страницы с якорями.
+ *
+ * `entry` — входной экран: тёмный, локализованный, без навигации по разделам. Его задача —
+ * первое впечатление, и рамка продукта ему только мешала бы.
+ * `landing` — основной сайт AEVIX: разделы, своя навигация, светлая тема.
+ *
+ * Режим по-прежнему выводится ТОЛЬКО из маршрута, поэтому оболочка не может разойтись с тем,
+ * где человек находится.
+ */
+export type ShellMode = "entry" | "landing" | "workspace" | "project";
+
+/**
+ * Маршруты публичного слоя — в одном месте, чтобы код, ссылки и тесты не расходились.
+ *
+ * `/platform`, а не `/site`: словом «сайт» в этом продукте называется то, что AEVIX генерирует
+ * клиенту, и второй смысл того же слова в URL путал бы. Имя оставляет место для роста — разделы
+ * позже могут стать `/platform/pricing`, не ломая ссылок.
+ */
+export const publicRoutes = {
+  entry: "/" as Route,
+  site: "/platform" as Route,
+} as const;
 
 export type ShellNavItem = {
   /** In-page anchor on the landing, a real route everywhere else. */
@@ -86,6 +108,7 @@ export function projectIdFromPath(pathname: string): string | null {
 export function shellModeFor(pathname: string): ShellMode {
   if (projectIdFromPath(pathname)) return "project";
   if (pathname.startsWith("/app")) return "workspace";
+  if (pathname === publicRoutes.entry) return "entry";
   return "landing";
 }
 
@@ -116,6 +139,7 @@ export function projectSectionLabel(pathname: string): string | null {
 /** Where the sidebar's cross-context link goes, and what it says. */
 export const shellCrossLinks = {
   toWorkspace: { href: "/app/projects" as Route, label: "Workspace", icon: LayoutDashboard },
-  toSite: { href: "/" as Route, label: "На сайт AEVIX", icon: Globe2 },
+  // Именно основной сайт, а не входной экран: из Workspace человек идёт читать про продукт.
+  toSite: { href: publicRoutes.site, label: "На сайт AEVIX", icon: Globe2 },
   toProjects: { href: "/app/projects" as Route, label: "Все проекты", icon: ArrowLeft },
 } as const;

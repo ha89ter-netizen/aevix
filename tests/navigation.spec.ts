@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "./support/fixtures";
+import { SITE } from "./support/routes";
 
 /**
  * The navigation architecture: one shell for the whole product, with a sidebar whose contents
@@ -50,7 +51,7 @@ async function createProject(page: Page, name: string, goal = "Получать 
 
 test.describe("one header, one job per zone", () => {
   test("the right side carries one call to action, plus a quieter way in", async ({ page }) => {
-    await page.goto("/");
+    await page.goto(SITE);
     // Целевое действие по-прежнему ровно одно: консультация приносит клиентов, вход нужен уже
     // пришедшим. Вход добавлен рядом по решению владельца продукта, но подчинён ей —
     // контурная ссылка против сплошной кнопки. Два одинаково громких элемента здесь однажды
@@ -65,7 +66,7 @@ test.describe("one header, one job per zone", () => {
   });
 
   test("the centre always names where you are", async ({ page }) => {
-    await page.goto("/");
+    await page.goto(SITE);
     await expect(page.locator(".shell-title")).toHaveText("Главная");
 
     await page.goto("/app/projects");
@@ -78,7 +79,7 @@ test.describe("one header, one job per zone", () => {
 
 test.describe("sidebar modes are mutually exclusive", () => {
   test("the landing shows only landing sections", async ({ page }) => {
-    await page.goto("/");
+    await page.goto(SITE);
     await openNav(page);
     await expect(page.locator(NAV_ITEM)).toHaveText([
       "Главная",
@@ -110,7 +111,7 @@ test.describe("sidebar modes are mutually exclusive", () => {
 });
 
 test.describe("the logo is the universal way home", () => {
-  test("returns to the Hero from deep inside a project", async ({ page }) => {
+  test("возвращает на публичный входной экран из глубины проекта", async ({ page }) => {
     await createProject(page, "Espresso Day");
     await openNav(page);
     // Deliberately not the Design section: a generated project opens its concept in a modal, and
@@ -120,13 +121,16 @@ test.describe("the logo is the universal way home", () => {
 
     await page.locator(".shell-brand").click();
     await page.waitForURL(/\/$/, { timeout: 10_000 });
-    await expect(page.locator(".shell-title")).toHaveText("Главная");
-    // Specifically the Hero — not merely the route.
-    await expect.poll(() => page.evaluate(() => window.scrollY), { timeout: 8000 }).toBeLessThan(150);
+
+    // Публичный слой разделён надвое, и логотип изнутри продукта ведёт к началу — на входной
+    // экран, а не в первый блок лендинга. Проверяется именно смена опыта: рамки продукта здесь
+    // нет вовсе, поэтому её отсутствие и есть доказательство перехода.
+    await expect(page.locator(".entry-screen")).toBeVisible();
+    await expect(page.locator(".shell-header")).toHaveCount(0);
   });
 
   test("scrolls back to the Hero when already on the landing", async ({ page }) => {
-    await page.goto("/");
+    await page.goto(SITE);
     await openNav(page);
     await page.locator(NAV_ITEM, { hasText: "Контакты" }).click();
     await expect.poll(() => page.evaluate(() => window.scrollY), { timeout: 8000 }).toBeGreaterThan(400);
@@ -138,15 +142,17 @@ test.describe("the logo is the universal way home", () => {
 
 test.describe("routing has no dead ends", () => {
   test("landing to Workspace and back, in one tab", async ({ page, context }) => {
-    await page.goto("/");
+    await page.goto(SITE);
     await openNav(page);
     await page.locator(".shell-sidebar-exit").click();
     await page.waitForURL("**/app/projects");
     expect(context.pages()).toHaveLength(1);
 
     await openNav(page);
+    // «На сайт AEVIX» ведёт на основной сайт, а не на входной экран: из Workspace человек идёт
+    // читать про продукт, а не смотреть первое впечатление заново.
     await page.locator(".shell-sidebar-exit").click();
-    await page.waitForURL(/\/$/);
+    await page.waitForURL(`**${SITE}`);
     expect(context.pages()).toHaveLength(1);
   });
 
@@ -177,7 +183,7 @@ test.describe("выдвижная панель прокручивается", ()
     // Панель была колонкой на всю высоту без overflow: на коротком окне нижние пункты просто
     // не существовали на экране и добраться до них было нечем.
     await page.setViewportSize({ width: 360, height: 320 });
-    await page.goto("/");
+    await page.goto(SITE);
     await openNav(page);
 
     const scroll = page.locator(".shell-sidebar-scroll");
@@ -209,7 +215,7 @@ test.describe("выдвижная панель прокручивается", ()
   test("панель не создаёт горизонтальной прокрутки", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === "desktop", "проверка для узких экранов");
     await page.setViewportSize({ width: 320, height: 480 });
-    await page.goto("/");
+    await page.goto(SITE);
     await openNav(page);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
     expect(overflow, "панель вылезает за ширину экрана").toBe(false);

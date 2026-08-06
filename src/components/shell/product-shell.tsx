@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useScrollLock } from "@/lib/use-scroll-lock";
 import { useBusiness } from "@/lib/business-context";
 import { ConsultationModal } from "@/components/site-experience";
 import { ShellHeader } from "./shell-header";
 import { ShellSidebar } from "./shell-sidebar";
-import { landingNavItems, shellModeFor } from "./shell-nav";
+import { landingNavItems, publicRoutes, shellModeFor } from "./shell-nav";
 
 const HOME_SECTION = "главная";
 
@@ -28,6 +29,25 @@ export function ProductShell({ children }: { children: ReactNode }) {
   const { status, content } = useBusiness();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeSection, setActiveSection] = useState(landingNavItems[0].href);
+  /**
+   * На широком экране панель закреплена и не выдвигается — блокировать прокрутку там нечего.
+   *
+   * Подписка, а не разовая проверка: поворот планшета меняет ответ, и прежний код этого не
+   * видел. Начальное значение считается синхронно, а не через первый эффект: лишний перерендер
+   * всей оболочки сразу после монтирования сдвигает тайминги всего, что под ней, — в том числе
+   * гонки загрузки проектов, на которой мигает переименование.
+   */
+  const [isWide, setWide] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches,
+  );
+
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 1024px)");
+    const sync = () => setWide(query.matches);
+    sync();
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
 
   const accent = status === "ready" && content ? content.accent : null;
   const style = accent
@@ -62,54 +82,14 @@ export function ProductShell({ children }: { children: ReactNode }) {
   /**
    * Пока выдвижная панель открыта, страница под ней не прокручивается.
    *
-   * Прежнее значение возвращается из замыкания, а не затирается пустой строкой: если прокрутку
-   * когда-нибудь запретит кто-то ещё, слепое обнуление молча отменило бы чужой запрет.
+   * Сам приём — общий хук: он тонкий (Lenis на лендинге и Safari на iOS, игнорирующий
+   * `overflow`), добыт дорого и обязан быть один на продукт. Вторая его копия неизбежно
+   * разошлась бы с первой.
    *
    * На десктопе панель закреплена и не является выдвижной — там блокировать нечего, поэтому
-   * эффект смотрит на ширину окна.
+   * условие смотрит на ширину окна.
    */
-  useEffect(() => {
-    if (!sidebarOpen) return;
-    if (window.matchMedia("(min-width: 1024px)").matches) return;
-    /**
-     * `overflow: hidden` тут недостаточно по двум причинам сразу. На лендинге прокруткой правит
-     * Lenis и двигает окно программно; а Safari на iOS просто игнорирует `overflow` на html и
-     * body как способ запретить прокрутку — проверено, тест на мобильном WebKit это ловил.
-     *
-     * Работает единственный надёжный приём: увести body в `position: fixed`, сдвинув его вверх
-     * на текущую прокрутку. Тогда страница физически не может уехать, а картинка не прыгает.
-     * При закрытии позиция восстанавливается ровно там, где была.
-     */
-    const root = document.documentElement;
-    const body = document.body;
-    const offset = window.scrollY;
-    const previous = {
-      rootOverflow: root.style.overflow,
-      position: body.style.position,
-      top: body.style.top,
-      left: body.style.left,
-      right: body.style.right,
-      width: body.style.width,
-    };
-
-    root.style.overflow = "hidden";
-    body.style.position = "fixed";
-    body.style.top = `-${offset}px`;
-    body.style.left = "0";
-    body.style.right = "0";
-    body.style.width = "100%";
-
-    return () => {
-      root.style.overflow = previous.rootOverflow;
-      body.style.position = previous.position;
-      body.style.top = previous.top;
-      body.style.left = previous.left;
-      body.style.right = previous.right;
-      body.style.width = previous.width;
-      // Без этого страница отскочила бы наверх: пока body был fixed, окно стояло на нуле.
-      window.scrollTo(0, offset);
-    };
-  }, [sidebarOpen]);
+  useScrollLock(sidebarOpen && !isWide);
 
   // Highlights the section currently in view, but only on the landing where sections exist.
   useEffect(() => {
@@ -142,19 +122,14 @@ export function ProductShell({ children }: { children: ReactNode }) {
     return true;
   }, []);
 
-  // Set when we navigate home from another route, so the scroll happens once the landing has
-  // actually rendered rather than against a page that isn't mounted yet.
-  const pendingHome = useRef(false);
-
-  useEffect(() => {
-    if (!pendingHome.current || mode !== "landing") return;
-    pendingHome.current = false;
-    // One frame after the route commits, the hero exists and can be scrolled to.
-    const frame = requestAnimationFrame(() => scrollToSection(`#${HOME_SECTION}`));
-    return () => cancelAnimationFrame(frame);
-  }, [mode, pathname, scrollToSection]);
-
-  /** The logo's single job: back to the Hero, wherever the visitor currently is. */
+  /**
+   * Логотип: на лендинге — наверх, отовсюду ещё — на публичный входной экран.
+   *
+   * Флаг «доскроллить до героя» здесь больше не ставится, и это важно. Раньше логотип уводил в
+   * корень, где был лендинг, и флаг честно отрабатывал. Теперь в корне входной экран, якоря
+   * `#главная` там нет — флаг остался бы висеть и выстрелил бы позже, при следующем заходе на
+   * `/platform`, неожиданной прокруткой посреди чтения.
+   */
   const goHome = useCallback(() => {
     if (mode === "landing" && sidebarOpen) {
       pendingScroll.current = `#${HOME_SECTION}`;
@@ -166,9 +141,8 @@ export function ProductShell({ children }: { children: ReactNode }) {
       scrollToSection(`#${HOME_SECTION}`);
       return;
     }
-    pendingHome.current = true;
-    // Client-side: the shell, providers and any described business all stay mounted.
-    router.push("/");
+    // Клиентский переход: оболочка, провайдеры и описанный бизнес остаются смонтированными.
+    router.push(publicRoutes.entry);
   }, [mode, router, scrollToSection, sidebarOpen]);
 
   /**
@@ -188,8 +162,7 @@ export function ProductShell({ children }: { children: ReactNode }) {
     // ложится поверх, а не под неё.
     const frame = requestAnimationFrame(() => {
       if (scrollToSection(href)) return;
-      pendingHome.current = false;
-      router.push(`/${href}` as never);
+      router.push(`${publicRoutes.site}${href}` as never);
     });
     return () => cancelAnimationFrame(frame);
   }, [sidebarOpen, router, scrollToSection]);
@@ -203,12 +176,25 @@ export function ProductShell({ children }: { children: ReactNode }) {
         return;
       }
       if (scrollToSection(href)) return;
-      // Landing section requested from a non-landing route — go there, then scroll.
-      pendingHome.current = false;
-      router.push(`/${href}` as never);
+      // Раздел лендинга запрошен не с лендинга: сначала туда, потом прокрутка. Именно на
+      // `/platform` — разделы живут там, а в корне теперь входной экран без якорей.
+      router.push(`${publicRoutes.site}${href}` as never);
     },
     [router, scrollToSection, sidebarOpen],
   );
+
+  /**
+   * Входной экран рисуется без рамки продукта.
+   *
+   * У него своя навигация — логотип и языки, больше ничего, — и любая примесь общей шапки,
+   * боковой панели или кнопки консультации разрушила бы то единственное, ради чего он
+   * существует: первое впечатление. Это не исключение из модели, а её продолжение: режим
+   * по-прежнему выводится из маршрута, просто у этого режима рамки нет.
+   *
+   * Провайдеры при этом остаются выше по дереву, поэтому переход «входной экран → сайт →
+   * Workspace» не перемонтирует приложение и не теряет состояние.
+   */
+  if (mode === "entry") return <>{children}</>;
 
   return (
     <div className={cn("shell", `shell-mode-${mode}`)} style={style} data-mode={mode}>

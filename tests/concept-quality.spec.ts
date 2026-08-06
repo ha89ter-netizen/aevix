@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "./support/fixtures";
+import { SITE } from "./support/routes";
 
 /**
  * Quality contract for generated website concepts: knowledge-driven page structure per niche,
@@ -13,7 +14,7 @@ import { test, expect, type Page } from "./support/fixtures";
 test.use({ contextOptions: { reducedMotion: "reduce" } });
 
 async function openExample(page: Page, name: RegExp) {
-  await page.goto("/");
+  await page.goto(SITE);
   const trigger = page.getByRole("button", { name: "Посмотреть пример" });
   await trigger.scrollIntoViewIfNeeded();
 

@@ -49,6 +49,76 @@
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/* ==========================================================================
+   ДВЕ ТЕМЫ, КОТОРЫЕ НЕ СПОРЯТ
+
+   Всё, что выше, — ПРИКЛАДНАЯ тема: светлая, для Workspace, мастера, проектов и основного
+   лендинга. Она остаётся собой и здесь ничем не переопределяется.
+
+   Ниже — МАРКЕТИНГОВАЯ тема: тёмная, только для публичного входного экрана. Она живёт в своём
+   пространстве имён (`--mk-*`) и включается атрибутом на корне поверхности, а не глобально.
+   Поэтому глобальной тёмной темы у продукта по-прежнему нет, и Workspace о ней не знает.
+
+   Почему пространство имён, а не переопределение `--paper` и `--line` внутри `[data-surface]`:
+   переопределение сделало бы «светлое» и «тёмное» одним и тем же токеном с разными значениями,
+   и любой компонент, случайно оказавшийся внутри маркетинговой поверхности, молча сменил бы
+   палитру. Разные имена делают принадлежность видимой в самом коде компонента.
+
+   Расширить тёмное на другие поверхности позже — значит поставить `data-surface="marketing"`
+   там, где нужно. Переписывать входной экран для этого не придётся.
+
+   Величины, не зависящие от темы, — радиусы, длительности, кривые, типографическая шкала и ритм
+   отступов — общие и объявлены один раз выше и ниже соответственно.
+   ========================================================================== */
+
+:root {
+  /* Типографическая шкала входного экрана. Отдельная от прикладной: у маркетинга свой масштаб —
+     заголовок обязан дышать на всю ширину, чего интерфейсу приложения никогда не нужно.
+     `clamp` вместо брейкпоинтов, чтобы между размерами экрана не было ступенек. */
+  --mk-text-eyebrow: 0.78rem;
+  --mk-text-body: clamp(1rem, 0.94rem + 0.3vw, 1.12rem);
+  --mk-text-display: clamp(2.35rem, 1.5rem + 2.9vw, 4rem);
+
+  /* Ритм отступов входного экрана — восьмёрка, шаг вдвое. Магические числа в компонентах
+     запрещены именно этим набором. */
+  --mk-space-2: 0.5rem;
+  --mk-space-3: 0.75rem;
+  --mk-space-4: 1rem;
+  --mk-space-6: 1.5rem;
+  --mk-space-8: 2rem;
+  --mk-space-12: 3rem;
+  --mk-space-16: 4rem;
+  --mk-space-24: 6rem;
+}
+
+[data-surface="marketing"] {
+  color-scheme: dark;
+
+  /* Поверхности. Не чёрный: чистый чёрный на большом экране выглядит дырой, а не материалом. */
+  --mk-bg: #0b0c0f;
+  --mk-bg-raised: #131519;
+  --mk-bg-sunken: #08090b;
+
+  /* Текст. Три уровня — больше не нужно, меньше не хватает на подпись под заголовком. */
+  --mk-text: #f4f5f7;
+  --mk-text-muted: rgba(244, 245, 247, 0.62);
+  --mk-text-faint: rgba(244, 245, 247, 0.38);
+
+  --mk-line: rgba(244, 245, 247, 0.1);
+  --mk-line-strong: rgba(244, 245, 247, 0.18);
+
+  /* Акцент тот же, что у продукта: платформа одна, и на входном экране она обязана быть узнаваемой.
+     Значение не дублируется — берётся из прикладных каналов акцента выше. */
+  --mk-accent: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+  --mk-accent-soft: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.14);
+  --mk-accent-contrast: #ffffff;
+
+  --mk-focus: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.75);
+
+  background: var(--mk-bg);
+  color: var(--mk-text);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -8901,4 +8971,546 @@ a.shell-account:hover {
 @media (prefers-reduced-motion: reduce) {
   .shell-menu { animation: none; }
   .auth-spinner { animation-duration: 2s; }
+}
+
+/* ==========================================================================
+   ПРИМИТИВ ДИАЛОГА
+
+   Стили одни на все подтверждения продукта. Диалог живёт в портале у `document.body`, поэтому
+   ни `backdrop-filter`, ни `transform` у предков на него больше не влияют — именно из-за них
+   окно выхода прижималось к правому краю шапки и обрезалось сверху.
+
+   Тема прикладная (светлая): все подтверждения продукта сейчас живут в приложении. Когда
+   диалог понадобится на маркетинговой поверхности, он получит вариант через `data-surface`, а
+   не вторую копию стилей.
+   ========================================================================== */
+
+.dialog-scrim {
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--mk-space-4);
+  background: rgba(9, 8, 7, 0.5);
+  backdrop-filter: blur(4px);
+  animation: dialog-scrim-in var(--motion-base) var(--ease-premium);
+}
+
+.dialog-panel {
+  display: grid;
+  width: min(26rem, 100%);
+  gap: var(--mk-space-3);
+  padding: var(--mk-space-8) var(--mk-space-6) var(--mk-space-6);
+  border-radius: var(--radius-lg);
+  background: #fff;
+  box-shadow: var(--shadow-lift);
+  text-align: center;
+  animation: dialog-panel-in var(--motion-slow) var(--ease-premium);
+}
+
+.dialog-panel:focus-visible,
+.dialog-panel:focus {
+  outline: none;
+}
+
+.dialog-icon {
+  display: grid;
+  height: 2.75rem;
+  width: 2.75rem;
+  justify-self: center;
+  place-content: center;
+  border-radius: var(--radius-md);
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.1);
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+}
+
+.dialog-panel.is-destructive .dialog-icon {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
+.dialog-title {
+  font-size: 1.05rem;
+  font-weight: 640;
+  color: #111214;
+}
+
+.dialog-text {
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: rgba(9, 8, 7, 0.62);
+}
+
+.dialog-actions {
+  display: grid;
+  margin-top: var(--mk-space-2);
+  gap: var(--mk-space-2);
+  grid-template-columns: 1fr 1fr;
+}
+
+.dialog-cancel,
+.dialog-confirm {
+  min-height: 2.6rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 560;
+  transition: background var(--motion-base) var(--ease-premium), opacity var(--motion-base) var(--ease-premium);
+}
+
+.dialog-cancel {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: rgba(9, 8, 7, 0.72);
+}
+
+.dialog-cancel:hover:not(:disabled) {
+  background: var(--silver);
+}
+
+.dialog-confirm {
+  background: #111214;
+  color: #fafaf8;
+}
+
+.dialog-confirm:hover:not(:disabled) {
+  background: #26282d;
+}
+
+.dialog-panel.is-destructive .dialog-confirm {
+  background: #dc2626;
+}
+
+.dialog-panel.is-destructive .dialog-confirm:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.dialog-cancel:disabled,
+.dialog-confirm:disabled {
+  opacity: 0.55;
+}
+
+/* Узкий экран: кнопки в столбец, подтверждение сверху — большой палец достаёт до низа, а не
+   до середины. */
+@media (max-width: 400px) {
+  .dialog-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .dialog-cancel {
+    order: 2;
+  }
+}
+
+@keyframes dialog-scrim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dialog-panel-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog-scrim,
+  .dialog-panel {
+    animation: none;
+  }
+}
+
+/* ==========================================================================
+   ВХОДНОЙ ЭКРАН
+
+   Маркетинговая поверхность: тёмная, локализованная, без рамки продукта. Все величины — из
+   шкалы `--mk-*`, объявленной в начале файла; магических чисел здесь нет намеренно, потому что
+   на этот экран будут возвращаться все следующие этапы.
+
+   Композиция: две колонки на широком экране, одна на узком. Текст и отсек экосистемы —
+   независимые ячейки сетки, а не соседи с взаимными отступами: сцена этапа 2 займёт свою
+   ячейку целиком, ничего не сдвинув.
+   ========================================================================== */
+
+.entry-screen {
+  display: grid;
+  min-height: 100svh;
+  grid-template-rows: auto 1fr auto;
+  padding: var(--mk-space-6) clamp(var(--mk-space-4), 4vw, var(--mk-space-16));
+  background: var(--mk-bg);
+  color: var(--mk-text);
+  /* Один скупой источник света вместо свечения по всему кадру: он обозначает, где будет ядро
+     системы, и на этом останавливается. */
+  background-image: radial-gradient(60rem 40rem at 78% 42%, var(--mk-accent-soft), transparent 70%);
+}
+
+/* ---- Верхняя панель: логотип и языки, больше ничего ---- */
+
+.entry-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mk-space-4);
+  padding-bottom: var(--mk-space-8);
+}
+
+.entry-brand-name {
+  font-size: 1.05rem;
+  font-weight: 620;
+  letter-spacing: 0.16em;
+  color: var(--mk-text);
+}
+
+.entry-lang {
+  position: relative;
+}
+
+.entry-lang-trigger {
+  min-height: 2.25rem;
+  padding: 0 var(--mk-space-3);
+  border: 1px solid var(--mk-line);
+  border-radius: var(--radius-sm);
+  color: var(--mk-text-muted);
+  font-size: 0.78rem;
+  font-weight: 560;
+  letter-spacing: 0.08em;
+  transition: color var(--motion-base) var(--ease-premium), border-color var(--motion-base) var(--ease-premium);
+}
+
+.entry-lang-trigger:hover,
+.entry-lang-trigger.is-open {
+  border-color: var(--mk-line-strong);
+  color: var(--mk-text);
+}
+
+.entry-lang-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + var(--mk-space-2));
+  right: 0;
+  display: grid;
+  min-width: 11rem;
+  padding: var(--mk-space-2);
+  border: 1px solid var(--mk-line);
+  border-radius: var(--radius-md);
+  background: var(--mk-bg-raised);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+.entry-lang-option {
+  display: flex;
+  align-items: baseline;
+  gap: var(--mk-space-3);
+  padding: var(--mk-space-2) var(--mk-space-3);
+  border-radius: var(--radius-xs);
+  color: var(--mk-text-muted);
+  font-size: 0.82rem;
+  text-align: left;
+  transition: background var(--motion-fast) var(--ease-premium), color var(--motion-fast) var(--ease-premium);
+}
+
+.entry-lang-option:hover {
+  background: rgba(244, 245, 247, 0.05);
+  color: var(--mk-text);
+}
+
+.entry-lang-option.is-active {
+  color: var(--mk-text);
+}
+
+.entry-lang-code {
+  min-width: 1.6rem;
+  font-weight: 620;
+  letter-spacing: 0.08em;
+}
+
+.entry-lang-name {
+  color: var(--mk-text-faint);
+}
+
+.entry-lang-option.is-active .entry-lang-name {
+  color: var(--mk-text-muted);
+}
+
+/* Честная оговорка об охвате перевода — тихо, но на виду у того, кто выбирает язык. */
+.entry-lang-scope {
+  margin-top: var(--mk-space-2);
+  padding: var(--mk-space-2) var(--mk-space-3) var(--mk-space-2);
+  border-top: 1px solid var(--mk-line);
+  color: var(--mk-text-faint);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+/* ---- Разворот ---- */
+
+.entry-main {
+  display: grid;
+  align-items: center;
+  gap: clamp(var(--mk-space-8), 5vw, var(--mk-space-24));
+  padding-bottom: var(--mk-space-8);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 900px) {
+  .entry-main {
+    /* Текст держит читаемую меру и не растягивается, остальное отдано сцене. */
+    grid-template-columns: minmax(20rem, 38rem) minmax(0, 1fr);
+  }
+}
+
+.entry-copy {
+  display: grid;
+  gap: var(--mk-space-6);
+  justify-items: start;
+}
+
+.entry-eyebrow {
+  color: var(--mk-text-faint);
+  font-size: var(--mk-text-eyebrow);
+  font-weight: 560;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.entry-headline {
+  margin: 0;
+  font-size: var(--mk-text-display);
+  font-weight: 620;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+
+/* Вторая строка приглушена: заголовок из двух утверждений, и второе — следствие первого. */
+.entry-headline-line:last-child {
+  color: var(--mk-text-muted);
+}
+
+.entry-lead {
+  max-width: 34rem;
+  color: var(--mk-text-muted);
+  font-size: var(--mk-text-body);
+  line-height: 1.6;
+}
+
+.entry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mk-space-3);
+  margin-top: var(--mk-space-2);
+}
+
+.entry-action {
+  display: inline-flex;
+  min-height: 3rem;
+  align-items: center;
+  gap: var(--mk-space-2);
+  padding: 0 var(--mk-space-6);
+  border-radius: var(--radius-sm);
+  font-size: 0.92rem;
+  font-weight: 560;
+  transition: background var(--motion-base) var(--ease-premium), border-color var(--motion-base) var(--ease-premium),
+    color var(--motion-base) var(--ease-premium);
+}
+
+.entry-action.is-primary {
+  background: var(--mk-accent);
+  color: var(--mk-accent-contrast);
+}
+
+.entry-action.is-primary:hover {
+  background: color-mix(in srgb, var(--mk-accent) 86%, #fff);
+}
+
+.entry-action.is-secondary {
+  border: 1px solid var(--mk-line-strong);
+  color: var(--mk-text-muted);
+}
+
+.entry-action.is-secondary:hover {
+  border-color: var(--mk-text-faint);
+  color: var(--mk-text);
+}
+
+.entry-action svg {
+  transition: transform var(--motion-base) var(--ease-premium);
+}
+
+.entry-action.is-primary:hover svg {
+  transform: translateX(3px);
+}
+
+/* Фокус виден на тёмном и не спорит с наведением. */
+.entry-action:focus-visible,
+.entry-lang-trigger:focus-visible,
+.entry-lang-option:focus-visible {
+  outline: 2px solid var(--mk-focus);
+  outline-offset: 3px;
+}
+
+/* ---- Отсек живой экосистемы (этап 2) ---- */
+
+.entry-ecosystem {
+  /* Соотношение сторон, а не высота по содержимому: место занято с первого кадра, и появление
+     сцены ничего не сдвинет. */
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-height: 70svh;
+}
+
+@media (min-width: 900px) {
+  .entry-ecosystem {
+    aspect-ratio: 4 / 3;
+  }
+}
+
+/* Сцена как очерченное поле: у пустоты появляется край, и она перестаёт читаться как «не
+   загрузилось». Рамка и метки остаются после этапа 2 — экосистема встаёт внутрь. */
+.entry-ecosystem-plane {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  border: 1px solid var(--mk-line);
+  border-radius: var(--radius-md);
+  /* Едва различимая разница тона: плоскость читается как поверхность, а не как вырез. */
+  background: linear-gradient(180deg, rgba(244, 245, 247, 0.022), rgba(244, 245, 247, 0.008));
+  /* Сцена сможет считать пропорции от плоскости, а не от окна: одна и та же сцена в широкой
+     колонке и в узкой полосе без отдельных веток кода. */
+  container-type: size;
+  contain: layout paint;
+}
+
+/* Приводочные метки: поле измерено, а не просто оставлено пустым.
+
+   Внутри поля, а не по самому краю: на скруглённом углу метка совпала бы с дугой рамки и
+   перестала бы читаться — получилась бы деталь, которая есть в коде и которой нет на экране. */
+.entry-plane-tick {
+  position: absolute;
+  height: 10px;
+  width: 10px;
+  border: 0 solid rgba(244, 245, 247, 0.26);
+}
+
+.entry-plane-tick.is-tl {
+  top: 14px;
+  left: 14px;
+  border-top-width: 1px;
+  border-left-width: 1px;
+}
+
+.entry-plane-tick.is-tr {
+  top: 14px;
+  right: 14px;
+  border-top-width: 1px;
+  border-right-width: 1px;
+}
+
+.entry-plane-tick.is-bl {
+  bottom: 14px;
+  left: 14px;
+  border-bottom-width: 1px;
+  border-left-width: 1px;
+}
+
+.entry-plane-tick.is-br {
+  bottom: 14px;
+  right: 14px;
+  border-bottom-width: 1px;
+  border-right-width: 1px;
+}
+
+/* ---- Основание композиции ---- */
+
+.entry-base {
+  display: flex;
+  align-items: center;
+  gap: var(--mk-space-4);
+  padding-top: var(--mk-space-6);
+}
+
+.entry-base-rule {
+  height: 1px;
+  flex: 1;
+  background: var(--mk-line);
+}
+
+/* Имя сцены стоит под самой сценой — как штамп на чертеже, а не как подпись ко всей странице. */
+.entry-base-name {
+  color: var(--mk-text-faint);
+  font-size: 0.7rem;
+  font-weight: 560;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* На узком экране сцена уступает первенство тексту: читают сверху вниз, и решение принимается
+   по словам, а не по картинке. Отсек не прячется — он становится ниже.
+
+   Две полосы разведены намеренно. На планшете места достаточно, чтобы кнопки стояли в строку и
+   отсек был широким, — сжимать там нечего. На телефоне кнопки занимают всю ширину: попасть
+   большим пальцем в половину строки труднее, чем в полосу. */
+@media (max-width: 899px) {
+  .entry-screen {
+    padding-top: var(--mk-space-4);
+  }
+
+  .entry-nav {
+    padding-bottom: var(--mk-space-6);
+  }
+
+  .entry-copy {
+    max-width: 40rem;
+  }
+
+  .entry-ecosystem {
+    aspect-ratio: 16 / 10;
+    max-height: 40svh;
+  }
+}
+
+@media (max-width: 599px) {
+  /* Трекинг 0.22em на узком экране растягивал строку от поля до поля. */
+  .entry-eyebrow {
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+  }
+
+  /* Композиция обязана помещаться в экран целиком: основание, до которого нужно доскроллить,
+     не закрывает композицию — оно её только обещает. Отсюда более плотный ритм и панорамная
+     сцена вместо крупного поля: на телефоне решение принимается по словам, сцена подтверждает. */
+  .entry-screen {
+    padding-bottom: var(--mk-space-4);
+  }
+
+  .entry-copy {
+    gap: var(--mk-space-4);
+  }
+
+  .entry-main {
+    gap: var(--mk-space-6);
+    padding-bottom: var(--mk-space-4);
+  }
+
+  .entry-actions {
+    width: 100%;
+    margin-top: 0;
+  }
+
+  .entry-action {
+    min-height: 2.85rem;
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+
+  .entry-ecosystem {
+    aspect-ratio: 21 / 9;
+    max-height: 22svh;
+  }
+
+  .entry-base {
+    padding-top: var(--mk-space-4);
+  }
 }

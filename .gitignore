@@ -22,3 +22,8 @@ tsconfig.tsbuildinfo
 npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
+
+# Референсы: в репозитории живут только выбранные — они часть спецификации редизайна.
+# Промежуточные генерации и отвергнутые варианты остаются локальными.
+/docs/references/*
+!/docs/references/selected/

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "./support/fixtures";
+import { siteSection } from "./support/routes";
 
 /**
  * Regression cover for the concept workspace scroll defect.
@@ -35,7 +36,7 @@ async function clickUntil(page: Page, click: () => Promise<void>, expected: () =
 }
 
 async function openConceptExample(page: Page) {
-  await page.goto("/#ai-анализ");
+  await page.goto(siteSection("#ai-анализ"));
 
   const dialog = page.getByRole("dialog");
   await clickUntil(
