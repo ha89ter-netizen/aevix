@@ -9549,16 +9549,16 @@ a.shell-account:hover {
 
 .eco-link {
   fill: none;
-  stroke: rgba(244, 245, 247, 0.16);
+  stroke: rgba(244, 245, 247, 0.24);
   stroke-width: 1;
   /* Закрытые пути не исчезают совсем: система помнит, что путь существует, просто сейчас не
      ведёт по нему данные. */
-  opacity: 0.12;
+  opacity: 0.18;
   transition: opacity 1.6s var(--ease-soft), stroke 1.6s var(--ease-soft);
 }
 
 .eco-link.is-open {
-  opacity: calc(0.3 + var(--w) * 0.4);
+  opacity: calc(0.42 + var(--w) * 0.45);
 }
 
 .eco-link.is-near {
@@ -9594,6 +9594,74 @@ a.shell-account:hover {
   filter: drop-shadow(0 0 4px rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.5));
 }
 
+/*
+   КОМЕТА
+
+   Раз в три секунды из ядра выходит импульс и летит к каждому умению. Не штрих, а комета: яркая
+   голова и два всё более длинных и тусклых следа за ней. Одной обводкой хвост не сделать —
+   она не умеет затухать вдоль пути, поэтому слоёв три, и различаются они длиной штриха,
+   толщиной и прозрачностью.
+
+   `pathLength: 100` делает скорость одинаковой независимо от длины спицы: иначе короткие
+   прострелило бы мгновенно, а длинные тянулись бы. Небольшой разброс вылета по удалённости
+   нужен, чтобы залп не выглядел командой «пли».
+
+   Всё считает композитор: ни одного кадра JavaScript.
+*/
+.eco-comet {
+  fill: none;
+  stroke: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+  stroke-linecap: round;
+  opacity: 0;
+  animation-duration: 3s;
+  animation-timing-function: cubic-bezier(0.34, 0.06, 0.2, 1);
+  animation-iteration-count: infinite;
+  animation-delay: calc(var(--reach, 0) * 0.25s + var(--fire, 0) * 3s);
+}
+
+/* Голова: короткая и почти白. Именно её глаз ведёт по пути. */
+.eco-comet.is-head {
+  stroke-width: 2;
+  stroke-dasharray: 3 97;
+  animation-name: eco-comet-head;
+}
+
+.eco-comet.is-mid {
+  stroke-width: 2.4;
+  stroke-dasharray: 9 91;
+  animation-name: eco-comet-mid;
+}
+
+/* Хвост: длинный, широкий и еле различимый — он додаёт направление, а не свет. */
+.eco-comet.is-tail {
+  stroke-width: 3.2;
+  stroke-dasharray: 20 80;
+  animation-name: eco-comet-tail;
+}
+
+/* Слои сдвинуты по смещению так, чтобы их передние края совпали: тогда хвост тянется ЗА
+   головой, а не перед ней. */
+@keyframes eco-comet-head {
+  0% { stroke-dashoffset: 0; opacity: 0; }
+  4% { opacity: 0.95; }
+  30% { stroke-dashoffset: -100; opacity: 0.9; }
+  34%, 100% { stroke-dashoffset: -100; opacity: 0; }
+}
+
+@keyframes eco-comet-mid {
+  0% { stroke-dashoffset: 6; opacity: 0; }
+  4% { opacity: 0.4; }
+  30% { stroke-dashoffset: -94; opacity: 0.36; }
+  34%, 100% { stroke-dashoffset: -94; opacity: 0; }
+}
+
+@keyframes eco-comet-tail {
+  0% { stroke-dashoffset: 17; opacity: 0; }
+  6% { opacity: 0.16; }
+  30% { stroke-dashoffset: -83; opacity: 0.13; }
+  34%, 100% { stroke-dashoffset: -83; opacity: 0; }
+}
+
 /* ---- Узлы ---- */
 
 .eco-node {
@@ -9604,34 +9672,85 @@ a.shell-account:hover {
   will-change: transform;
 }
 
-/* Анимация назначена всегда и лишь ставится на паузу. Снимать и возвращать её означало бы
-   начинать дыхание заново с нулевого кадра — узлы дёргались бы при каждом возвращении на
-   вкладку, ровно в тот момент, когда человек снова смотрит на сцену. */
-.eco-node {
-  animation: eco-breathe var(--dur, 12s) var(--ease-soft) var(--delay, 0s) infinite;
-  animation-play-state: paused;
+/*
+   ПРИЛЁТ
+
+   Комета долетела — умение отзывается свечением. Момент считается из тех же двух чисел, что и
+   полёт: удалённости и собственного времени вылета. Поэтому свет и прилёт — одно событие, а не
+   два совпадения, и подгонять их руками не приходится.
+
+   Голова кометы доходит до цели на 30% цикла, то есть через 0.9с после вылета; свет вспыхивает
+   там же и держится примерно полсекунды. Короче — человек не успевает заметить: первая версия
+   гасла за 0.27с, и её просто не видели.
+
+   И отдельно — мерцание. Раз в пять секунд, у каждого умения в свой момент: фаза берётся из
+   идентификатора и разнесена по всему периоду, поэтому мерцает всегда где-то, но никогда везде.
+*/
+.eco.is-breathing .eco-node-face {
+  animation:
+    eco-arrive 3s var(--ease-soft) calc(var(--reach, 0) * 0.25s + var(--fire, 0) * 3s + 0.9s) infinite,
+    eco-shimmer 5s ease-in-out var(--shimmer, 0s) infinite;
 }
 
-.eco.is-breathing .eco-node,
-.eco.is-breathing .eco-node-state {
-  animation-play-state: running;
-}
-
-@keyframes eco-breathe {
+@keyframes eco-arrive {
   0% {
-    transform: translate3d(-50%, -50%, 0) scale(var(--scale, 1));
+    transform: none;
+    color: var(--mk-text-muted);
+    border-color: rgba(244, 245, 247, 0.08);
+    box-shadow:
+      inset 0 1px 0 rgba(244, 245, 247, 0.06),
+      0 6px 18px rgba(0, 0, 0, 0.3);
   }
-  50% {
-    transform: translate3d(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px)), 0)
-      scale(calc(var(--scale, 1) * 1.025));
+  /* Вспышка в момент прилёта. */
+  2% {
+    transform: translateY(-1.5px) scale(1.03);
+    color: var(--mk-text);
+    border-color: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.9);
+    box-shadow:
+      inset 0 1px 0 rgba(244, 245, 247, 0.2),
+      0 6px 18px rgba(0, 0, 0, 0.3),
+      0 0 0 1px rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.4),
+      0 0 26px 3px rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.42);
   }
+  /* Держится, пока читается как «здесь только что поработали»… */
+  9% {
+    transform: translateY(-1px) scale(1.022);
+    color: var(--mk-text);
+    border-color: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.6);
+    box-shadow:
+      inset 0 1px 0 rgba(244, 245, 247, 0.16),
+      0 6px 18px rgba(0, 0, 0, 0.3),
+      0 0 20px 2px rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.26);
+  }
+  /* …и уходит. Резкое гашение выглядело бы лампочкой. */
+  22%,
   100% {
-    transform: translate3d(-50%, -50%, 0) scale(var(--scale, 1));
+    transform: none;
+    color: var(--mk-text-muted);
+    border-color: rgba(244, 245, 247, 0.08);
+    box-shadow:
+      inset 0 1px 0 rgba(244, 245, 247, 0.06),
+      0 6px 18px rgba(0, 0, 0, 0.3);
   }
 }
 
-.eco-node:focus {
-  outline: none;
+@keyframes eco-shimmer {
+  0%, 74%, 100% { filter: none; }
+  84% { filter: brightness(1.22); }
+}
+
+/* Ядро не вспыхивает: кометы из него ВЫЛЕТАЮТ, и прилетать туда нечему. Светящийся центр читался
+   бы как «сюда что-то пришло», то есть врал бы о направлении работы. */
+.eco.is-breathing .eco-node.is-core .eco-node-face {
+  animation: none;
+}
+
+/* Узел, с которым человек работает, не вспыхивает и не мерцает: отклик на действие важнее общего
+   ритма, а мигающая под курсором рамка выглядит поломкой. */
+.eco.is-breathing .eco-node.is-self .eco-node-face,
+.eco.is-breathing .eco-node.is-near .eco-node-face,
+.eco.is-breathing .eco-node.is-wanted .eco-node-face {
+  animation: none;
 }
 
 /* Стекло: слой света сверху, тон снизу и очень скромная тень. Ни неона, ни толстых рамок. */
@@ -9654,7 +9773,7 @@ a.shell-account:hover {
      пользуется, становится тише — и остаётся на сцене. */
   /* Заметность складывается из важности и плана: дальнее спокойнее ровно настолько, чтобы
      разницу нельзя было назвать словами. */
-  opacity: calc((0.4 + var(--w, 0.5) * 0.6) * (1 - var(--depth, 0.5) * 0.22));
+  opacity: calc((0.56 + var(--w, 0.5) * 0.44) * (1 - var(--depth, 0.5) * 0.18));
   transition:
     opacity var(--motion-slower) var(--ease-soft),
     border-color var(--motion-slower) var(--ease-soft),
@@ -9667,7 +9786,7 @@ a.shell-account:hover {
   height: 13px;
   width: 13px;
   flex: 0 0 auto;
-  color: rgba(244, 245, 247, 0.55);
+  color: rgba(244, 245, 247, 0.7);
   transition: color var(--motion-slower) var(--ease-soft);
 }
 
@@ -9761,6 +9880,14 @@ a.shell-account:hover {
   opacity: 1;
 }
 
+/* Узел, с которым человек сейчас работает, не вздрагивает и не перекрашивается волной: отклик
+   на действие важнее общего ритма, а мигающая под курсором рамка выглядит поломкой. */
+.eco.is-breathing .eco-node.is-self .eco-node-face,
+.eco.is-breathing .eco-node.is-near .eco-node-face,
+.eco.is-breathing .eco-node.is-wanted .eco-node-face {
+  animation: none;
+}
+
 /* Остальное не гаснет, а отступает: соседи отзываются мягко, сцена не взрывается. */
 .eco-node.is-dimmed .eco-node-face {
   opacity: calc(0.2 + var(--w, 0.5) * 0.2);
@@ -9815,6 +9942,8 @@ a.shell-account:hover {
 @media (prefers-reduced-motion: reduce) {
   .eco-node,
   .eco-node-state,
+  .eco-comet,
+  .eco.is-breathing .eco-node-face,
   .eco-node.is-sparked .eco-node-face {
     animation: none !important;
   }

@@ -111,7 +111,7 @@ test.describe("sidebar modes are mutually exclusive", () => {
 });
 
 test.describe("the logo is the universal way home", () => {
-  test("возвращает на публичный входной экран из глубины проекта", async ({ page }) => {
+  test("возвращает на главную сайта из глубины проекта", async ({ page }) => {
     await createProject(page, "Espresso Day");
     await openNav(page);
     // Deliberately not the Design section: a generated project opens its concept in a modal, and
@@ -120,13 +120,12 @@ test.describe("the logo is the universal way home", () => {
     await page.waitForURL("**/workflow");
 
     await page.locator(".shell-brand").click();
-    await page.waitForURL(/\/$/, { timeout: 10_000 });
+    await page.waitForURL(`**${SITE}`, { timeout: 10_000 });
 
-    // Публичный слой разделён надвое, и логотип изнутри продукта ведёт к началу — на входной
-    // экран, а не в первый блок лендинга. Проверяется именно смена опыта: рамки продукта здесь
-    // нет вовсе, поэтому её отсутствие и есть доказательство перехода.
-    await expect(page.locator(".entry-screen")).toBeVisible();
-    await expect(page.locator(".shell-header")).toHaveCount(0);
+    // От логотипа ждут «домой», а дом здесь — начало содержательного сайта, а не входной экран:
+    // его человек уже видел и шёл дальше. Проверяется и адрес, и то, что открылся именно герой.
+    await expect(page.locator("#главная")).toBeVisible();
+    await expect.poll(() => page.evaluate(() => window.scrollY), { timeout: 8000 }).toBeLessThan(150);
   });
 
   test("scrolls back to the Hero when already on the landing", async ({ page }) => {
