@@ -1066,7 +1066,7 @@ body::before {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }.hero-title {
-  max-width: 14ch;
+  max-width: min(14ch, 100%);
   font-size: clamp(3.05rem, 4.65vw, 5.05rem);
   line-height: 0.96;
   letter-spacing: -0.035em;
@@ -1082,7 +1082,7 @@ body::before {
 }
 
 .contact-title {
-  max-width: 14ch;
+  max-width: min(14ch, 100%);
   font-size: clamp(3rem, 6vw, 5.75rem);
   line-height: 0.98;
   letter-spacing: -0.035em;
@@ -2474,6 +2474,40 @@ body::before {
   background: var(--concept-bg);
   color: var(--concept-text);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+  /* Типографический пол ролей (этап 3, адаптивная типографика). Ниже него роль не проваливается,
+     даже если copy оказался длинным: H1 остаётся H1, а не body-текстом. Пол намеренно НЕ умножается
+     на --concept-heading-scale — это жёсткий минимум независимо от стиля; масштабируется потолок.
+     Значения выведены из существующей шкалы: h1-floor заметно выше section-floor, тот выше body. */
+  --concept-h1-floor: 2.2rem;
+  --concept-heading-floor: 1.55rem;
+}
+
+/* Пользовательский copy на сгенерированном сайте не переносится посреди слова и не режется дефисом.
+   Перенос — только между словами и только такой, «какой выбрал бы дизайнер»: text-wrap: balance на
+   заголовках уравнивает строки, а не отдаёт судьбу строки браузеру. Автоматический hyphens и
+   break-all под запретом: это они делали из «LUMIERE» → «LU-\nMIERE» и удешевляли сайт. Последний
+   предохранитель от горизонтального переполнения — overflow-wrap на самих заголовках (перенос слова
+   БЕЗ дефиса, только если слово физически шире строки), а до него не доводят бюджет copy и пол. */
+.concept-site :is(h1, h2, h3, h4, .concept-hero-copy > span),
+.concept-site :is(.concept-service-cards, .concept-service-columns, .concept-service-feature, .concept-service-list) strong,
+.concept-site .concept-hero-actions button {
+  hyphens: manual;
+  -webkit-hyphens: manual;
+  /* word-break: normal запрещает агрессивный разрыв латиницы посреди слова; overflow-wrap:
+     break-word — единственный разрешённый предохранитель: переносит слово БЕЗ дефиса и только
+     если оно физически шире строки. Вместе они дают «перенос между словами, слово целиком». */
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+.concept-site :is(h1, h2, h3, h4) {
+  text-wrap: balance;
+}
+/* Значимый copy нельзя обрывать многоточием: у сгенерированных заголовков и названий услуг снимаем
+   любые clamp-обрезки — если текст длинный, он переносится, а не исчезает под «…». */
+.concept-site :is(.concept-hero-copy h2, .concept-section-heading h3) {
+  overflow: visible;
+  text-overflow: clip;
+  -webkit-line-clamp: none;
 }
 
 .concept-site button:focus-visible,
@@ -2632,13 +2666,26 @@ body::before {
   transition: transform var(--motion-slow) var(--ease-premium), border-color var(--motion-slow) var(--ease-premium), box-shadow var(--motion-slow) var(--ease-premium);
 }
 
+/*
+  База hero — безопасная по построению.
+
+  Здесь НЕТ жёстких колонок: их задаёт семейство ниже по `data-hero`. Ключевое отличие от
+  прежней версии — `min-width: 0` и отсутствие `minmax(20rem, …)` на текстовой колонке: раньше
+  именно фиксированный пол на колонке фото давил заголовок, и тот наезжал. Теперь ни одна
+  геометрия не может передавить текст.
+*/
 .concept-hero {
   display: grid;
-  min-height: 36rem;
-  grid-template-columns: minmax(0, 1.1fr) minmax(20rem, 0.9fr);
+  min-width: 0;
+  min-height: 34rem;
   align-items: center;
   gap: 3rem;
   padding: calc(5rem * var(--concept-spacing)) 3.5rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.concept-hero > * {
+  min-width: 0;
 }
 
 .concept-hero-copy > p,
@@ -2651,13 +2698,32 @@ body::before {
   text-transform: uppercase;
 }
 
+.concept-hero-copy {
+  min-width: 0;
+}
+
 .concept-hero-copy h2 {
-  max-width: 12ch;
+  max-width: min(12ch, 100%);
   margin-top: 1rem;
-  font-size: calc(4rem * var(--concept-heading-scale));
+  /* Ответственная типографика, а не один магический размер: floor ≤ предпочтительный ≤ ceiling.
+     Предпочтительный размер считается от ШИРИНЫ КОНТЕЙНЕРА (cqi), а не окна — превью живёт в
+     container-type, и тот же сайт бывает узким на широком экране. При сужении контейнера H1
+     плавно едет к полу и НЕ ниже: длинный copy не превращает заголовок в микроскопический. Если
+     под полом он всё равно не помещается красиво — это сигнал менять copy/композицию (см. бюджет
+     в concept-composition.ts), а не жать шрифт дальше. */
+  /* Коэффициент cqi подобран под ДОЛЮ КОНТЕЙНЕРА, которую занимает колонка заголовка (cqi считается
+     от ширины устройства). База обслуживает split и canvas — двухколоночные, колонка ~0.5 экрана,
+     поэтому 4.5cqi: при 1200px это ~54px, что помещается в ~540px колонку в 2–3 строки, не стекая
+     по слову в строку. Одноколоночные statement/image-led берут больший коэффициент в своих
+     правилах — у них колонка почти во весь экран. Так заголовок соразмерен СВОЕЙ колонке. */
+  font-size: clamp(var(--concept-h1-floor), 4.5cqi, calc(4rem * var(--concept-heading-scale)));
   font-weight: var(--concept-heading-weight);
-  line-height: 0.98;
+  line-height: 1;
   letter-spacing: var(--concept-letter-spacing);
+  /* Последний предохранитель от переполнения — перенос слова БЕЗ дефиса (overflow-wrap, не
+     hyphens: auto и не break-all). Срабатывает лишь на слове шире строки; до него не доводят пол
+     выше и бюджет copy. Глобальная политика ставит hyphens: manual и word-break: normal. */
+  overflow-wrap: break-word;
 }
 
 .concept-hero-copy > span {
@@ -2755,11 +2821,13 @@ body::before {
 
 .concept-section-heading h3,
 .concept-action-section h3 {
-  max-width: 18ch;
+  max-width: min(18ch, 100%);
   margin-top: 0.75rem;
-  font-size: calc(2.6rem * var(--concept-heading-scale));
+  /* Тот же принцип, что у H1: floored clamp от ширины контейнера, а не фиксированный размер со
+     ступенями. H2/H3 не проваливаются ниже heading-floor, даже когда заголовок секции длинный. */
+  font-size: clamp(var(--concept-heading-floor), 4cqi, calc(2.6rem * var(--concept-heading-scale)));
   font-weight: var(--concept-heading-weight);
-  line-height: 1.08;
+  line-height: 1.1;
   letter-spacing: var(--concept-letter-spacing);
 }
 
@@ -3408,75 +3476,15 @@ body::before {
   letter-spacing: 0.2em;
 }
 
-.concept-site[data-layout="editorial"] .concept-hero {
-  grid-template-columns: 1fr;
-  gap: 2.5rem;
-  min-height: 0;
-  padding-top: calc(4rem * var(--concept-spacing));
-  text-align: left;
-}
+/*
+  Секционные правила этой раскладки удалены (этап 3, доведение). Композицией всех секций теперь
+  управляет ОДНА ось — композиционное семейство (`data-family`): hero, услуги, галерея, about,
+  контакты, прайс. `data-layout` сведён к вариации НАВИГАЦИИ (правила `.concept-nav` выше и
+  showcase-nav ниже) — это микро-вариация внутри семейства, а не вторая ось композиции. Так
+  ушёл конфликт двух осей, из-за которого стиль не управлял композицией.
+*/
 
-.concept-site[data-layout="editorial"] .concept-hero-copy h2 {
-  max-width: 18ch;
-  font-size: calc(4.6rem * var(--concept-heading-scale));
-  line-height: 1.02;
-}
-
-.concept-site[data-layout="editorial"] .concept-hero-visual {
-  min-height: 21rem;
-  border-radius: 0;
-  box-shadow: none;
-}
-
-.concept-site[data-layout="editorial"] .concept-section-heading h3 {
-  max-width: 24ch;
-  font-size: calc(3rem * var(--concept-heading-scale));
-}
-
-.concept-site[data-layout="editorial"] .concept-section {
-  border-top-width: 2px;
-}
-
-.concept-site[data-layout="editorial"] .concept-list-grid {
-  gap: 0;
-}
-
-.concept-site[data-layout="editorial"] .concept-list-grid article {
-  min-height: 10rem;
-  border: none;
-  border-top: 1px solid color-mix(in srgb, var(--concept-text) 14%, transparent);
-  border-radius: 0;
-  background: transparent;
-  padding: 1.35rem 1.35rem 1.35rem 0;
-}
-
-.concept-site[data-layout="editorial"] .concept-pricelist {
-  display: block;
-  max-width: none;
-  column-count: 2;
-  column-gap: 3.5rem;
-}
-
-.concept-site[data-layout="editorial"] .concept-pricelist-row {
-  break-inside: avoid;
-}
-
-.concept-site[data-layout="editorial"] .concept-gallery-frame,
-.concept-site[data-layout="editorial"] .concept-review-card,
-.concept-site[data-layout="editorial"] .concept-about-photo {
-  border-radius: 0;
-}
-
-.concept-site[data-layout="editorial"] .concept-about-cta {
-  border-radius: 0;
-  border-top: 2px solid var(--concept-text);
-  border-bottom: 2px solid var(--concept-text);
-  background: transparent;
-  padding-inline: 0;
-}
-
-/* ---- Showcase: immersive — full-bleed hero image with overlay copy, the
-   navigation floats on top, gallery becomes a snap strip, elevated cards. ---- */
+/* ---- Showcase: вариация навигации (плавающая поверх, светлый текст). ---- */
 
 .concept-site[data-layout="showcase"] {
   --showcase-nav-text: #fff;
@@ -3513,80 +3521,8 @@ body::before {
   color: #14151a;
 }
 
-.concept-site[data-layout="showcase"] .concept-hero {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  min-height: 42rem;
-  align-items: flex-end;
-  padding-top: calc(8rem * var(--concept-spacing));
-}
-
-.concept-site[data-layout="showcase"] .concept-hero-copy {
-  position: relative;
-  z-index: 2;
-  max-width: 44rem;
-  color: #fff;
-}
-
-.concept-site[data-layout="showcase"] .concept-hero-copy > p {
-  color: rgba(255, 255, 255, 0.75);
-}
-
-.concept-site[data-layout="showcase"] .concept-hero-copy > span {
-  color: rgba(255, 255, 255, 0.78);
-}
-
-.concept-site[data-layout="showcase"] .concept-hero-copy button:last-child {
-  border-color: rgba(255, 255, 255, 0.45);
-  color: #fff;
-}
-
-.concept-site[data-layout="showcase"] .concept-hero-visual {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  min-height: 0;
-  border-radius: 0;
-  box-shadow: none;
-}
-
-.concept-site[data-layout="showcase"] .concept-hero-visual::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  background: linear-gradient(200deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.62));
-}
-
-.concept-site[data-layout="showcase"] .concept-hero-visual-caption {
-  display: none;
-}
-
-.concept-site[data-layout="showcase"] .concept-gallery-grid {
-  display: flex;
-  gap: 0.75rem;
-  overflow-x: auto;
-  padding-bottom: 0.75rem;
-  scroll-snap-type: x mandatory;
-}
-
-.concept-site[data-layout="showcase"] .concept-gallery-frame {
-  flex: 0 0 clamp(15rem, 38cqw, 22rem);
-  min-height: 14rem;
-  scroll-snap-align: start;
-}
-
-.concept-site[data-layout="showcase"] .concept-list-grid article,
-.concept-site[data-layout="showcase"] .concept-review-card {
-  border-color: transparent;
-  box-shadow: var(--concept-shadow-sm);
-}
-
-.concept-site[data-layout="showcase"] .concept-about-cta {
-  box-shadow: var(--concept-shadow-lg);
-  background: var(--concept-surface);
-}
+/* Секционные правила showcase удалены — по той же причине, что и editorial: композицию секций
+   ведёт семейство. Осталась только навигация выше. */
 
 @container (max-width: 680px) {
   .concept-nav {
@@ -3613,10 +3549,8 @@ body::before {
     padding: 3.5rem 1.25rem 2rem;
   }
 
-  .concept-hero-copy h2 {
-    font-size: 2.7rem;
-  }
-
+  /* Размеры H1/H3 здесь больше не переопределяются фиксированным calc — ими управляет floored
+     clamp(cqi) из базовых правил. Остаётся только перекладка сетки и колонок кнопок. */
   .concept-hero-copy > div {
     flex-direction: column;
   }
@@ -3631,11 +3565,6 @@ body::before {
 
   .concept-section {
     padding: 3.5rem 1.25rem;
-  }
-
-  .concept-section-heading h3,
-  .concept-action-section h3 {
-    font-size: 2rem;
   }
 
   .concept-list-grid,
@@ -3693,25 +3622,8 @@ body::before {
     font-size: 2.6rem;
   }
 
-  .concept-site[data-layout="editorial"] .concept-pricelist {
-    column-count: 1;
-  }
-
-  .concept-site[data-layout="editorial"] .concept-hero-copy h2 {
-    font-size: 2.9rem;
-  }
-
   .concept-site[data-layout="editorial"] .concept-nav {
     padding: 1.1rem 1.25rem 0.9rem;
-  }
-
-  .concept-site[data-layout="showcase"] .concept-hero {
-    min-height: 30rem;
-    padding-top: 6rem;
-  }
-
-  .concept-site[data-layout="showcase"] .concept-gallery-frame {
-    flex-basis: 78cqw;
   }
 }
 
@@ -9956,4 +9868,512 @@ a.shell-account:hover {
   .eco-link.is-open {
     opacity: calc(0.34 + var(--w) * 0.36);
   }
+}
+
+/* ==========================================================================
+   КОМПОЗИЦИОННЫЕ СЕМЕЙСТВА (этап 3)
+
+   Геометрия сгенерированных сайтов. Стиль выбирает семейство (см. concept-composition.ts), а
+   семейство здесь задаёт РАЗНУЮ композицию: hero, подачу услуг, ритм, работу с фото. Токены
+   (цвет, радиус, тень) — отдельный слой поверх, поэтому два стиля одного семейства всё равно
+   различимы, а разные семейства различимы даже без цвета и радиуса — на чёрно-белом каркасе.
+
+   Живёт целиком в слое `--concept-*`; ни один токен маркетинговой темы (`--mk-*`) сюда не
+   заходит и наоборот.
+   ========================================================================== */
+
+/* ---- HERO: пять геометрий ---- */
+
+/* split — две колонки, текст и фото рядом. Оба minmax с нулевым полом: текст непередавим. */
+.concept-hero[data-hero="split"] {
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+}
+
+/* statement — только типографика по центру; фото широким блоком под заявлением. */
+.concept-hero[data-hero="statement"] {
+  justify-items: center;
+  text-align: center;
+  gap: 3.5rem;
+  padding-top: calc(6rem * var(--concept-spacing));
+}
+.concept-hero[data-hero="statement"] .concept-hero-copy {
+  max-width: 52rem;
+}
+.concept-hero[data-hero="statement"] .concept-hero-copy h2 {
+  max-width: min(18ch, 100%);
+  margin-inline: auto;
+  /* statement — одна широкая колонка по центру: коэффициент крупнее, заголовок доминирует. */
+  font-size: clamp(var(--concept-h1-floor), 6cqi, calc(4.4rem * var(--concept-heading-scale)));
+}
+.concept-hero[data-hero="statement"] .concept-hero-actions {
+  justify-content: center;
+}
+.concept-hero[data-hero="statement"] .concept-hero-visual {
+  width: 100%;
+  min-height: 24rem;
+}
+
+/* image-led — фото занимает экран, копия лежит поверх снизу в безопасном контейнере. */
+.concept-hero[data-hero="image-led"] {
+  position: relative;
+  min-height: 40rem;
+  padding: 0;
+  align-items: stretch;
+}
+.concept-hero[data-hero="image-led"] .concept-hero-visual {
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
+  min-height: 0;
+}
+.concept-hero[data-hero="image-led"] .concept-hero-overlay {
+  position: relative;
+  z-index: 1;
+  align-self: end;
+  width: 100%;
+  padding: 3.5rem;
+  /* Подложка снизу — чтобы текст читался поверх любого фото. */
+  background: linear-gradient(to top, rgba(8, 9, 11, 0.78) 8%, rgba(8, 9, 11, 0.4) 46%, transparent);
+}
+.concept-hero[data-hero="image-led"] .concept-hero-copy > p,
+.concept-hero[data-hero="image-led"] .concept-hero-copy h2,
+.concept-hero[data-hero="image-led"] .concept-hero-copy > span {
+  color: #fff;
+}
+.concept-hero[data-hero="image-led"] .concept-hero-copy h2 {
+  max-width: min(20ch, 100%);
+  /* image-led — копия во всю ширину экрана поверх фото: тоже крупный коэффициент. */
+  font-size: clamp(var(--concept-h1-floor), 6cqi, calc(4.2rem * var(--concept-heading-scale)));
+}
+.concept-hero[data-hero="image-led"] .concept-hero-copy > span {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+/* overlap — редакционный наезд: копия заходит на фото контролируемо. */
+.concept-hero[data-hero="overlap"] {
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  align-items: center;
+}
+.concept-hero[data-hero="overlap"] .concept-hero-copy {
+  position: relative;
+  z-index: 1;
+  /* Наезд ровно на 4rem и только когда есть куда: на узком экране правило снимается ниже. */
+  margin-right: -4rem;
+  padding: 2rem;
+  background: color-mix(in srgb, var(--concept-bg) 82%, transparent);
+  backdrop-filter: blur(6px);
+}
+.concept-hero[data-hero="overlap"] .concept-hero-copy h2 {
+  /* overlap — колонка самая узкая (~0.44 экрана): самый малый коэффициент, иначе заголовок вдвое
+     крупнее колонки и слова стекают по одному (ровно этот баг ловил стресс-тест — 74px в 441px). */
+  font-size: clamp(var(--concept-h1-floor), 3.6cqi, calc(4.4rem * var(--concept-heading-scale)));
+  /* Мера редакционного столбца согласована с бюджетом И с длиной слов языка: 18ch вмещает
+     длинное русское слово (11–13 букв) в тяжёлом display-начертании ЦЕЛИКОМ, не разрывая его.
+     Прежние 14–16ch были уже длинного слова — и overflow-wrap ломал «уверенности» пополам
+     (поймано стресс-тестом: честные 4 строки превращались в 5 с разрезанным словом). Узость —
+     характер, но не ценой разорванного слова. */
+  max-width: min(18ch, 100%);
+}
+
+/* canvas — асимметрия: копия в одном углу, фото смещено в противоположный. */
+.concept-hero[data-hero="canvas"] {
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: start;
+  gap: 2rem;
+  padding-top: calc(4rem * var(--concept-spacing));
+}
+.concept-hero[data-hero="canvas"] .concept-hero-copy {
+  align-self: center;
+}
+.concept-hero[data-hero="canvas"] .concept-hero-copy h2 {
+  /* Как overlap: мера вмещает длинное слово целиком (см. соседний комментарий). */
+  max-width: min(17ch, 100%);
+}
+.concept-hero[data-hero="canvas"] .concept-hero-visual {
+  min-height: 32rem;
+  margin-top: 2.5rem;
+}
+
+.concept-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 2rem;
+  /* Кнопки не должны выталкивать друг друга за край: на тесном контейнере ряд переносится, а
+     длинный CTA переносится целым словом (см. глобальную политику — hyphens: manual). */
+  max-width: 100%;
+}
+.concept-hero-actions button {
+  min-width: 0;
+  white-space: normal;
+}
+
+/* ---- УСЛУГИ: четыре подачи ---- */
+
+/* cards — сдержанная сетка карточек. */
+.concept-service-cards {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+}
+.concept-service-cards article {
+  min-width: 0;
+  padding: 1.75rem;
+  border: var(--concept-border-width) solid var(--concept-border);
+  border-radius: var(--concept-radius);
+  background: var(--concept-surface);
+}
+.concept-service-cards small {
+  color: var(--concept-accent);
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+.concept-service-cards strong,
+.concept-service-columns strong,
+.concept-service-feature strong,
+.concept-service-list strong {
+  display: block;
+  margin-top: 0.6rem;
+  font-size: 1.05rem;
+  font-weight: var(--concept-heading-weight);
+}
+.concept-service-cards span,
+.concept-service-columns span,
+.concept-service-feature .concept-service-rest span {
+  color: color-mix(in srgb, var(--concept-text) 56%, transparent);
+  font-size: 0.9rem;
+}
+
+/* list — типографический список, минимум рамок. */
+.concept-service-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.concept-service-list li {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 1.5rem;
+  padding: 1.4rem 0;
+  border-top: 1px solid var(--concept-border);
+}
+.concept-service-list li:last-child {
+  border-bottom: 1px solid var(--concept-border);
+}
+.concept-service-list small {
+  color: var(--concept-accent);
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+.concept-service-list strong {
+  margin: 0;
+  font-size: 1.5rem;
+}
+.concept-service-list span {
+  color: color-mix(in srgb, var(--concept-text) 56%, transparent);
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+/* columns — категории в колонках для каталожных бизнесов. */
+.concept-service-columns {
+  display: grid;
+  gap: 1rem 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+}
+.concept-service-columns article {
+  min-width: 0;
+  padding: 1.1rem 0;
+  border-bottom: 1px solid var(--concept-border);
+}
+.concept-service-columns strong {
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+/* feature — одно направление крупно, остальные тихо рядом. */
+.concept-service-feature {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  align-items: stretch;
+}
+.concept-service-lead {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 2.5rem;
+  border-radius: var(--concept-radius);
+  background: color-mix(in srgb, var(--concept-accent) 12%, var(--concept-surface));
+  border: var(--concept-border-width) solid var(--concept-border);
+}
+.concept-service-lead strong {
+  margin: 0;
+  font-size: 2rem;
+}
+.concept-service-lead span {
+  margin-top: 0.5rem;
+  color: var(--concept-accent);
+  font-weight: 600;
+}
+.concept-service-rest {
+  min-width: 0;
+  display: grid;
+  gap: 0.75rem;
+  align-content: center;
+}
+.concept-service-rest article {
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid var(--concept-border);
+}
+.concept-service-rest strong {
+  margin: 0;
+  font-size: 1rem;
+}
+
+/* ---- РИТМ СЕКЦИЙ по семейству ---- */
+
+.concept-site[data-family="editorial"] .concept-section,
+.concept-site[data-family="minimal"] .concept-section {
+  padding-block: calc(6.5rem * var(--concept-spacing));
+}
+.concept-site[data-family="technical"] .concept-section {
+  padding-block: calc(3.5rem * var(--concept-spacing));
+}
+
+/* Редакционное семейство ломает ровную сетку заголовков — уводит их влево и крупнит. */
+.concept-site[data-family="editorial"] .concept-section-heading h3 {
+  font-size: clamp(var(--concept-heading-floor), 4.4cqi, calc(2.8rem * var(--concept-heading-scale)));
+  max-width: 16ch;
+}
+/* Техническое — наоборот, жёсткая метка-заголовок. */
+.concept-site[data-family="technical"] .concept-section-heading > p {
+  border-left: 3px solid var(--concept-accent);
+  padding-left: 0.75rem;
+}
+
+/* ==========================================================================
+   АДАПТИВ СЕМЕЙСТВ
+
+   `@container`, а НЕ `@media`. Превью концепта живёт внутри `.concept-device` с
+   `container-type: inline-size`, и его ширина не равна ширине окна: тот же сайт бывает узким на
+   широком экране (device-режим «планшет/телефон», открытая панель дизайнера). Правила по
+   ширине окна на узком контейнере не срабатывали бы — и наезжающий hero резал бы заголовок.
+   Это и был первый дефект реализации, пойманный на скриншоте.
+
+   На узком контейнере композиция ПЕРЕСТРАИВАЕТСЯ в одну колонку, но характер остаётся: наезды
+   снимаются (иначе они станут обрезкой), фото не диктует ширину, текст всегда читаем.
+   ========================================================================== */
+/*
+  Промежуточный порог для двухколоночных hero с КРУПНЫМ заголовком.
+
+  overlap и canvas несут самый большой H1 (редакционный и технический характер), и на ширине
+  720–950 две колонки становятся так тесны, что длинное слово в заголовке вылезает за колонку.
+  Ниже 960 они переходят в одну колонку раньше остальных — это про размер шрифта относительно
+  колонки, а не про экран целиком, поэтому порог свой.
+*/
+@container (max-width: 960px) {
+  .concept-hero[data-hero="overlap"],
+  .concept-hero[data-hero="canvas"] {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2rem;
+  }
+  .concept-hero[data-hero="overlap"] .concept-hero-copy {
+    margin-right: 0;
+    background: transparent;
+    backdrop-filter: none;
+    padding: 0;
+  }
+  .concept-hero[data-hero="canvas"] .concept-hero-visual {
+    margin-top: 0;
+    min-height: 24rem;
+  }
+}
+
+@container (max-width: 720px) {
+  .concept-hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2rem;
+    padding: 3rem 1.75rem;
+    min-height: 0;
+  }
+  /* Наезд убирается: контейнеру некуда заходить, и наезд стал бы обрезкой. */
+  .concept-hero[data-hero="overlap"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .concept-hero[data-hero="overlap"] .concept-hero-copy {
+    margin-right: 0;
+    background: transparent;
+    backdrop-filter: none;
+    padding: 0;
+  }
+  .concept-hero[data-hero="canvas"],
+  .concept-hero[data-hero="split"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .concept-hero[data-hero="canvas"] .concept-hero-visual {
+    margin-top: 0;
+    min-height: 22rem;
+  }
+  .concept-hero[data-hero="image-led"] {
+    min-height: 30rem;
+  }
+  /* Размер H1 больше НЕ задаётся ступенями по брейкпоинту: floored clamp(cqi) выше уже плавно
+     ведёт его к полу при сужении контейнера. Две механики размера конфликтовали бы, и фиксированный
+     calc мог уйти под пол при малом heading-scale. Здесь остаётся только перекладка сетки. */
+  .concept-service-feature {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container (max-width: 460px) {
+  .concept-service-list li {
+    grid-template-columns: 2rem minmax(0, 1fr);
+    grid-template-areas: "num name" ". price";
+    gap: 0.35rem 1rem;
+  }
+  .concept-service-list li > strong {
+    grid-area: name;
+  }
+  .concept-service-list li > span {
+    grid-area: price;
+  }
+  .concept-service-list strong {
+    font-size: 1.15rem;
+  }
+  .concept-hero-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* ==========================================================================
+   ГЕОМЕТРИЯ СЕКЦИЙ ПО СЕМЕЙСТВУ (этап 3, доведение)
+
+   Не только hero и услуги: about, галерея, контакты и прайс тоже меняют геометрию по семейству.
+   Это то, что доводит систему до конца — стиль ощущается как работа одного арт-директора на всех
+   секциях, а не только на первом экране. Всё через `data-family`, в слое `--concept-*`.
+   ========================================================================== */
+
+/* ---- Галерея: ритм кадров зависит от семейства ---- */
+
+/* editorial — крупные асимметричные кадры, редакционный разворот. */
+.concept-site[data-family="editorial"] .concept-gallery-grid {
+  grid-template-columns: repeat(6, 1fr);
+}
+.concept-site[data-family="editorial"] .concept-gallery-frame-1 {
+  grid-column: span 4;
+  grid-row: span 2;
+}
+.concept-site[data-family="editorial"] .concept-gallery-frame {
+  grid-column: span 2;
+}
+/* gallery — фото главный материал: плотная мозаика во всю ширину. */
+.concept-site[data-family="gallery"] .concept-gallery-grid {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+.concept-site[data-family="gallery"] .concept-gallery-frame-1 {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+/* minimal — одна-две крупные фотографии, максимум воздуха. */
+.concept-site[data-family="minimal"] .concept-gallery-grid {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+}
+/* technical — жёсткая ровная решётка. */
+.concept-site[data-family="technical"] .concept-gallery-grid {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+}
+.concept-site[data-family="technical"] .concept-gallery-frame {
+  border-radius: 0;
+}
+
+/* ---- Контакты: строгие семейства кладут карту сбоку, воздушные — крупно ---- */
+
+.concept-site[data-family="minimal"] .concept-contacts-grid,
+.concept-site[data-family="editorial"] .concept-contacts-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3rem;
+}
+.concept-site[data-family="technical"] .concept-contacts-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+}
+
+/* ---- About: редакционные семейства уводят историю в узкую колонку с крупной врезкой ---- */
+
+.concept-site[data-family="editorial"] .concept-about-story,
+.concept-site[data-family="minimal"] .concept-about-story {
+  max-width: 42rem;
+  font-size: 1.15rem;
+  line-height: 1.8;
+}
+.concept-site[data-family="editorial"] .concept-about-mission {
+  font-size: 2rem;
+  line-height: 1.2;
+  border: none;
+  padding-left: 0;
+}
+
+/* ---- Прайс: технические — плотная таблица, воздушные — разреженный список ---- */
+
+.concept-site[data-family="technical"] .concept-pricelist {
+  column-gap: 3rem;
+}
+.concept-site[data-family="technical"] .concept-pricelist-row {
+  padding-block: 0.55rem;
+}
+.concept-site[data-family="minimal"] .concept-pricelist-row,
+.concept-site[data-family="organic"] .concept-pricelist-row {
+  padding-block: 1.1rem;
+}
+
+/* ==========================================================================
+   ORGANIC — мягкое семейство
+
+   Тот же split-hero, что у structured, но другой характер: крупные скругления, смещённое фото,
+   свободная сетка. Именно средствами композиции, БЕЗ декоративных blob'ов и пятен.
+   ========================================================================== */
+
+.concept-site[data-family="organic"] .concept-hero {
+  gap: 3.5rem;
+  align-items: center;
+}
+.concept-site[data-family="organic"] .concept-hero-visual {
+  border-radius: clamp(1.5rem, 4cqw, 3rem);
+  /* Фото чуть выше базовой линии текста — мягкая асимметрия вместо жёсткого выравнивания. */
+  transform: translateY(-1.5rem);
+}
+.concept-site[data-family="organic"] .concept-hero-copy h2 {
+  line-height: 1.08;
+}
+.concept-site[data-family="organic"] .concept-service-columns article {
+  border-bottom: none;
+  padding: 1.25rem 1.5rem;
+  border-radius: clamp(1rem, 3cqw, 1.75rem);
+  background: color-mix(in srgb, var(--concept-accent) 7%, var(--concept-surface));
+}
+.concept-site[data-family="organic"] .concept-section-heading h3 {
+  border-radius: 0;
+}
+/* Structured — противоположность organic: рамка строгая, ничего не смещено. */
+.concept-site[data-family="structured"] .concept-hero-visual {
+  border: var(--concept-border-width) solid var(--concept-border);
+}
+.concept-site[data-family="structured"] .concept-service-columns {
+  gap: 0;
+}
+.concept-site[data-family="structured"] .concept-service-columns article {
+  padding: 1.1rem 1.25rem;
+  border-bottom: 1px solid var(--concept-border);
 }

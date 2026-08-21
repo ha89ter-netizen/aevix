@@ -27,6 +27,9 @@ import { ConceptSidebar } from "@/components/concept-sidebar";
 import { cn } from "@/lib/utils";
 import { conceptImagesFor, type ConceptImagery } from "@/lib/concept-images";
 import { businessKnowledgeFor, type BusinessKnowledge } from "@/lib/business-knowledge";
+import { compositionForStyle, type FamilyComposition } from "@/lib/concept-composition";
+import { ConceptHero } from "@/components/concept/ConceptHero";
+import { ConceptServices } from "@/components/concept/ConceptServices";
 import { SECTION_LABELS, useDesignerSelection } from "@/components/workspace/designer-selection";
 import { motionTransition } from "@/lib/motion";
 import {
@@ -191,6 +194,7 @@ function ConceptSection({
   offers,
   businessName,
   city,
+  composition,
 }: {
   section: WebsiteConceptSection;
   isHomePage: boolean;
@@ -202,6 +206,8 @@ function ConceptSection({
   /** The project's own price list when it has one; otherwise the niche defaults are used. */
   offers?: WebsiteConcept["offers"];
   businessName: string;
+  /** Геометрия семейства: как подавать услуги, сколько показывать в превью на главной. */
+  composition: FamilyComposition;
 }) {
   if (section.type === "pricing") {
     // The catalogue: products for product businesses (menu/rooms/каталог), the full service
@@ -233,27 +239,19 @@ function ConceptSection({
   }
 
   if (section.type === "services") {
-    // Home shows a 3-card teaser; inner pages show up to 6 — the exhaustive list with prices
-    // is the pricing section's job, so these cards never duplicate it.
-    const limit = isHomePage ? 3 : 6;
-    const cards = (offers?.services ?? knowledge.services).slice(0, limit);
+    // Превью характера бизнеса, а не каталог: полный список с ценами — работа секции pricing,
+    // поэтому эти карточки её никогда не дублируют. Сколько показывать и какой подачей — решает
+    // семейство; на внутренних страницах превью чуть шире.
+    const limit = isHomePage ? composition.homeServiceCount : Math.max(6, composition.homeServiceCount);
+    const services = (offers?.services ?? knowledge.services).slice(0, limit);
     return (
-      <section className="concept-section concept-list-section">
-        <div className="concept-section-heading">
-          <p>{knowledge.servicesTitle}</p>
-          <h3>{section.title}</h3>
-          {section.text ? <span>{section.text}</span> : null}
-        </div>
-        <div className="concept-list-grid">
-          {cards.map((card, index) => (
-            <article key={card.name}>
-              <small>{String(index + 1).padStart(2, "0")}</small>
-              <strong>{card.name}</strong>
-              <span>{card.price}</span>
-            </article>
-          ))}
-        </div>
-      </section>
+      <ConceptServices
+        kind={composition.services}
+        eyebrow={knowledge.servicesTitle}
+        title={section.title}
+        text={section.text || undefined}
+        services={services}
+      />
     );
   }
 
@@ -513,6 +511,9 @@ function ConceptPreview({
   const imagery = conceptImagesFor(concept.businessType, concept.businessName);
   const knowledge = businessKnowledgeFor(concept.businessType, concept.businessName);
   const layout = resolveConceptLayout(concept);
+  // Композиционное семейство стиля — оно и задаёт геометрию hero и подачу услуг. Именно этой
+  // связи стиля с композицией раньше не было, из-за чего разные стили выглядели одинаково.
+  const composition = compositionForStyle(concept.styleId);
   const identity = useMemo(() => generateVisualIdentity(concept.colorIds, concept.styleId), [concept.colorIds, concept.styleId]);
   const style = {
     "--concept-bg": identity.palette.background,
@@ -574,7 +575,7 @@ function ConceptPreview({
         className={cn("concept-device", `concept-device-${mode}`)}
         transition={motionTransition.slow}
       >
-        <div className="concept-site" data-layout={layout} style={style}>
+        <div className="concept-site" data-layout={layout} data-family={composition.family} style={style}>
           <div className="concept-atmosphere" aria-hidden="true">
             <span className="concept-orb concept-orb-1" />
             <span className="concept-orb concept-orb-2" />
@@ -602,26 +603,18 @@ function ConceptPreview({
             <button type="button" onClick={onDemoAction}>Связаться</button>
           </header>
           <motion.main key={activePage.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={motionTransition.slow}>
-            <section className={cn("concept-hero concept-preview-piece", heroVisible && "is-visible")}>
-              <div className="concept-hero-copy">
-                <p>{activePage.hero.eyebrow}</p>
-                <h2>{activePage.hero.title}</h2>
-                <span>{activePage.hero.subtitle}</span>
-                <div>
-                  <button type="button" onClick={onDemoAction}>{activePage.hero.primaryCta}</button>
-                  <button type="button" onClick={() => nextPage.id === activePage.id ? onDemoAction() : onPageChange(nextPage.id)}>{activePage.hero.secondaryCta}</button>
-                </div>
-              </div>
-              <div className="concept-hero-visual" style={{ background: imagery.gradient }}>
-                {/* Decorative external mock imagery with a gradient fallback — plain img by design. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img key={heroSrc} className="concept-photo concept-hero-photo" src={heroSrc} alt="" loading="lazy" />
-                <div className="concept-hero-visual-caption">
-                  <span>{concept.businessType}</span>
-                  <strong>{concept.businessName}</strong>
-                </div>
-              </div>
-            </section>
+            <div className={cn("concept-hero-wrap concept-preview-piece", heroVisible && "is-visible")}>
+              <ConceptHero
+                kind={composition.hero}
+                hero={activePage.hero}
+                businessName={concept.businessName}
+                businessType={concept.businessType}
+                imageSrc={heroSrc}
+                gradient={imagery.gradient}
+                onPrimary={onDemoAction}
+                onSecondary={() => (nextPage.id === activePage.id ? onDemoAction() : onPageChange(nextPage.id))}
+              />
+            </div>
             <div className={cn("concept-preview-piece", heroVisible && "is-visible")}>
               {activePage.sections.map((section, index) => {
                 // Only the home page reveals section-by-section (it's the one on screen for
@@ -690,6 +683,7 @@ function ConceptPreview({
                       offers={concept.offers}
                       businessName={concept.businessName}
                       city={concept.city}
+                      composition={composition}
                     />
                   </div>
                 );

@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import { businessKnowledgeFor, type BusinessKnowledge } from "@/lib/business-knowledge";
+import { describeCopyBudget } from "@/lib/concept-composition";
 import {
   buildFallbackWebsiteConcept,
   dedupeConceptSections,
@@ -76,6 +77,7 @@ const SYSTEM_INSTRUCTIONS = `Ты — арт-директор digital-студи
 - не выдумывай клиентов, отзывы, награды, статистику, гарантии, сроки или финансовые результаты;
 - не придумывай конкретные цены бизнеса: используй нейтральные названия форматов;
 - создай короткий, естественный и премиальный текст без технического жаргона — избегай шаблонных AI-фраз;
+- текст пишется ПОД композицию, а не наугад: соблюдай переданный ниже бюджет типографики (число слов, строк, символов). Заголовок — одна законченная мысль; никаких искусственных переносов и дефисов внутри слов; названия услуг и призывы — короткие, целыми словами;
 - сохрани указанное название и тип бизнеса;
 - создай от 3 до 4 связанных страниц, первая страница всегда имеет id home;
 - navigation должна содержать ровно по одному пункту для каждой страницы;
@@ -217,7 +219,11 @@ export async function POST(request: Request) {
       const response = await client.responses.create(
         {
           model: "gpt-4.1-mini",
-          instructions: `${SYSTEM_INSTRUCTIONS}\n\n${knowledgeDigest(knowledge)}${retryHint(missingTypes)}`,
+          // Бюджет типографики зависит от выбранного стиля (он же — семейство композиции), а
+          // генерируемые сайты русские, поэтому язык фиксирован. Модель получает design budget
+          // ДО написания текста — это то, что заставляет copy попадать в композицию, а не
+          // впихиваться в неё постфактум обрезкой на отрисовке.
+          instructions: `${SYSTEM_INSTRUCTIONS}\n\n${knowledgeDigest(knowledge)}\n\nБюджет типографики: ${describeCopyBudget(input.styleId, "ru")}${retryHint(missingTypes)}`,
           input: JSON.stringify(input),
           max_output_tokens: 3800,
           text: {
