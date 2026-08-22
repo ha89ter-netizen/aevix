@@ -8128,205 +8128,324 @@ a.shell-account:hover {
   font-weight: 560;
 }
 
-/* ---- Карта процесса: конвейер ---- */
 
-/**
- * Лента, а не сетка с переносом.
- *
- * Сначала здесь стояла auto-fit сетка, и шесть шагов легли как 4 + 2: между четвёртым и пятым
- * связи не было нарисовано, и цепочка визуально рвалась — ровно то, чего схема автоматизации
- * допускать не должна. Лента не переносится никогда: не помещается — прокручивается сама,
- * страница при этом стоит на месте.
- */
-.workflow {
+/* ==========================================================================
+   ПРОЦЕСС как визуальная история (этап 4)
+
+   Не схема ●─●─● и не таймлайн: крупные карточки, у каждой своя микро-сцена из UI-примитивов,
+   читается сверху вниз. Illustration explains — text confirms. Живёт в прикладной (светлой) теме
+   Workspace; ни маркетинговые (--mk-*), ни концептовые (--concept-*) токены сюда не заходят.
+
+   Ширину диктует не окно, а контейнер: страница внутри .workspace-project-scope, а панель
+   AI-дизайнера при открытии съедает 21rem справа (padding-right у scope). container-type на самой
+   истории ловит и то, и другое — сетка перестраивается, когда панель открыта, а не только когда
+   меняют окно.
+   ========================================================================== */
+
+.process-story {
+  container-type: inline-size;
   display: grid;
-  gap: 1.6rem;
+  gap: clamp(1.75rem, 3vw, 2.75rem);
+  max-width: 76rem;
+  --pi-panel: #fff;
+  --pi-soft: #eceae5;
+  --pi-soft2: #dcd9d2;
+  --pi-muted: #cfccc4;
+  --pi-cell: #f3f1ec;
+  --pi-line: var(--line);
+  --pi-accent: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+  --pi-accent-soft: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.14);
+  --pi-star: #e7c65a;
 }
 
-.workflow-pipeline {
-  display: flex;
-  align-items: stretch;
-  gap: 0;
-  /* Прокручивается ЛЕНТА, а не страница. */
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding-bottom: 0.4rem;
-  scroll-snap-type: x proximity;
-  overscroll-behavior-x: contain;
-  -webkit-overflow-scrolling: touch;
+/* ---- Верх страницы: быстро отвечает «как устроена работа этого бизнеса» ---- */
+.process-head {
+  display: grid;
+  gap: 0.65rem;
+  max-width: 44rem;
 }
-
-.workflow-node {
-  position: relative;
+.process-eyebrow {
   display: flex;
-  flex: 0 0 auto;
   align-items: center;
-  gap: 0.75rem;
-  width: 13.5rem;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--line);
-  background: #fff;
-  padding: 0.9rem 1rem;
-  scroll-snap-align: start;
-  /* Проявление волной — один раз при появлении, дальше покой. */
-  animation: workflow-node-in var(--motion-slow) var(--ease-premium) both;
-  transition: border-color var(--motion-base) var(--ease-premium), box-shadow var(--motion-base) var(--ease-premium);
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  margin: 0;
+  font-size: 0.78rem;
+  color: rgba(9, 8, 7, 0.55);
+}
+.process-tag {
+  font-size: 0.68rem;
+  font-weight: 640;
+  letter-spacing: 0.02em;
+  color: var(--pi-accent);
+  background: var(--pi-accent-soft);
+  border-radius: var(--radius-pill);
+  padding: 0.2rem 0.6rem;
+}
+.process-title {
+  margin: 0;
+  /* Адаптивная типографика (принцип этапа 3): floored clamp, мера в ch, перенос между словами,
+     без авто-дефисов. Заголовок не проваливается ниже пола и не режется. */
+  font-size: clamp(1.9rem, 1.2rem + 3.4vw, 3rem);
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+  font-weight: 720;
+  max-width: 18ch;
+  text-wrap: balance;
+  hyphens: manual;
+  overflow-wrap: break-word;
+}
+.process-lede {
+  margin: 0;
+  max-width: 52ch;
+  color: rgba(9, 8, 7, 0.66);
+  font-size: 1.02rem;
+  line-height: 1.55;
+  text-wrap: pretty;
 }
 
-.workflow-node:hover {
-  border-color: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.4);
-  box-shadow: 0 10px 26px rgba(9, 8, 7, 0.08);
+/* ---- Сетка карточек: редакторская, «без сироты» ---- */
+.process-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(1rem, 1.6vw, 1.4rem);
+  counter-reset: none;
+}
+.process-card.is-wide {
+  grid-column: 1 / -1;
 }
 
-@keyframes workflow-node-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-/** Соединитель — отдельный элемент ленты, поэтому цепочка не может разъехаться с узлами. */
-.workflow-link {
+/* Карточка. Спокойная, крупная, много воздуха. Не dashboard-виджет: тень мягкая, hover физически
+   спокойный (см. ниже). Половинная — вертикальная (иллюстрация сверху), широкая — горизонтальная
+   (иллюстрация сбоку). Так композиции карточек РАЗНЫЕ, а не одна шесть раз. */
+.process-card {
   position: relative;
-  flex: 0 0 2.4rem;
-  align-self: center;
-  height: 1px;
-  background: linear-gradient(90deg, var(--line), rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.5));
-  animation: workflow-node-in var(--motion-slow) var(--ease-premium) both;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  padding: clamp(1.1rem, 1.8vw, 1.6rem);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg, 18px);
+  background: #fbfaf7;
+  transition: border-color var(--motion-base) var(--ease-premium), background var(--motion-base) var(--ease-premium);
+}
+.process-card.is-wide {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  align-items: center;
+  gap: clamp(1.25rem, 2.5vw, 2.5rem);
+  padding: clamp(1.25rem, 2.2vw, 2rem);
+}
+/* Hover спокойный: без translateY(-8px)+гигантской тени. Меняется только контраст. */
+.process-card:hover {
+  border-color: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.34);
+  background: #fff;
 }
 
-/* Стрелка: направление должно читаться, а не угадываться. */
-.workflow-link::after {
+.process-card-num {
+  position: absolute;
+  top: clamp(0.8rem, 1.4vw, 1.15rem);
+  right: clamp(0.9rem, 1.6vw, 1.3rem);
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: rgba(9, 8, 7, 0.32);
+}
+
+/* Иллюстрация — главный элемент. Крупная область, спокойный фон, скруглённая. */
+.process-card-illu {
+  position: relative;
+  min-width: 0;
+  aspect-ratio: 16 / 10;
+  border-radius: calc(var(--radius-md) - 2px);
+  background: linear-gradient(180deg, #fff, #f4f2ed);
+  border: 1px solid rgba(9, 8, 7, 0.05);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.process-illustration {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.process-card.is-wide .process-card-illu {
+  aspect-ratio: 16 / 9;
+}
+
+.process-card-copy {
+  min-width: 0;
+  display: grid;
+  gap: 0.5rem;
+  align-content: center;
+}
+.process-card-title {
+  margin: 0;
+  font-size: clamp(1.15rem, 0.9rem + 1vw, 1.5rem);
+  line-height: 1.15;
+  font-weight: 660;
+  letter-spacing: -0.01em;
+  color: rgba(9, 8, 7, 0.92);
+  /* Та же типографическая дисциплина: мера, баланс, без разрыва слов и дефисов. */
+  max-width: 22ch;
+  text-wrap: balance;
+  hyphens: manual;
+  overflow-wrap: break-word;
+}
+.process-card.is-wide .process-card-title {
+  font-size: clamp(1.35rem, 1rem + 1.4vw, 1.85rem);
+  max-width: 20ch;
+}
+.process-card-caption {
+  font-size: 0.76rem;
+  font-weight: 560;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--pi-accent);
+}
+
+/* ---- «Почему именно так»: спокойный смысловой финал ---- */
+.process-why {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg, 18px);
+  background: linear-gradient(180deg, #fbfaf7, #f4f2ec);
+  padding: clamp(1.4rem, 2.4vw, 2.1rem);
+  display: grid;
+  gap: 1rem;
+  max-width: 60rem;
+}
+.process-why-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 680;
+  letter-spacing: -0.01em;
+}
+.process-why-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.7rem;
+}
+.process-why-list li {
+  position: relative;
+  padding-left: 1.5rem;
+  color: rgba(9, 8, 7, 0.72);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  max-width: 60ch;
+}
+.process-why-list li::before {
   content: "";
   position: absolute;
-  top: 50%;
-  right: 0;
-  width: 5px;
-  height: 5px;
-  transform: translateY(-50%) rotate(45deg);
-  border-top: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.55);
-  border-right: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.55);
+  left: 0;
+  top: 0.5em;
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  background: var(--pi-accent);
 }
 
-.workflow-node-mark {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 2.35rem;
-  height: 2.35rem;
-  border-radius: var(--radius-md);
-  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.1);
-  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
-}
+/* ---- Палитра примитивов иллюстраций ---- */
+.pi-bg { fill: #fff; }
+.pi-panel { fill: var(--pi-panel); stroke: var(--pi-line); stroke-width: 1.5; }
+.pi-soft { fill: var(--pi-soft); }
+.pi-soft2 { fill: var(--pi-soft2); }
+.pi-muted { fill: var(--pi-muted); }
+.pi-cell { fill: var(--pi-cell); }
+.pi-chip { fill: #fff; stroke: var(--pi-line); stroke-width: 1.25; }
+.pi-status { fill: #fff; stroke: var(--pi-line); stroke-width: 1.25; }
+.pi-accent { fill: var(--pi-accent); }
+.pi-accent-soft { fill: var(--pi-accent-soft); }
+.pi-accentline { fill: var(--pi-accent); }
+.pi-slot { fill: var(--pi-accent); }
+.pi-onaccent { fill: rgba(255, 255, 255, 0.85); }
+.pi-onaccent-fill { fill: rgba(255, 255, 255, 0.7); }
+.pi-onaccent-stroke { stroke: rgba(255, 255, 255, 0.6); stroke-width: 1.5; }
+.pi-check { stroke: var(--pi-accent); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.pi-check-onaccent { stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.pi-check-ring { stroke: var(--pi-accent); stroke-width: 1.5; opacity: 0.5; }
+.pi-lens { stroke: var(--pi-accent); stroke-width: 2.4; fill: none; stroke-linecap: round; }
+/* Звёзды заполнены по умолчанию — сцена читается как «оценка» и без анимации/reduced-motion.
+   Проявление добавляет только поочерёдное появление, не сам цвет. */
+.pi-star { fill: var(--pi-star); }
+.pi-arrow { stroke: rgba(9, 8, 7, 0.4); stroke-width: 2; fill: none; }
+.pi-arrowhead { fill: rgba(9, 8, 7, 0.4); }
+.pi-scan { fill: var(--pi-accent); opacity: 0; }
 
-.workflow-node-body {
-  display: grid;
-  gap: 0.1rem;
-  min-width: 0;
-}
+/* ---- Движение: однократный вход при попадании во вьюпорт. Карточки видимы по умолчанию;
+   анимация — только у раскрытой карточки (is-revealed) и только внутри её сцены. Спокойно, один
+   раз. Прежняя схема пульсировала бесконечно — здесь это запрещено. ---- */
+@keyframes pi-rise { from { opacity: 0; transform: translateY(14px); } }
+@keyframes pi-drop { from { opacity: 0; transform: translateY(-16px); } }
+@keyframes pi-slide { from { opacity: 0; transform: translateX(-14px); } }
+@keyframes pi-pop { from { opacity: 0; transform: scale(0.55); } }
+@keyframes pi-scan { 0% { opacity: 0; transform: translateX(-24px); } 30% { opacity: 0.5; } 100% { opacity: 0; transform: translateX(160px); } }
+@keyframes pi-slot { from { fill: var(--pi-soft); } 60% { fill: var(--pi-accent); } }
+@keyframes pi-starpop { from { opacity: 0; transform: scale(0.4); } }
+@keyframes pi-draw { from { stroke-dashoffset: 60; } to { stroke-dashoffset: 0; } }
 
-.workflow-node-step {
-  color: rgba(9, 8, 7, 0.4);
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
+.process-illustration[data-revealed="true"] .pi-rise { animation: pi-rise var(--motion-slower) var(--ease-premium); transform-box: fill-box; transform-origin: center; }
+.process-illustration[data-revealed="true"] .pi-drop { animation: pi-drop var(--motion-slower) var(--ease-premium); }
+.process-illustration[data-revealed="true"] .pi-slide { animation: pi-slide var(--motion-slower) var(--ease-premium); }
+.process-illustration[data-revealed="true"] .pi-pop { animation: pi-pop var(--motion-slow) var(--ease-premium); transform-box: fill-box; transform-origin: center; }
+.process-illustration[data-revealed="true"] .pi-scan { animation: pi-scan 1.1s var(--ease-premium); }
+.process-illustration[data-revealed="true"] .pi-slot { animation: pi-slot 1s var(--ease-premium) 0.2s; }
+.process-illustration[data-revealed="true"] .pi-draw { stroke-dasharray: 60; animation: pi-draw var(--motion-slower) var(--ease-premium) forwards; }
+/* Каскад у составных сцен: параметры/звёзды проявляются по очереди, один раз. */
+.process-illustration[data-revealed="true"] .pi-stagger > * { animation: pi-rise var(--motion-slow) var(--ease-premium) both; }
+.process-illustration[data-revealed="true"] .pi-stagger > *:nth-child(2) { animation-delay: 0.08s; }
+.process-illustration[data-revealed="true"] .pi-stagger > *:nth-child(3) { animation-delay: 0.16s; }
+.process-illustration[data-revealed="true"] .pi-stagger > *:nth-child(4) { animation-delay: 0.24s; }
+.process-illustration[data-revealed="true"] .pi-stagger > *:nth-child(5) { animation-delay: 0.32s; }
+.process-illustration[data-revealed="true"] .pi-stagger > *:nth-child(6) { animation-delay: 0.4s; }
+.process-illustration[data-revealed="true"] .pi-stars .pi-star { animation: pi-starpop var(--motion-slow) var(--ease-premium) both; animation-delay: calc(var(--i) * 0.09s); transform-box: fill-box; transform-origin: center; }
 
-.workflow-node-title {
-  color: #111214;
-  font-size: 0.92rem;
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
+/* Карточка при входе — очень спокойный подъём, один раз. */
+@keyframes process-card-in { from { opacity: 0; transform: translateY(10px); } }
+.process-card.is-revealed { animation: process-card-in var(--motion-slow) var(--ease-premium); }
 
-/** Пояснение под лентой: зачем эта последовательность и что будет дальше. Короткое — главным
-    на странице остаётся схема, а не текст. */
-.workflow-note {
-  display: grid;
-  gap: 0.35rem;
-  max-width: 46rem;
-  border-left: 2px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.35);
-  padding-left: 0.9rem;
-}
-
-.workflow-note strong {
-  font-size: 0.9rem;
-  font-weight: 640;
-}
-
-.workflow-note span {
-  color: rgba(9, 8, 7, 0.6);
-  font-size: 0.86rem;
-  line-height: 1.55;
-}
-
-/* На телефоне лента разворачивается в столбец: горизонтальная прокрутка на узком экране хуже,
-   чем вертикальная, а связь между шагами сохраняется той же линией. */
-@media (max-width: 700px) {
-  .workflow-pipeline {
+/* ---- Адаптив по КОНТЕЙНЕРУ (ловит и окно, и открытую панель дизайнера) ---- */
+/* Планшет/узкий десктоп: карточки остаются крупными, но одна колонка — две стали бы бессмысленно
+   узкими (особенно при открытой панели). Широкая карточка тоже вертикальная. */
+@container (max-width: 640px) {
+  .process-grid { grid-template-columns: minmax(0, 1fr); }
+  .process-card.is-wide {
+    display: flex;
     flex-direction: column;
-    align-items: stretch;
-    overflow-x: visible;
+    grid-column: auto;
   }
-
-  .workflow-node {
-    width: auto;
-  }
-
-  .workflow-link {
-    flex: 0 0 1.5rem;
-    align-self: flex-start;
-    width: 1px;
-    height: 1.5rem;
-    margin-left: 1.9rem;
-    background: linear-gradient(180deg, var(--line), rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.5));
-  }
-
-  .workflow-link::after {
-    top: auto;
-    bottom: 0;
-    right: -2px;
-    transform: rotate(135deg);
-  }
+  .process-card.is-wide .process-card-illu { aspect-ratio: 16 / 10; }
+}
+/* Телефон: одна сильная последовательность, иллюстрация остаётся КРУПНОЙ (не icon+12px). */
+@container (max-width: 380px) {
+  .process-card { padding: 1rem; }
+  .process-card-illu { aspect-ratio: 3 / 2; }
 }
 
-/**
- * Отступ под панель AI-дизайнера. Она `position: fixed` в правом верхнем углу и перекрывала
- * содержимое — на «Процессе» съедала третий узел. Отступ появляется только когда панель
- * открыта, иначе страница теряла бы 21rem ширины впустую.
- */
-/* Порог тот же, на котором панель сама переезжает вниз (см. .designer-panel): при 1024
-   планшет оставался без отступа, хотя панель на нём ещё висит справа вверху. */
-@media (min-width: 768px) {
-  body[data-designer="open"] .workspace-project-scope {
-    padding-right: calc(21rem + clamp(0.75rem, 2vw, 1.5rem) + 1rem);
-  }
-}
-
-/**
- * На телефоне панель прижата к низу и перекрыть содержимое может только снизу. Отступ равен её
- * высоте с запасом, поэтому до последнего элемента страницы можно долистать — панель ничего не
- * прячет безвозвратно. Полностью убрать пересечение здесь нельзя, не переселив панель в поток,
- * а её устройство — отдельная задача.
- */
-@media (max-width: 767px) {
-  body[data-designer="open"] .workspace-project-scope {
-    padding-bottom: 26rem;
-  }
-}
-
-/* Движение — украшение, а не смысл: без него страница обязана читаться так же. */
+/* Движение — украшение, а не смысл: без него страница читается так же (финальное состояние сцены
+   самодостаточно). Полностью снимаем все входы и действия. */
 @media (prefers-reduced-motion: reduce) {
-  .workflow-node,
-  .workflow-link {
+  .process-card.is-revealed,
+  .process-illustration[data-revealed="true"] .pi-rise,
+  .process-illustration[data-revealed="true"] .pi-drop,
+  .process-illustration[data-revealed="true"] .pi-slide,
+  .process-illustration[data-revealed="true"] .pi-pop,
+  .process-illustration[data-revealed="true"] .pi-scan,
+  .process-illustration[data-revealed="true"] .pi-slot,
+  .process-illustration[data-revealed="true"] .pi-draw,
+  .process-illustration[data-revealed="true"] .pi-stagger > *,
+  .process-illustration[data-revealed="true"] .pi-stars .pi-star {
     animation: none;
   }
+  /* Галочка, что рисуется штрихом, при reduced-motion просто нарисована. */
+  .process-illustration .pi-draw { stroke-dasharray: none; }
+  .pi-scan { opacity: 0; }
 }
 
 /* ---- Композиции превью: четыре семейства ---- */
