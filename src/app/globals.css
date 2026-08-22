@@ -2230,50 +2230,364 @@ body::before {
   }
 }
 
-/* Auto-generated service price list inside a concept's "Цены" section. */
-.concept-pricelist {
+/* ==========================================================================
+   КАТАЛОГ УСЛУГ/ЦЕН как decision surface (этап 5)
+
+   Не прайс-таблица и не стена SaaS-карточек: сильная иерархия, крупная цена как часть композиции,
+   реальные категории, один signature-акцент, тихие разделители. Свой визуальный язык, отдельный от
+   ConceptServices (превью) и «Процесса» (story). Живёт в слое --concept-*, поэтому берёт палитру
+   семейства (тёмное technical, светлое editorial и т.д.).
+
+   Ширину диктует КОНТЕЙНЕР: концепт внутри .concept-device (container-type), значит @container
+   ловит и узкое устройство, и открытую панель AI-дизайнера.
+   ========================================================================== */
+
+.concept-catalogue {
   display: grid;
-  gap: 0;
-  margin-top: 0.5rem;
+  gap: clamp(1.5rem, 3cqi, 2.5rem);
 }
 
-.concept-pricelist-row {
+.concept-catalogue-head {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 46rem;
+}
+.concept-catalogue-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  color: var(--concept-accent);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: var(--concept-letter-spacing);
+  text-transform: uppercase;
+}
+.concept-catalogue-lede {
+  color: color-mix(in srgb, var(--concept-text) 64%, transparent);
+  font-size: 1.02rem;
+  line-height: 1.6;
+}
+.concept-catalogue-meta {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  font-weight: 560;
+  color: color-mix(in srgb, var(--concept-text) 60%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+.concept-catalogue-meta-range {
+  color: var(--concept-accent);
+  font-weight: 640;
+}
+
+/* ---- Цена как элемент композиции: значение сильное, «от» тихое, валюта не отрывается ---- */
+.concept-price {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.concept-price-lead {
+  font-size: 0.72em;
+  font-weight: 560;
+  color: color-mix(in srgb, var(--concept-text) 52%, transparent);
+}
+.concept-price-value {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.concept-price[data-kind="custom"] .concept-price-value,
+.concept-price[data-kind="free"] .concept-price-value {
+  font-weight: 620;
+  color: color-mix(in srgb, var(--concept-text) 72%, transparent);
+}
+
+/* ---- Signature-акцент: одна крупная панель, а не карточка в сетке ---- */
+.concept-catalogue-featured {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: clamp(1.25rem, 2.4cqi, 2rem);
+  border-radius: var(--concept-radius);
+  border: var(--concept-border-width) solid color-mix(in srgb, var(--concept-accent) 30%, var(--concept-border));
+  background: color-mix(in srgb, var(--concept-accent) 9%, var(--concept-surface));
+}
+.concept-catalogue-featured-copy {
+  min-width: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.concept-catalogue-featured-tag {
+  justify-self: start;
+  font-size: 0.66rem;
+  font-weight: 680;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--concept-accent);
+  border: 1px solid color-mix(in srgb, var(--concept-accent) 40%, transparent);
+  border-radius: var(--concept-radius-sm);
+  padding: 0.16rem 0.5rem;
+}
+.concept-catalogue-featured-name {
+  font-size: clamp(1.35rem, 1rem + 1.6cqi, 1.9rem);
+  font-weight: var(--concept-heading-weight);
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+  max-width: 24ch;
+  text-wrap: balance;
+  overflow-wrap: break-word;
+  hyphens: manual;
+}
+.concept-catalogue-featured-price .concept-price-value {
+  font-size: clamp(1.6rem, 1.2rem + 1.8cqi, 2.3rem);
+  color: var(--concept-accent);
+}
+.concept-catalogue-featured-cta,
+.concept-catalogue-cta {
+  flex: 0 0 auto;
+  border: none;
+  border-radius: var(--concept-radius-sm);
+  background: var(--concept-accent);
+  color: var(--concept-on-accent, #fff);
+  padding: 0.85rem 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 640;
+  cursor: pointer;
+  transition: background var(--motion-base, 180ms) ease;
+}
+.concept-catalogue-featured-cta:hover,
+.concept-catalogue-cta:hover {
+  background: var(--concept-accent-hover, var(--concept-accent));
+}
+
+/* ---- Рельс категорий: тихая навигация, липкая на прокрутке ---- */
+.concept-catalogue-rail {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0 calc(-1 * clamp(0.5rem, 2cqi, 1.5rem));
+  padding: 0.5rem clamp(0.5rem, 2cqi, 1.5rem);
+  background: color-mix(in srgb, var(--concept-bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--concept-border);
+}
+.concept-catalogue-rail ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.concept-catalogue-rail a {
+  display: inline-block;
+  padding: 0.3rem 0;
+  color: color-mix(in srgb, var(--concept-text) 62%, transparent);
+  font-size: 0.86rem;
+  font-weight: 560;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: color var(--motion-base, 180ms) ease, border-color var(--motion-base, 180ms) ease;
+}
+.concept-catalogue-rail a:hover {
+  color: var(--concept-text);
+  border-bottom-color: var(--concept-accent);
+}
+.concept-catalogue-rail a:focus-visible {
+  outline: 2px solid var(--concept-accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* ---- Тело каталога: категории и сканируемые строки ---- */
+.concept-catalogue-body {
+  display: grid;
+  gap: clamp(1.5rem, 3cqi, 2.75rem);
+}
+.concept-catalogue-cat-title {
   display: flex;
   align-items: baseline;
   gap: 0.6rem;
-  padding: 0.72rem 0;
+  margin: 0 0 0.75rem;
+  font-size: clamp(1.05rem, 0.9rem + 0.8cqi, 1.35rem);
+  font-weight: var(--concept-heading-weight);
+  letter-spacing: -0.01em;
+  scroll-margin-top: 3.5rem;
+}
+.concept-catalogue-cat-count {
+  font-size: 0.78rem;
+  font-weight: 560;
+  color: color-mix(in srgb, var(--concept-text) 42%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+.concept-catalogue-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+}
+.concept-catalogue-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.85rem 0;
   border-bottom: 1px solid color-mix(in srgb, var(--concept-text) 8%, transparent);
+  min-width: 0;
 }
-
-.concept-pricelist-row strong {
-  font-size: 0.98rem;
-  font-weight: 600;
+.concept-catalogue-row-name {
+  font-size: 1rem;
+  font-weight: 560;
   color: var(--concept-text);
+  /* Ключевое название не режется и не переносится посреди слова — только между словами. */
+  overflow-wrap: break-word;
+  hyphens: manual;
+  min-width: 0;
 }
-
-.concept-pricelist-dots {
-  flex: 1;
+.concept-catalogue-row-dots {
+  flex: 1 1 auto;
   align-self: center;
+  min-width: 1.5rem;
   height: 1px;
-  background-image: linear-gradient(to right, color-mix(in srgb, var(--concept-text) 28%, transparent) 42%, transparent 0);
-  background-size: 6px 1px;
+  /* Тихий поводок: очень бледный, лишь связывает имя и цену глазом. */
+  background-image: linear-gradient(to right, color-mix(in srgb, var(--concept-text) 16%, transparent) 40%, transparent 0);
+  background-size: 5px 1px;
   background-repeat: repeat-x;
 }
-
-.concept-pricelist-price {
+.concept-catalogue-row-price {
   flex: 0 0 auto;
-  font-family: var(--font-manrope), sans-serif;
-  font-size: 0.98rem;
-  font-weight: 700;
-  color: var(--concept-accent);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  font-size: 1.05rem;
+  color: var(--concept-text);
+}
+.concept-catalogue-row.is-featured .concept-catalogue-row-name {
+  font-weight: 660;
+}
+.concept-catalogue-row.is-featured .concept-catalogue-row-name::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 0.5rem;
+  border-radius: 2px;
+  background: var(--concept-accent);
+  vertical-align: middle;
 }
 
-.concept-pricelist-note {
-  margin-top: 0.85rem;
+.concept-catalogue-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 1.5rem;
+  padding-top: 0.5rem;
+}
+.concept-catalogue-note {
   font-size: 0.72rem;
   color: color-mix(in srgb, var(--concept-text) 50%, transparent);
+}
+
+/* ---- Размер каталога: маленький — редакционный, большой — утилитарный ---- */
+.concept-catalogue[data-size="editorial"] .concept-catalogue-row {
+  padding: 1.05rem 0;
+}
+.concept-catalogue[data-size="editorial"] .concept-catalogue-row-name {
+  font-size: 1.1rem;
+}
+.concept-catalogue[data-size="utilitarian"] .concept-catalogue-row {
+  padding: 0.7rem 0;
+}
+
+/* ---- Подвал превью услуг на главной (диапазон + «Все услуги») ---- */
+.concept-services-preview-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+  margin-top: 1.75rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--concept-border);
+}
+.concept-services-preview-meta {
+  font-size: 0.86rem;
+  font-weight: 560;
+  color: color-mix(in srgb, var(--concept-text) 62%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+.concept-services-viewall {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--concept-accent);
+  font-size: 0.9rem;
+  font-weight: 640;
+  padding: 0.3rem 0;
+  border-bottom: 2px solid transparent;
+  transition: border-color var(--motion-base, 180ms) ease;
+}
+.concept-services-viewall::after {
+  content: " →";
+}
+.concept-services-viewall:hover {
+  border-bottom-color: var(--concept-accent);
+}
+.concept-catalogue-featured-cta:focus-visible,
+.concept-catalogue-cta:focus-visible,
+.concept-services-viewall:focus-visible {
+  outline: 2px solid var(--concept-accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ---- Адаптив по контейнеру: строка перекладывается, иерархия сохраняется ---- */
+@container (max-width: 560px) {
+  .concept-catalogue-row {
+    /* Имя сверху, цена под ним слева — но цена остаётся визуально сильной, не 11px. */
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    align-items: baseline;
+  }
+  .concept-catalogue-row-name {
+    flex: 1 1 100%;
+    font-size: 1.02rem;
+  }
+  .concept-catalogue-row-dots {
+    display: none;
+  }
+  .concept-catalogue-row-price {
+    flex: 0 0 auto;
+    font-size: 1.05rem;
+    color: var(--concept-accent);
+  }
+  .concept-catalogue-featured {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .concept-catalogue-featured-cta {
+    width: 100%;
+  }
+  .concept-catalogue-rail {
+    margin-inline: 0;
+    overflow-x: auto;
+  }
+  .concept-catalogue-rail ul {
+    flex-wrap: nowrap;
+  }
+  .concept-catalogue-rail a {
+    white-space: nowrap;
+  }
+}
+
+/* Движение — минимум: это decision surface. Ничего не прилетает и не считается; цена статична.
+   Оставляем только hover/focus-переходы, которые уже уважают reduced-motion через свою краткость. */
+@media (prefers-reduced-motion: reduce) {
+  .concept-catalogue-rail a,
+  .concept-catalogue-cta,
+  .concept-catalogue-featured-cta,
+  .concept-services-viewall {
+    transition: none;
+  }
 }
 
 .concept-mode-switch button {
@@ -10442,19 +10756,6 @@ a.shell-account:hover {
   line-height: 1.2;
   border: none;
   padding-left: 0;
-}
-
-/* ---- Прайс: технические — плотная таблица, воздушные — разреженный список ---- */
-
-.concept-site[data-family="technical"] .concept-pricelist {
-  column-gap: 3rem;
-}
-.concept-site[data-family="technical"] .concept-pricelist-row {
-  padding-block: 0.55rem;
-}
-.concept-site[data-family="minimal"] .concept-pricelist-row,
-.concept-site[data-family="organic"] .concept-pricelist-row {
-  padding-block: 1.1rem;
 }
 
 /* ==========================================================================

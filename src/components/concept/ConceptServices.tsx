@@ -1,13 +1,15 @@
+import type { ReactNode } from "react";
 import type { ServiceKind } from "@/lib/concept-composition";
 import type { ConceptOffer } from "@/lib/website-concept";
 
 /**
  * Превью услуг на главной — примитив с четырьмя подачами.
  *
- * Полный каталог с ценами живёт ТОЛЬКО на странице услуг; здесь — превью характера бизнеса,
- * поэтому карточек немного (число задаёт семейство). Разные семейства подают одни и те же услуги
- * по-разному: сетка карточек, типографический список, колонки категорий или одно направление
- * крупно. Это геометрия, а не оформление, — поэтому подача входит в различие стилей.
+ * Полный каталог с ценами живёт ТОЛЬКО в разделе pricing (этап 5, `ConceptCatalogue`); здесь —
+ * редакционное превью характера бизнеса. С этапа 5 главная показывает не первые N строк каталога, а
+ * signature-выборку из разных категорий плюс подвал превью (`footer`): диапазон цен, счётчик и
+ * призыв «Все услуги». Разные семейства подают одни и те же услуги по-разному — это геометрия, а не
+ * оформление.
  */
 
 export type ConceptServicesProps = {
@@ -16,6 +18,8 @@ export type ConceptServicesProps = {
   title: string;
   text?: string;
   services: ConceptOffer[];
+  /** Подвал превью (диапазон цен + «Все услуги»). Живёт внутри секции, в её ритме. */
+  footer?: ReactNode;
 };
 
 function Heading({ eyebrow, title, text }: Pick<ConceptServicesProps, "eyebrow" | "title" | "text">) {
@@ -28,39 +32,33 @@ function Heading({ eyebrow, title, text }: Pick<ConceptServicesProps, "eyebrow" 
   );
 }
 
-export function ConceptServices({ kind, eyebrow, title, text, services }: ConceptServicesProps) {
+function Body({ kind, services }: Pick<ConceptServicesProps, "kind" | "services">) {
   if (kind === "list") {
     // Редакционный список: минимум рамок, ведёт типографика и нумерация.
     return (
-      <section className="concept-section concept-services" data-services="list">
-        <Heading eyebrow={eyebrow} title={title} text={text} />
-        <ol className="concept-service-list">
-          {services.map((service, index) => (
-            <li key={service.name}>
-              <small>{String(index + 1).padStart(2, "0")}</small>
-              <strong>{service.name}</strong>
-              <span>{service.price}</span>
-            </li>
-          ))}
-        </ol>
-      </section>
+      <ol className="concept-service-list">
+        {services.map((service, index) => (
+          <li key={service.name}>
+            <small>{String(index + 1).padStart(2, "0")}</small>
+            <strong>{service.name}</strong>
+            <span>{service.price}</span>
+          </li>
+        ))}
+      </ol>
     );
   }
 
   if (kind === "columns") {
     // Категории в колонках — для бизнесов, у которых услуги читаются как разделы каталога.
     return (
-      <section className="concept-section concept-services" data-services="columns">
-        <Heading eyebrow={eyebrow} title={title} text={text} />
-        <div className="concept-service-columns">
-          {services.map((service) => (
-            <article key={service.name}>
-              <strong>{service.name}</strong>
-              <span>{service.price}</span>
-            </article>
-          ))}
-        </div>
-      </section>
+      <div className="concept-service-columns">
+        {services.map((service) => (
+          <article key={service.name}>
+            <strong>{service.name}</strong>
+            <span>{service.price}</span>
+          </article>
+        ))}
+      </div>
     );
   }
 
@@ -68,41 +66,45 @@ export function ConceptServices({ kind, eyebrow, title, text, services }: Concep
     // Одно направление крупно, остальные тихо рядом: показывает главное, а не список.
     const [lead, ...rest] = services;
     return (
-      <section className="concept-section concept-services" data-services="feature">
-        <Heading eyebrow={eyebrow} title={title} text={text} />
-        <div className="concept-service-feature">
-          {lead ? (
-            <article className="concept-service-lead">
-              <strong>{lead.name}</strong>
-              <span>{lead.price}</span>
+      <div className="concept-service-feature">
+        {lead ? (
+          <article className="concept-service-lead">
+            <strong>{lead.name}</strong>
+            <span>{lead.price}</span>
+          </article>
+        ) : null}
+        <div className="concept-service-rest">
+          {rest.map((service) => (
+            <article key={service.name}>
+              <strong>{service.name}</strong>
+              <span>{service.price}</span>
             </article>
-          ) : null}
-          <div className="concept-service-rest">
-            {rest.map((service) => (
-              <article key={service.name}>
-                <strong>{service.name}</strong>
-                <span>{service.price}</span>
-              </article>
-            ))}
-          </div>
+          ))}
         </div>
-      </section>
+      </div>
     );
   }
 
   // cards — сдержанная сетка карточек с номерами.
   return (
-    <section className="concept-section concept-services" data-services="cards">
+    <div className="concept-service-cards">
+      {services.map((service, index) => (
+        <article key={service.name}>
+          <small>{String(index + 1).padStart(2, "0")}</small>
+          <strong>{service.name}</strong>
+          <span>{service.price}</span>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+export function ConceptServices({ kind, eyebrow, title, text, services, footer }: ConceptServicesProps) {
+  return (
+    <section className="concept-section concept-services" data-services={kind}>
       <Heading eyebrow={eyebrow} title={title} text={text} />
-      <div className="concept-service-cards">
-        {services.map((service, index) => (
-          <article key={service.name}>
-            <small>{String(index + 1).padStart(2, "0")}</small>
-            <strong>{service.name}</strong>
-            <span>{service.price}</span>
-          </article>
-        ))}
-      </div>
+      <Body kind={kind} services={services} />
+      {footer}
     </section>
   );
 }

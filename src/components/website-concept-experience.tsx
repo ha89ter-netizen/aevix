@@ -30,6 +30,8 @@ import { businessKnowledgeFor, type BusinessKnowledge } from "@/lib/business-kno
 import { compositionForStyle, type FamilyComposition } from "@/lib/concept-composition";
 import { ConceptHero } from "@/components/concept/ConceptHero";
 import { ConceptServices } from "@/components/concept/ConceptServices";
+import { ConceptCatalogue } from "@/components/concept/ConceptCatalogue";
+import { buildCatalogue, cataloguePreview, pluralItems } from "@/lib/catalogue-model";
 import { SECTION_LABELS, useDesignerSelection } from "@/components/workspace/designer-selection";
 import { motionTransition } from "@/lib/motion";
 import {
@@ -210,40 +212,27 @@ function ConceptSection({
   composition: FamilyComposition;
 }) {
   if (section.type === "pricing") {
-    // The catalogue: products for product businesses (menu/rooms/каталог), the full service
-    // price list otherwise. The FULL list lives only here — home never repeats it.
-    const products = offers?.products ?? knowledge.products;
-    const services = offers?.services ?? knowledge.services;
-    const priceList = products.length ? products : services;
-    return (
-      <section className="concept-section concept-list-section">
-        <div className="concept-section-heading">
-          <p>
-            {products.length ? knowledge.productsPageName ?? "Каталог" : "Услуги и цены"} <DemoChip label="Демо-цены" />
-          </p>
-          <h3>{section.title}</h3>
-          {section.text ? <span>{section.text}</span> : null}
-        </div>
-        <div className="concept-pricelist">
-          {priceList.map((offer) => (
-            <div key={offer.name} className="concept-pricelist-row">
-              <strong>{offer.name}</strong>
-              <span className="concept-pricelist-dots" aria-hidden="true" />
-              <span className="concept-pricelist-price">{offer.price}</span>
-            </div>
-          ))}
-        </div>
-        <p className="concept-pricelist-note">Средние демонстрационные цены — при наполнении сайта их заменят ваши.</p>
-      </section>
-    );
+    // Полный каталог как decision surface (этап 5): категории, семантика цены, signature-акцент,
+    // словарь ниши. Одна модель (`buildCatalogue`) — этот раздел представляет её как момент выбора.
+    // Полный список живёт ТОЛЬКО здесь; главная показывает редакционное превью, а не копию.
+    const catalogue = buildCatalogue(knowledge, offers);
+    return <ConceptCatalogue catalogue={catalogue} title={section.title} text={section.text || undefined} onCta={onDemoAction} />;
   }
 
   if (section.type === "services") {
-    // Превью характера бизнеса, а не каталог: полный список с ценами — работа секции pricing,
-    // поэтому эти карточки её никогда не дублируют. Сколько показывать и какой подачей — решает
-    // семейство; на внутренних страницах превью чуть шире.
+    // Редакционное превью, а не префикс каталога (этап 5). Раньше показывались первые N услуг —
+    // те же, что в каталоге: один список дважды. Теперь берём signature-выборку из РАЗНЫХ категорий
+    // (`cataloguePreview`) — она отвечает «чем занимается бизнес», а не повторяет прайс. Подвал
+    // добавляет ориентир решения: диапазон цен, счётчик и «Все услуги». Полный список — только в
+    // секции pricing. Подачу (геометрию) по-прежнему выбирает семейство.
+    const catalogue = buildCatalogue(knowledge, offers);
     const limit = isHomePage ? composition.homeServiceCount : Math.max(6, composition.homeServiceCount);
-    const services = (offers?.services ?? knowledge.services).slice(0, limit);
+    const preview = cataloguePreview(catalogue, limit);
+    const services = preview.signature.map((item) => ({
+      name: item.name,
+      price: item.price.lead ? `${item.price.lead} ${item.price.value}` : item.price.value,
+    }));
+    const viewAllLabel = catalogue.title === "Меню" ? "Всё меню" : catalogue.title === "Каталог" ? "Весь каталог" : "Все услуги";
     return (
       <ConceptServices
         kind={composition.services}
@@ -251,6 +240,17 @@ function ConceptSection({
         title={section.title}
         text={section.text || undefined}
         services={services}
+        footer={
+          <div className="concept-services-preview-foot">
+            <span className="concept-services-preview-meta">
+              {pluralItems(catalogue.total, catalogue.itemNoun)}
+              {catalogue.priceRange ? ` · ${catalogue.priceRange.display}` : ""}
+            </span>
+            <button type="button" className="concept-services-viewall" onClick={onDemoAction}>
+              {viewAllLabel}
+            </button>
+          </div>
+        }
       />
     );
   }
