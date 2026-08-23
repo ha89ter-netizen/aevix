@@ -9,6 +9,7 @@ import {
   readLocalProjectsForMigration,
   serverProjectStore,
   storeFor,
+  localProjectStore,
 } from "./project-repository";
 import {
   generationStages,
@@ -223,6 +224,7 @@ type ProjectsContextValue = {
    * loading" from "genuinely no projects" (the empty state waits for this). */
   isLoaded: boolean;
   saveState: SaveState;
+  /** Повторить сохранение после ошибки (отправляет актуальное состояние). */
   retrySave: () => void;
   /** Куда пишутся проекты прямо сейчас. Список проектов показывает по этому полю, лежит ли
    * работа в аккаунте или всё ещё только на этом устройстве. */
@@ -306,6 +308,8 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  // Ручной повтор сохранения после ошибки: бампает эффект ниже, который переотправляет ТЕКУЩЕЕ
+  // состояние (с несинхронизированными правками), а не то, что было в момент сбоя.
   const [retryTick, setRetryTick] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [migrationError, setMigrationError] = useState<string | null>(null);
@@ -412,6 +416,8 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
    * задержка перед отправкой создаёт окно, в которое правка живёт только в памяти.
    */
   const pendingRef = useRef<Project[] | null>(null);
+  /** Монотонный счётчик поколений сохранения — для защиты от устаревшего ответа (см. эффект ниже). */
+  const saveGenRef = useRef(0);
 
   // Skip the very first run (before the load above has happened) so it can't stomp real stored
   // data with the initial empty array.
@@ -421,34 +427,42 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
     pendingRef.current = projects;
     let cancelled = false;
     const store = storeFor(signedIn);
+    // Поколение сохранения: каждая новая правка увеличивает счётчик. Отложенный ответ применяется,
+    // только если он всё ещё последний, — иначе устаревший ответ откатил бы более новое состояние.
+    const generation = (saveGenRef.current += 1);
+    // Отмена запроса при вытеснении: если правка B пришла, пока медленное сохранение A ещё в полёте,
+    // A отменяется, чтобы не долететь позже и не перезаписать B на сервере (stale overwrite).
+    const controller = new AbortController();
+    const isCurrent = () => !cancelled && generation === saveGenRef.current;
 
     const timer = window.setTimeout(() => {
-      // The indicator holds "saving" for a beat even when the write is instant, so a change is
-      // visibly acknowledged; with a server behind this, the real latency simply takes over.
       const started = Date.now();
       store
-        .save(projects)
+        .save(projects, controller.signal)
         .then(() => {
-          if (cancelled) return;
+          if (!isCurrent()) return; // вытеснено более новой правкой — не трогаем состояние
           pendingRef.current = null;
           const remaining = Math.max(0, 350 - (Date.now() - started));
           window.setTimeout(() => {
-            if (!cancelled) setSaveState("saved");
+            if (isCurrent()) setSaveState("saved");
           }, remaining);
         })
         .catch(() => {
+          // Отмена вытеснением — не ошибка: более новая правка уже сохраняется своим прогоном.
+          if (controller.signal.aborted || !isCurrent()) return;
           // Локальная запись не умеет не удаваться, серверная умеет. Показать это обязательно:
           // иначе человек продолжит работать в уверенности, что всё сохранено.
-          if (!cancelled) setSaveState("error");
+          setSaveState("error");
         });
     }, signedIn ? SAVE_DEBOUNCE_MS : 0);
 
     return () => {
       cancelled = true;
+      controller.abort();
       window.clearTimeout(timer);
     };
-    // retryTick в зависимостях: «Повторить» после ошибки переигрывает этот эффект и переотправляет
-    // актуальное несинхронизированное состояние.
+    // retryTick в зависимостях: «Повторить» после ошибки переигрывает эффект. Поколение + отмена
+    // гарантируют, что запоздалый ответ прошлой попытки не перекроет более новое состояние.
   }, [projects, isLoaded, signedIn, retryTick]);
 
   /** Повторить сохранение после ошибки — переотправляет актуальное несинхронизированное состояние. */
@@ -462,18 +476,26 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
    * разрешает запросу пережить закрытие документа.
    */
   useEffect(() => {
-    if (!signedIn) return;
     const flush = () => {
       const pending = pendingRef.current;
       if (!pending) return;
       pendingRef.current = null;
-      // Напрямую, а не через хранилище: keepalive — свойство именно этого, последнего запроса.
-      void fetch("/api/projects", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projects: pending }),
-        keepalive: true,
-      }).catch(() => {});
+      if (signedIn) {
+        // Серверу — keepalive: свойство именно этого, последнего запроса, чтобы он пережил закрытие
+        // документа. (Ограничение keepalive по размеру payload — известный остаточный край, см. долг.)
+        void fetch("/api/projects", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projects: pending }),
+          keepalive: true,
+        }).catch(() => {});
+      } else {
+        // Локально запись синхронна и на pagehide успевает лечь В ХРАНИЛИЩЕ. Без этого «правка →
+        // мгновенный reload» теряла последнюю правку: обычная запись отложена на макротаск
+        // (setTimeout 0), а флаша для локального пути раньше не было — ровно это делало
+        // переименование флаки (этап 6). Теперь reload сразу после правки видит актуальное имя.
+        void localProjectStore.save(pending);
+      }
     };
     window.addEventListener("pagehide", flush);
     return () => window.removeEventListener("pagehide", flush);

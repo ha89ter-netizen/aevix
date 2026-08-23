@@ -22,7 +22,9 @@ import { normalizeProjects } from "./project-schema";
 /** Implement this to move projects off the device. See docs/database.md. */
 export type ProjectStore = {
   load(): Promise<Project[]>;
-  save(projects: Project[]): Promise<void>;
+  /** `signal` отменяет запрос, если сохранение вытеснено более новым состоянием (защита от
+   *  устаревшего ответа, который иначе перезаписал бы актуальное состояние). */
+  save(projects: Project[], signal?: AbortSignal): Promise<void>;
   clear(): Promise<void>;
 };
 const STORAGE_KEY = "aevix.projects";
@@ -104,11 +106,12 @@ export const serverProjectStore: ProjectStore = {
     return normalizeProjects(data.projects);
   },
 
-  async save(projects: Project[]): Promise<void> {
+  async save(projects: Project[], signal?: AbortSignal): Promise<void> {
     const response = await fetch("/api/projects", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ projects }),
+      signal,
     });
     if (!response.ok) throw new Error("Не удалось сохранить проекты");
   },
