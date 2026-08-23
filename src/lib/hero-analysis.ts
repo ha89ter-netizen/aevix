@@ -226,9 +226,11 @@ const GENERIC_PROFILE: HeroBusinessProfile = {
 const NICHE_TO_DISPLAY: Record<NicheId, HeroBusinessCategory> = {
   coffee: "food",
   restaurant: "food",
+  bakery: "food",
   barbershop: "barbershop",
   beauty: "beauty",
   dental: "dental",
+  medical: "generic",
   auto: "auto",
   flowers: "ecommerce",
   perfume: "ecommerce",
@@ -237,6 +239,11 @@ const NICHE_TO_DISPLAY: Record<NicheId, HeroBusinessCategory> = {
   hotel: "generic",
   realestate: "generic",
   construction: "generic",
+  legal: "generic",
+  education: "generic",
+  pet: "generic",
+  photo: "generic",
+  cleaning: "generic",
   generic: "generic",
 };
 
