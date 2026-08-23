@@ -6,6 +6,7 @@ import { useBusiness } from "@/lib/business-context";
 import { useProjects } from "@/lib/projects";
 import { projectIdFromPath, projectSectionLabel, shellTitle } from "./shell-nav";
 import { ShellHeaderAccount } from "./shell-header-account";
+import { SaveStatus } from "@/components/workspace/save-status";
 
 /**
  * Three zones, one job each — the previous header offered four competing controls of equal
@@ -50,6 +51,8 @@ export function ShellHeader({ onOpenSidebar, onGoHome }: { onOpenSidebar: () => 
           прежнюю беду с четырьмя равнозначными кнопками, вход оформлен подчёркнуто тише
           консультации и исчезает у вошедшего — ему регистрироваться уже незачем. */}
       <div className="shell-header-right">
+        {/* Единый индикатор сохранения — виден при любой правке проекта/дизайна/AI Designer (QA-3). */}
+        <SaveStatus />
         <button type="button" className="shell-cta" onClick={openConsultation}>
           <Sparkles className="h-4 w-4" />
           <span>Бесплатная консультация</span>

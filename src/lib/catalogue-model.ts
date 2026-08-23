@@ -276,13 +276,26 @@ export function cataloguePreview(catalogue: Catalogue, maxSignature = 3): Catalo
     signature.push(catalogue.featured);
     seen.add(catalogue.featured.id);
   }
-  // По одной позиции из разных категорий — показывает РАЗБРОС направлений, а не начало списка.
+  // Сначала по одной позиции из разных категорий — показывает РАЗБРОС направлений, а не начало
+  // списка (редакционная выборка вместо первых N).
   for (const category of catalogue.categories) {
     if (signature.length >= maxSignature) break;
     const pick = category.items.find((i) => !seen.has(i.id));
     if (pick) {
       signature.push(pick);
       seen.add(pick.id);
+    }
+  }
+  // Затем добираем до maxSignature из оставшихся: у услуг категорий часто нет (одна группа), и без
+  // добора превью схлопывалось бы в одну-две позиции — на внутренней странице услуг этого мало и
+  // реальные услуги (напр. кейтеринг) пропадали (QA-13). Разброс уже задан первым проходом.
+  if (signature.length < maxSignature) {
+    for (const item of catalogue.categories.flatMap((c) => c.items)) {
+      if (signature.length >= maxSignature) break;
+      if (!seen.has(item.id)) {
+        signature.push(item);
+        seen.add(item.id);
+      }
     }
   }
   return { directions, signature, priceRange: catalogue.priceRange, cta: catalogue.cta, itemNoun: catalogue.itemNoun, total: catalogue.total };

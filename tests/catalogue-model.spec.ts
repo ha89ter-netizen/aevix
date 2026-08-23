@@ -64,6 +64,33 @@ test.describe("каталог · категории и словарь ниши",
   });
 });
 
+test.describe("каталог · меню/товары/услуги — разные поверхности (QA-13)", () => {
+  test("меню-бизнес: коммерческий каталог = товары, а услуги остаются услугами", () => {
+    const coffee = nk("Кофейня", "ROAST");
+    // Коммерческий каталог кофейни — это меню (товары).
+    const commercial = buildCatalogue(coffee);
+    expect(commercial.kind).toBe("menu");
+    const menuNames = commercial.categories.flatMap((c) => c.items.map((i) => i.name)).join(" ");
+    expect(menuNames).toMatch(/капучино|латте|эспрессо/i);
+
+    // Услуги-возможности (доставка/кейтеринг) строятся отдельно и НЕ подменяются товарами.
+    const servicesOnly = buildCatalogue(coffee, { products: [], services: coffee.services });
+    expect(servicesOnly.kind).toBe("services");
+    const serviceNames = servicesOnly.categories.flatMap((c) => c.items.map((i) => i.name)).join(" ");
+    expect(serviceNames).toMatch(/доставк|кейтеринг|корпоратив|бронир/i);
+    // Ни одна услуга не является позицией меню — списки не пересекаются как один и тот же.
+    expect(serviceNames).not.toMatch(/капучино|латте/i);
+  });
+
+  test("превью услуг не схлопывается до одной позиции без категорий (добор до лимита)", () => {
+    const coffee = nk("Кофейня", "ROAST");
+    const servicesCatalogue = buildCatalogue(coffee, { products: [], services: coffee.services });
+    const preview = cataloguePreview(servicesCatalogue, 6);
+    // На внутренней странице услуг показывается несколько реальных услуг, а не одна.
+    expect(preview.signature.length).toBeGreaterThanOrEqual(Math.min(4, servicesCatalogue.total));
+  });
+});
+
 test.describe("каталог · превью ≠ полный каталог", () => {
   test("превью — редакционная выборка из разных категорий, а не первые N строк", () => {
     const c = buildCatalogue(nk("Барбершоп", "FORMA"));

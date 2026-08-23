@@ -7736,6 +7736,52 @@ a.shell-account:hover {
   min-width: 0;
 }
 
+/* Индикатор сохранения (QA-3). Спокойный, но очевидный: не модаль, не 10px серым, не перекрывает. */
+.save-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 560;
+  white-space: nowrap;
+}
+.save-status[data-state="saving"] .save-status-label {
+  color: rgba(9, 8, 7, 0.5);
+}
+.save-status[data-state="saved"] .save-status-label {
+  color: #2f7d4f;
+}
+.save-status-error {
+  color: #a33636;
+  font-weight: 620;
+}
+.save-status-retry {
+  border: 1px solid #a33636;
+  color: #a33636;
+  background: transparent;
+  border-radius: var(--radius-pill);
+  padding: 0.22rem 0.72rem;
+  font-size: 0.78rem;
+  font-weight: 640;
+  cursor: pointer;
+  transition: background var(--motion-base) var(--ease-premium);
+}
+.save-status-retry:hover {
+  background: rgba(163, 54, 54, 0.08);
+}
+.save-status-retry:focus-visible {
+  outline: 2px solid #a33636;
+  outline-offset: 2px;
+}
+/* На узком экране скрываем «Сохранение…»/«Сохранено» (шум), но ОШИБКУ и «Повторить» показываем
+   всегда — их прятать нельзя. */
+@media (max-width: 560px) {
+  .save-status[data-state="saving"],
+  .save-status[data-state="saved"] {
+    display: none;
+  }
+}
+
 /* Вход рядом с консультацией, но заметно тише её: контурная кнопка против сплошной чёрной.
    Иерархия здесь не украшение — две одинаково громкие кнопки рядом перестают читаться обе. */
 .shell-header-login {

@@ -1,11 +1,14 @@
 /**
- * Pure, dependency-free business detection for the Hero analysis field.
+ * Персонализация Hero по нише бизнеса.
  *
- * Kept separate from React so it can be unit-reasoned and reused: given a free-text
- * business description it returns a recognised category plus the AEVIX automation points
- * most relevant to that category. Detection is local and instant, which is also the
- * graceful fallback when the AI endpoint is unavailable.
+ * РАСПОЗНАВАНИЕ ниши больше не живёт здесь — оно в каноническом резолвере `resolveNiche` (niche.ts),
+ * том же, что кормит генерацию сайта. Поэтому карточка анализа и сгенерированный сайт не могут
+ * разойтись по нише (было QA-2), а «ресторан» больше не уходит в авто по подстроке «сто» (было QA-1).
+ * Здесь остаётся только МАППИНГ канонической ниши в укрупнённую display-категорию и её контент
+ * (лейбл, автоматизации). Detection и content разделены.
  */
+
+import { resolveNiche, nicheConfidence, type NicheId } from "./niche";
 
 export type HeroBusinessCategory =
   | "barbershop"
@@ -214,35 +217,41 @@ const GENERIC_PROFILE: HeroBusinessProfile = {
   confidence: 58,
 };
 
-// Ordered by specificity so a description that mentions several things resolves to the
-// most concrete category first (e.g. "барбершоп" before the generic "магазин").
-const DETECTION_ORDER: Array<Exclude<HeroBusinessCategory, "generic">> = [
-  "barbershop",
-  "dental",
-  "auto",
-  "beauty",
-  "food",
-  "ecommerce",
-];
+/**
+ * Каноническая ниша (14) → укрупнённая display-категория карточки анализа (6 + generic). Ниши без
+ * своей display-категории (фитнес/отель/недвижимость/стройка) показываются как «Малый бизнес», но их
+ * niche IDENTITY та же, что у генерации — расхождения нет. Раскрыть эти категории в карточке — долг
+ * следующих волн (QA-5/QA-7), не Wave 1.
+ */
+const NICHE_TO_DISPLAY: Record<NicheId, HeroBusinessCategory> = {
+  coffee: "food",
+  restaurant: "food",
+  barbershop: "barbershop",
+  beauty: "beauty",
+  dental: "dental",
+  auto: "auto",
+  flowers: "ecommerce",
+  perfume: "ecommerce",
+  shop: "ecommerce",
+  fitness: "generic",
+  hotel: "generic",
+  realestate: "generic",
+  construction: "generic",
+  generic: "generic",
+};
 
 export function detectBusiness(input: string): HeroBusinessProfile {
-  const normalized = input.toLowerCase();
-
-  for (const category of DETECTION_ORDER) {
-    const seed = PROFILE_SEEDS[category];
-    const matched = seed.keywords.filter((keyword) => normalized.includes(keyword)).length;
-    if (matched > 0) {
-      return {
-        category,
-        label: seed.label,
-        descriptor: seed.descriptor,
-        automations: seed.automations.slice(0, 5),
-        confidence: Math.min(97, 82 + matched * 5),
-      };
-    }
-  }
-
-  return GENERIC_PROFILE;
+  const resolution = resolveNiche(input);
+  const category = NICHE_TO_DISPLAY[resolution.id];
+  if (category === "generic") return GENERIC_PROFILE;
+  const seed = PROFILE_SEEDS[category];
+  return {
+    category,
+    label: seed.label,
+    descriptor: seed.descriptor,
+    automations: seed.automations.slice(0, 5),
+    confidence: nicheConfidence(resolution),
+  };
 }
 
 /**

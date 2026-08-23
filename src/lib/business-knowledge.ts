@@ -1,4 +1,5 @@
 import type { ConceptColorId, ConceptLayoutId, ConceptStyleId } from "./website-concept";
+import { resolveNiche, type NicheId } from "./niche";
 
 /**
  * The knowledge layer behind every generated concept: instead of inventing a business niche
@@ -1174,62 +1175,23 @@ const GENERIC: BusinessKnowledge = {
  * hit the restaurant's «бар» keyword and «стоматология» could hit a broad match first. This is
  * intentionally NOT the declaration order of KNOWLEDGE above.
  */
-const MATCH_ORDER = [
-  "dental",
-  "barbershop",
-  "perfume",
-  "auto",
-  "beauty",
-  "coffee",
-  "hotel",
-  "flowers",
-  "fitness",
-  "realestate",
-  "restaurant",
-  "construction",
-  "shop",
-] as const;
-
-const ORDERED_KNOWLEDGE = MATCH_ORDER.map((id) => KNOWLEDGE.find((entry) => entry.id === id)).filter(
-  (entry): entry is BusinessKnowledge => Boolean(entry),
+/** Ниша → знания. Один справочник по каноническому id резолвера (см. niche.ts). */
+const KNOWLEDGE_BY_ID = new Map<NicheId, BusinessKnowledge>(
+  [...KNOWLEDGE, GENERIC].map((entry) => [entry.id as NicheId, entry]),
 );
 
 /**
- * Resolves the knowledge entry for a free-text business type/name. Checks the explicit type
- * first, then the extra hint (usually the business name — «ROAST coffee» matches even when the
- * wizard type is the generic «Другое»).
+ * Возвращает знания ниши по свободному тексту типа/названия бизнеса.
+ *
+ * Распознавание ниши больше НЕ живёт здесь: identity приходит из канонического резолвера
+ * `resolveNiche` (niche.ts) — того же, что читает карточка анализа. Поэтому analysis и concept не
+ * могут разойтись по нише (было QA-2), а подстрочная ловушка «сто» в «ресторане» устранена там же
+ * (было QA-1). Здесь остаётся только КОНТЕНТ ниши.
+ *
+ * (Поле `keywords` в записях ниш больше не используется для распознавания — единственный словарь
+ * теперь в niche.ts. Оставлено как справочные данные; вычистить — отдельная уборка.)
  */
 export function businessKnowledgeFor(businessType: string, extraHint = ""): BusinessKnowledge {
-  const haystacks = [businessType.toLowerCase(), `${businessType} ${extraHint}`.toLowerCase()];
-  for (const haystack of haystacks) {
-    const match = bestMatch(haystack);
-    if (match) return match;
-  }
-  return GENERIC;
-}
-
-/**
- * Ниша с НАИБОЛЬШИМ числом совпавших ключей, а не первая попавшаяся.
- *
- * Раньше побеждало первое совпадение по порядку, и короткий ключ внутри длинного слова уводил
- * в чужую нишу: «Ресторан авторской кухни» распознавался как автосервис, потому что «авто»
- * лежит внутри «авторской». Ресторан при этом совпадает дважды — «ресторан» и «кухн», — и счёт
- * решает спор правильно.
- *
- * При равном счёте по-прежнему решает MATCH_ORDER: он выстроен от частных ниш к общим, и это
- * осмысленный разрыв ничьей.
- */
-function bestMatch(haystack: string): BusinessKnowledge | null {
-  let best: BusinessKnowledge | null = null;
-  let bestScore = 0;
-  for (const entry of ORDERED_KNOWLEDGE) {
-    let score = 0;
-    for (const word of entry.keywords) if (haystack.includes(word)) score += 1;
-    // Строго больше: при равенстве остаётся тот, кто раньше в MATCH_ORDER.
-    if (score > bestScore) {
-      best = entry;
-      bestScore = score;
-    }
-  }
-  return best;
+  const { id } = resolveNiche(`${businessType} ${extraHint}`);
+  return KNOWLEDGE_BY_ID.get(id) ?? GENERIC;
 }

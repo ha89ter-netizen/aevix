@@ -223,6 +223,7 @@ type ProjectsContextValue = {
    * loading" from "genuinely no projects" (the empty state waits for this). */
   isLoaded: boolean;
   saveState: SaveState;
+  retrySave: () => void;
   /** Куда пишутся проекты прямо сейчас. Список проектов показывает по этому полю, лежит ли
    * работа в аккаунте или всё ещё только на этом устройстве. */
   storage: "device" | "account";
@@ -305,6 +306,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [retryTick, setRetryTick] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [migrationError, setMigrationError] = useState<string | null>(null);
   const [generation, setGeneration] = useState<GenerationState>(null);
@@ -445,7 +447,12 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [projects, isLoaded, signedIn]);
+    // retryTick в зависимостях: «Повторить» после ошибки переигрывает этот эффект и переотправляет
+    // актуальное несинхронизированное состояние.
+  }, [projects, isLoaded, signedIn, retryTick]);
+
+  /** Повторить сохранение после ошибки — переотправляет актуальное несинхронизированное состояние. */
+  const retrySave = useCallback(() => setRetryTick((tick) => tick + 1), []);
 
   /**
    * Досохранение при уходе со страницы.
@@ -741,6 +748,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
       projects,
       isLoaded,
       saveState,
+      retrySave,
       storage: signedIn ? "account" : "device",
       loadError,
       migrationError,
@@ -764,7 +772,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
       generateAll,
       regenerate,
     }),
-    [projects, isLoaded, saveState, signedIn, loadError, migrationError, create, rename, duplicate, remove, getProject, saveAnalysis, saveDesign, savePricing, appendDesignerEntry, pushHistory, undo, redo, canUndo, canRedo, publish, unpublish, generation, generateAll, regenerate],
+    [projects, isLoaded, saveState, retrySave, signedIn, loadError, migrationError, create, rename, duplicate, remove, getProject, saveAnalysis, saveDesign, savePricing, appendDesignerEntry, pushHistory, undo, redo, canUndo, canRedo, publish, unpublish, generation, generateAll, regenerate],
   );
 
   return <ProjectsContext.Provider value={value}>{children}</ProjectsContext.Provider>;

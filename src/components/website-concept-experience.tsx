@@ -220,19 +220,22 @@ function ConceptSection({
   }
 
   if (section.type === "services") {
-    // Редакционное превью, а не префикс каталога (этап 5). Раньше показывались первые N услуг —
-    // те же, что в каталоге: один список дважды. Теперь берём signature-выборку из РАЗНЫХ категорий
-    // (`cataloguePreview`) — она отвечает «чем занимается бизнес», а не повторяет прайс. Подвал
-    // добавляет ориентир решения: диапазон цен, счётчик и «Все услуги». Полный список — только в
-    // секции pricing. Подачу (геометрию) по-прежнему выбирает семейство.
-    const catalogue = buildCatalogue(knowledge, offers);
+    // Превью УСЛУГ бизнеса — то, что он делает для клиента (стрижки, а у кофейни — доставка,
+    // кейтеринг, бронь). Это НЕ коммерческий каталог: у меню/товарного бизнеса каталог (секция
+    // pricing) — это товары, а услуги-возможности живут отдельно и не должны исчезать (QA-13,
+    // этап 7). Поэтому строим превью явно из `services`, а не из buildCatalogue, который для
+    // товарного бизнеса вернул бы товары. Полный прайс — только в секции pricing.
+    //
+    // Само превью — редакционная signature-выборка из разных категорий услуг (не первые N: не
+    // повторяет полный список), плюс подвал-ориентир: счётчик и «Все услуги».
+    const servicesList = offers?.services ?? knowledge.services;
+    const servicesCatalogue = buildCatalogue(knowledge, { products: [], services: servicesList });
     const limit = isHomePage ? composition.homeServiceCount : Math.max(6, composition.homeServiceCount);
-    const preview = cataloguePreview(catalogue, limit);
+    const preview = cataloguePreview(servicesCatalogue, limit);
     const services = preview.signature.map((item) => ({
       name: item.name,
       price: item.price.lead ? `${item.price.lead} ${item.price.value}` : item.price.value,
     }));
-    const viewAllLabel = catalogue.title === "Меню" ? "Всё меню" : catalogue.title === "Каталог" ? "Весь каталог" : "Все услуги";
     return (
       <ConceptServices
         kind={composition.services}
@@ -243,11 +246,11 @@ function ConceptSection({
         footer={
           <div className="concept-services-preview-foot">
             <span className="concept-services-preview-meta">
-              {pluralItems(catalogue.total, catalogue.itemNoun)}
-              {catalogue.priceRange ? ` · ${catalogue.priceRange.display}` : ""}
+              {pluralItems(servicesCatalogue.total, servicesCatalogue.itemNoun)}
+              {servicesCatalogue.priceRange ? ` · ${servicesCatalogue.priceRange.display}` : ""}
             </span>
             <button type="button" className="concept-services-viewall" onClick={onDemoAction}>
-              {viewAllLabel}
+              Все услуги
             </button>
           </div>
         }
