@@ -155,12 +155,15 @@ test.describe("hero analysis field", () => {
     await expect(page.locator(".hero-sequence-step")).toHaveCount(4);
     await expect(page.getByText("Перестраиваем интерфейс")).toBeVisible();
 
-    // Success state: recognised business + confidence + 3 metric tiles + 5-phase roadmap.
+    // Success state: recognised business + Understanding rows (Known/Inferred/Proposed) + 5-phase
+    // proposed system. NO fabricated metric tiles or numeric confidence (Wave 4 removed them).
     const result = page.locator(RESULT);
     await expect(result).toBeVisible();
     await expect(result.getByText("Барбершоп", { exact: true })).toBeVisible();
-    await expect(result.locator(".hero-confidence")).toBeVisible();
-    await expect(result.locator(".hero-metric")).toHaveCount(3);
+    await expect(result.getByText("AEVIX понял")).toBeVisible();
+    await expect(result.locator(".hero-metric")).toHaveCount(0);
+    await expect(result.locator(".hero-confidence")).toHaveCount(0);
+    await expect(result.locator(".hero-understanding-row")).toHaveCount(3);
     await expect(result.locator(".hero-roadmap-step")).toHaveCount(5);
     await expect(result.getByText("запись ведётся вручную", { exact: false })).toBeVisible();
     await expect(result.getByRole("button", { name: /Продолжить/ })).toBeVisible();

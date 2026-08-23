@@ -122,33 +122,58 @@ test.describe("site personalisation", () => {
     await expect(page.locator(".pricing-scene .hero-recommend-badge")).toHaveCount(3);
   });
 
-  test("Hero result shows category metrics dashboard", async ({ page }) => {
+  test("pricing states WHY these modules are recommended (deterministic reason, once)", async ({ page }) => {
     await analyzeBarber(page);
-    const result = page.locator(RESULT);
-    await expect(result.locator(".hero-metric")).toHaveCount(3);
-    // Per-business implementation roadmap renders its phases.
-    await expect(result.locator(".hero-roadmap-step")).toHaveCount(5);
+    const reason = page.locator(".pricing-recommend-reason");
+    // Shown once — a single clean composition, not a copy on every card.
+    await expect(reason).toHaveCount(1);
+    // Barbershop is a booking niche → the deterministic reason speaks about запись, not marketing.
+    await expect(reason).toContainText("запис");
+    await expect(reason).toContainText("Почему");
   });
 
-  test("shows AI confidence, and asks for detail when it is low", async ({ page }) => {
-    // A clearly-matched description reports high confidence and no prompt for more detail.
-    await analyzeBarber(page);
-    const confidence = page.locator(".hero-confidence");
-    await expect(confidence).toBeVisible();
-    await expect
-      .poll(async () => parseInt((await confidence.innerText()).replace(/\D/g, ""), 10))
-      .toBeGreaterThanOrEqual(85);
-    await expect(page.locator(".hero-confidence-hint")).toHaveCount(0);
-  });
-
-  test("low-confidence description invites more detail", async ({ page }) => {
+  test("generic gets NO invented niche reason at pricing", async ({ page }) => {
     await mockSuccess(page, "Разбор готов.");
     await gotoHydrated(page);
-    // Nothing category-specific: detection falls back to generic with low confidence.
+    // Nothing category-specific → generic. No niche-specific "почему" is fabricated.
     await page.locator(FIELD).fill("хочу больше заявок");
     await page.locator(FIELD).press("Enter");
     await expect(page.locator(RESULT)).toBeVisible();
-    await expect(page.locator(".hero-confidence-hint")).toBeVisible();
+    await expect(page.locator(".pricing-recommend-reason")).toHaveCount(0);
+  });
+
+  test("Hero result shows Understanding, not fabricated numbers (Wave 4)", async ({ page }) => {
+    await analyzeBarber(page);
+    const result = page.locator(RESULT);
+    // Known / Inferred / Proposed — three understanding rows, plus the proposed-system roadmap.
+    await expect(result.locator(".hero-understanding-row")).toHaveCount(3);
+    await expect(result.locator(".hero-roadmap-step")).toHaveCount(5);
+    // The fabricated analytics are gone: no metric tiles, no "%/часов/выручка" claims.
+    await expect(result.locator(".hero-metric")).toHaveCount(0);
+    await expect(result.getByText("Выручка")).toHaveCount(0);
+    await expect(result.getByText("Часов/нед.")).toHaveCount(0);
+    await expect(result.getByText(/\+\d+\s*%/)).toHaveCount(0);
+  });
+
+  test("recognised business is stated qualitatively, no numeric confidence", async ({ page }) => {
+    await analyzeBarber(page);
+    const result = page.locator(RESULT);
+    // Header states understanding qualitatively; no numeric recognition % anywhere on the card.
+    await expect(result.getByText("AEVIX понял")).toBeVisible();
+    await expect(result.locator(".hero-confidence")).toHaveCount(0);
+    await expect(result.getByText("Что поняли")).toBeVisible();
+  });
+
+  test("unrecognised business is honest, not fake niche expertise", async ({ page }) => {
+    await mockSuccess(page, "Разбор готов.");
+    await gotoHydrated(page);
+    // Nothing category-specific: detection falls back to generic — and says so plainly.
+    await page.locator(FIELD).fill("хочу больше заявок");
+    await page.locator(FIELD).press("Enter");
+    const result = page.locator(RESULT);
+    await expect(result).toBeVisible();
+    await expect(result.getByText("Тип бизнеса не распознан")).toBeVisible();
+    await expect(result.getByText(/Не удалось уверенно определить тип бизнеса/)).toBeVisible();
   });
 
   test("whole-site accent re-themes to the business", async ({ page }) => {

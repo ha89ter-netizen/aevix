@@ -1308,6 +1308,87 @@ body::before {
   line-height: 1.4;
 }
 
+/* Причина рекомендации у прайса: одна спокойная строка, не реклама (этап 7, Wave 4).
+   Детерминированный текст из recommendCapabilities.reason — почему именно эти модули этому бизнесу. */
+.pricing-recommend-reason {
+  display: flex;
+  gap: 0.55rem;
+  align-items: baseline;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: rgba(15, 15, 20, 0.6);
+}
+.pricing-recommend-reason-label {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+  transform: translateY(-0.05em);
+}
+
+/* Ярлык категории услуги AEVIX: основа / возможность / канал / бонус (этап 7, Wave 4).
+   Разводит прежнюю ошибку категории — AI (интеллект) и Telegram/WhatsApp (каналы) больше не читаются
+   как три равных продукта. Семантический цвет, не декоративный акцент. */
+.product-kind {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: 1px solid transparent;
+}
+.product-kind-core {
+  color: #5b3ec8;
+  background: rgba(122, 92, 255, 0.12);
+  border-color: rgba(122, 92, 255, 0.28);
+}
+.product-kind-capability {
+  color: #1f7a54;
+  background: rgba(31, 122, 84, 0.1);
+  border-color: rgba(31, 122, 84, 0.24);
+}
+.product-kind-channel {
+  color: #b06a12;
+  background: rgba(176, 106, 18, 0.1);
+  border-color: rgba(176, 106, 18, 0.24);
+}
+.product-kind-addon {
+  color: rgba(15, 15, 20, 0.5);
+  background: rgba(15, 15, 20, 0.05);
+  border-color: rgba(15, 15, 20, 0.12);
+}
+
+/* Что AEVIX понял: Known / Inferred / Proposed — editorial-строки, не KPI-плитки (этап 7, Wave 4) */
+.hero-understanding-row {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, 9rem) 1fr;
+  gap: 0.5rem 0.9rem;
+  align-items: baseline;
+}
+@media (max-width: 30rem) {
+  .hero-understanding-row {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+  }
+}
+.hero-understanding-label {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(15, 15, 20, 0.44);
+  padding-top: 0.1rem;
+}
+.hero-understanding-text {
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: rgba(15, 15, 20, 0.74);
+}
+
 /* Implementation roadmap: connected phases inside the hero control centre */
 .hero-roadmap {
   display: flex;

@@ -31,15 +31,6 @@ export type HeroBusinessProfile = {
   confidence: number;
 };
 
-/** Illustrative potential metrics (an estimate of upside, not a guarantee). */
-export type BusinessMetrics = {
-  /** Share of routine that AEVIX can take over, 0–100. */
-  automationScore: number;
-  hoursSavedPerWeek: number;
-  revenueUpliftPct: number;
-  priority: "Высокий" | "Средний";
-};
-
 export type BusinessFaq = { q: string; a: string };
 
 /**
@@ -63,8 +54,8 @@ export type BusinessContent = {
   accent: AccentRgb;
   /** Ambient background tones — see BusinessMood. */
   mood: BusinessMood;
-  metrics: BusinessMetrics;
-  /** Ordered implementation roadmap phases shown in the hero control centre. */
+  /** Steps of the system AEVIX proposes to build for this business (the "Proposed" chain).
+   *  Deliberately module names, not fabricated numbers — see the Wave 4 note below. */
   roadmap: string[];
   /** Personalised before → automated → result case. */
   caseBefore: string;
@@ -269,7 +260,6 @@ export const businessContent: Record<HeroBusinessCategory, BusinessContent> = {
   barbershop: {
     accent: { r: 109, g: 94, b: 214 },
     mood: { a: { r: 92, g: 84, b: 138 }, b: { r: 120, g: 126, b: 148 } },
-    metrics: { automationScore: 82, hoursSavedPerWeek: 9, revenueUpliftPct: 14, priority: "Высокий" },
     roadmap: ["AI-консультант", "Онлайн-запись", "CRM", "Напоминания", "Отзывы"],
     caseBefore: "Клиенты пишут в разные чаты, администратор вручную сверяет свободные окна мастеров.",
     caseAutomated: "AEVIX отвечает, подбирает мастера и время, фиксирует запись и запускает напоминание.",
@@ -286,12 +276,11 @@ export const businessContent: Record<HeroBusinessCategory, BusinessContent> = {
   beauty: {
     accent: { r: 166, g: 91, b: 141 },
     mood: { a: { r: 206, g: 142, b: 178 }, b: { r: 240, g: 198, b: 190 } },
-    metrics: { automationScore: 85, hoursSavedPerWeek: 11, revenueUpliftPct: 16, priority: "Высокий" },
     roadmap: ["AI-консультант", "Запись по мастерам", "CRM", "Напоминания", "Возврат клиентов"],
     caseBefore: "Администратор вручную ведёт запись по услугам и мастерам в нескольких чатах.",
     caseAutomated: "AEVIX уточняет процедуру, подбирает мастера и время, ведёт историю визитов.",
     caseResult: "Прозрачная загрузка мастеров, понятные популярные услуги и выше возвращаемость клиентов.",
-    focusModules: ["AI-консультант", "CRM", "WhatsApp-бот"],
+    focusModules: ["AI-консультант", "CRM", "WhatsApp"],
     faq: [
       { q: "Можно записывать на конкретного мастера?", a: "Да. AI уточняет услугу и мастера и предлагает только доступные окна этого специалиста." },
       { q: "Будет ли храниться история клиента?", a: "CRM хранит визиты и предпочтения, поэтому повторная запись и допродажа услуг проще." },
@@ -303,12 +292,11 @@ export const businessContent: Record<HeroBusinessCategory, BusinessContent> = {
   food: {
     accent: { r: 157, g: 105, b: 61 },
     mood: { a: { r: 208, g: 150, b: 96 }, b: { r: 196, g: 118, b: 86 } },
-    metrics: { automationScore: 78, hoursSavedPerWeek: 12, revenueUpliftPct: 12, priority: "Высокий" },
     roadmap: ["AI-консультант", "Приём заказов", "Бронь / доставка", "CRM", "Отзывы"],
     caseBefore: "Гости спрашивают меню, бронь, доставку и акции в разных каналах — команда отвечает вручную.",
     caseAutomated: "AEVIX выбирает сценарий: бронь, меню, вопрос по заказу или обратная связь.",
     caseResult: "Типовые вопросы закрываются автоматически, а команда остаётся в зале и на кухне.",
-    focusModules: ["AI-консультант", "Telegram-бот", "Комплексная автоматизация"],
+    focusModules: ["AI-консультант", "Telegram", "Комплексная автоматизация"],
     faq: [
       { q: "Сможет ли бот принимать брони?", a: "Да. Гость выбирает дату и время, бронь фиксируется и подтверждается автоматически." },
       { q: "А доставку и меню потянет?", a: "AI отвечает по меню, помогает оформить доставку и передаёт заказ команде со статусом." },
@@ -320,12 +308,11 @@ export const businessContent: Record<HeroBusinessCategory, BusinessContent> = {
   ecommerce: {
     accent: { r: 72, g: 114, b: 199 },
     mood: { a: { r: 120, g: 152, b: 232 }, b: { r: 156, g: 140, b: 236 } },
-    metrics: { automationScore: 80, hoursSavedPerWeek: 10, revenueUpliftPct: 18, priority: "Высокий" },
     roadmap: ["AI-консультант", "Каталог и заказы", "CRM", "Корзина", "Повторные продажи"],
     caseBefore: "Покупатели уточняют наличие, цену и доставку в переписке — менеджер отвечает вручную.",
     caseAutomated: "AEVIX отвечает по каталогу, собирает данные заказа и передаёт сложные случаи сотруднику.",
     caseResult: "Быстрее ответы, меньше брошенных корзин и больше повторных заказов.",
-    focusModules: ["AI-консультант", "Сайт компании", "CRM"],
+    focusModules: ["AI-консультант", "Сайт / лендинг", "CRM"],
     faq: [
       { q: "Ответит ли AI по наличию и цене?", a: "Да. Консультант отвечает по каталогу, помогает подобрать товар и оформить заказ." },
       { q: "Поможет с брошенными корзинами?", a: "Система может напомнить о незавершённом заказе и вернуть покупателя к оформлению." },
@@ -337,12 +324,11 @@ export const businessContent: Record<HeroBusinessCategory, BusinessContent> = {
   dental: {
     accent: { r: 48, g: 127, b: 134 },
     mood: { a: { r: 96, g: 178, b: 186 }, b: { r: 150, g: 200, b: 226 } },
-    metrics: { automationScore: 76, hoursSavedPerWeek: 8, revenueUpliftPct: 11, priority: "Средний" },
     roadmap: ["AI-консультант", "Онлайн-запись", "CRM", "Напоминания", "Отзывы"],
     caseBefore: "Администратор вручную записывает пациентов и отвечает на частые вопросы по услугам.",
     caseAutomated: "AEVIX отвечает на вопросы, подбирает врача и время, ведёт историю визитов.",
     caseResult: "Меньше неявок, ровное расписание врачей и понятная история обращений пациентов.",
-    focusModules: ["AI-консультант", "CRM", "WhatsApp-бот"],
+    focusModules: ["AI-консультант", "CRM", "WhatsApp"],
     faq: [
       { q: "Как пациенты будут записываться?", a: "AI подбирает врача, услугу и свободное время; запись фиксируется в CRM с историей визитов." },
       { q: "Уменьшит ли неявки?", a: "Подтверждения и напоминания перед приёмом обычно заметно снижают количество неявок." },
@@ -354,12 +340,11 @@ export const businessContent: Record<HeroBusinessCategory, BusinessContent> = {
   auto: {
     accent: { r: 96, g: 112, b: 148 },
     mood: { a: { r: 122, g: 136, b: 152 }, b: { r: 214, g: 148, b: 96 } },
-    metrics: { automationScore: 74, hoursSavedPerWeek: 8, revenueUpliftPct: 10, priority: "Средний" },
     roadmap: ["AI-консультант", "Приём заявок", "CRM", "Напоминания о ТО", "Отзывы"],
     caseBefore: "Заявки на услуги приходят в разные каналы, приёмщик вручную согласует время и цену.",
     caseAutomated: "AEVIX принимает заявку, уточняет услугу и время, ведёт историю обслуживания.",
     caseResult: "Заявки не теряются, загрузка постов ровнее и клиенты вовремя возвращаются на ТО.",
-    focusModules: ["AI-консультант", "CRM", "Telegram-бот"],
+    focusModules: ["AI-консультант", "CRM", "Telegram"],
     faq: [
       { q: "Как будут приходить заявки?", a: "Клиент описывает задачу, AI уточняет услугу, авто и удобное время, заявка попадает в CRM." },
       { q: "Напомнит клиентам о ТО?", a: "Да. По истории обслуживания система вовремя напоминает клиентам о плановом ТО." },
@@ -371,7 +356,6 @@ export const businessContent: Record<HeroBusinessCategory, BusinessContent> = {
   generic: {
     accent: { r: 118, g: 89, b: 247 },
     mood: { a: { r: 129, g: 176, b: 255 }, b: { r: 255, g: 197, b: 163 } },
-    metrics: { automationScore: 72, hoursSavedPerWeek: 7, revenueUpliftPct: 10, priority: "Средний" },
     roadmap: ["AI-консультант", "Поток заявок", "CRM", "Напоминания", "Отзывы"],
     caseBefore: "Обращения приходят в разные каналы, команда держит статусы и ответы в голове.",
     caseAutomated: "AEVIX собирает входящие в один поток, отвечает на типовое и фиксирует заявки.",

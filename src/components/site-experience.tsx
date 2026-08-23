@@ -61,6 +61,8 @@ import {
   type HeroBusinessProfile,
 } from "@/lib/hero-analysis";
 import { ANALYSIS_SEQUENCE, useBusiness } from "@/lib/business-context";
+import { AEVIX_PRODUCTS, PRODUCT_KIND_LABEL, recommendCapabilities, type AevixProduct } from "@/lib/aevix-products";
+import { resolveNiche } from "@/lib/niche";
 import { motionTransition } from "@/lib/motion";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -151,63 +153,33 @@ const businessTypeOptions: BusinessType[] = [
 
 const branchOptions: BranchCount[] = ["1", "2–5", "6–10", "больше 10"];
 
-const serviceCatalog: Array<{
-  id: ServiceId;
-  title: string;
-  price: number;
-  description: string;
-  icon: IconComponent;
-}> = [
-  {
-    id: "ai",
-    title: "AI-консультант",
-    price: 120_000,
-    description: "Диалог, уточнение задачи и передача обращения команде.",
-    icon: Bot,
-  },
-  {
-    id: "telegram",
-    title: "Telegram-бот",
-    price: 150_000,
-    description: "Заявки, ответы и сценарии внутри Telegram.",
-    icon: Send,
-  },
-  {
-    id: "whatsapp",
-    title: "WhatsApp-бот",
-    price: 180_000,
-    description: "Ответы и сбор данных в привычном канале.",
-    icon: MessageCircle,
-  },
-  {
-    id: "site",
-    title: "Сайт / лендинг",
-    price: 100_000,
-    description: "Цена зависит от объёма, дизайна и информации.",
-    icon: Globe2,
-  },
-  {
-    id: "crm",
-    title: "CRM",
-    price: 0,
-    description: "Заявки и статусы в одном рабочем контуре.",
-    icon: Layers3,
-  },
-  {
-    id: "automation",
-    title: "Комплексная автоматизация",
-    price: 350_000,
-    description: "CRM-flow, напоминания и контроль процесса.",
-    icon: Workflow,
-  },
-  {
-    id: "nfc",
-    title: "NFC",
-    price: 0,
-    description: "Бонус: быстрый вход в запись, каталог или отзывы.",
-    icon: CreditCard,
-  },
-];
+// Иконки — единственное, что остаётся в презентационном слое. Всё остальное (title / description /
+// price / kind / семантика цены) приходит из КАНОНИЧЕСКОЙ модели услуг (aevix-products.ts): один
+// источник истины, без дублирования копий описаний и цен по компонентам (этап 7, Wave 4).
+const serviceIcons: Record<ServiceId, IconComponent> = {
+  ai: Bot,
+  site: Globe2,
+  telegram: Send,
+  whatsapp: MessageCircle,
+  crm: Layers3,
+  automation: Workflow,
+  nfc: CreditCard,
+};
+
+const serviceCatalog: Array<Omit<AevixProduct, "id"> & { id: ServiceId; icon: IconComponent }> =
+  AEVIX_PRODUCTS.map((product) => ({
+    ...product,
+    id: product.id as ServiceId,
+    icon: serviceIcons[product.id as ServiceId],
+  }));
+
+/** Честная подпись к цене: разное для «от / включено / по составу / бонус» — клиент не гадает. */
+function priceLabel(product: { price: number; priceModel: string; priceNote: string }): string {
+  if (product.priceModel === "included") return "Включено";
+  if (product.priceModel === "bonus") return "Бонус";
+  if (product.priceModel === "custom") return "По составу проекта";
+  return `от ${formatKzt(product.price)}`;
+}
 
 const initialEstimateForm: EstimateForm = {
   businessType: "Барбершоп",
@@ -944,15 +916,9 @@ function HeroAnalysisResult({
   onReset: () => void;
   onContinue: () => void;
 }) {
-  const { metrics } = content;
   const CategoryIcon = categoryIcons[profile.category];
-  // Nothing specific matched: invite more detail rather than pretending certainty.
-  const lowConfidence = profile.confidence < 70;
-  const metricTiles = [
-    { label: "Автоматизация", value: metrics.automationScore, suffix: "%" },
-    { label: "Часов/нед.", value: metrics.hoursSavedPerWeek, prefix: "~" },
-    { label: "Выручка", value: metrics.revenueUpliftPct, prefix: "+", suffix: "%" },
-  ];
+  // Nothing specific matched: be honest, don't fake niche expertise (Wave 4). generic ⟺ low confidence.
+  const isGeneric = profile.category === "generic";
 
   return (
     <motion.div
@@ -969,58 +935,50 @@ function HeroAnalysisResult({
             <CategoryIcon className="h-5 w-5" />
           </span>
           <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-violet">Бизнес распознан</p>
+            <p className="text-xs font-medium uppercase tracking-[0.2em] text-violet">
+              {isGeneric ? "Тип бизнеса не распознан" : "AEVIX понял"}
+            </p>
             <p className="truncate text-lg font-semibold leading-tight text-ink">{profile.label}</p>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <span className="hero-confidence" title="Уверенность распознавания">
-            <AnimatedNumber value={profile.confidence} />%
-          </span>
-          <button
-            type="button"
-            onClick={onReset}
-            className="rounded-full border border-ink/10 bg-white/70 px-3 py-1.5 text-xs font-medium text-ink/60 transition hover:border-violet/24 hover:text-ink"
-          >
-            Изменить
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={onReset}
+          className="shrink-0 rounded-full border border-ink/10 bg-white/70 px-3 py-1.5 text-xs font-medium text-ink/60 transition hover:border-violet/24 hover:text-ink"
+        >
+          Изменить
+        </button>
       </div>
 
       <p className="mt-4 text-sm leading-6 text-ink/68">
-        {summary ?? `${profile.descriptor}. Ниже — как AEVIX перестраивает процесс.`}
+        {isGeneric
+          ? "Не удалось уверенно определить тип бизнеса. Уточните нишу или задачу — и разбор станет конкретнее. Пока показываем нейтральный сценарий."
+          : (summary ?? `${profile.descriptor}.`)}
       </p>
 
-      {lowConfidence ? (
-        <p className="hero-confidence-hint mt-3">
-          Уточните нишу или задачу — разбор станет точнее.
-        </p>
-      ) : null}
-
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        {metricTiles.map((tile, index) => (
-          <motion.div
-            key={tile.label}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...motionTransition.slow, delay: 0.1 + index * 0.05 }}
-            className="hero-metric rounded-2xl border border-ink/8 bg-white/64 px-3 py-2.5"
-          >
-            <p className="price-display text-xl font-semibold leading-none text-ink">
-              {tile.prefix}
-              <AnimatedNumber value={tile.value} />
-              {tile.suffix}
-            </p>
-            <p className="mt-1 text-[0.66rem] uppercase tracking-[0.12em] text-ink/44">{tile.label}</p>
-          </motion.div>
-        ))}
+      {/* Known / Inferred / Proposed — три РАЗНЫЕ категории уверенности, смешивать нельзя (Wave 4).
+          Никаких процентов автоматизации, часов и «выручки +N%»: это были выдуманные числа без
+          источника — убраны. Здесь только то, что понято, что ОБЫЧНО полезно (inference из ниши,
+          с явной оговоркой), и что AEVIX предлагает построить. */}
+      <div className="hero-understanding mt-4 space-y-3">
+        {!isGeneric ? (
+          <div className="hero-understanding-row">
+            <p className="hero-understanding-label">Что поняли</p>
+            <p className="hero-understanding-text">{profile.descriptor}</p>
+          </div>
+        ) : null}
+        <div className="hero-understanding-row">
+          <p className="hero-understanding-label">Обычно вручную</p>
+          <p className="hero-understanding-text">{content.caseBefore}</p>
+        </div>
+        <div className="hero-understanding-row">
+          <p className="hero-understanding-label">AEVIX предлагает</p>
+          <p className="hero-understanding-text">{content.caseAutomated}</p>
+        </div>
       </div>
-      <p className="mt-2 text-[0.68rem] leading-4 text-ink/40">
-        Оценка потенциала (приоритет: {metrics.priority.toLowerCase()}), а не гарантированный результат.
-      </p>
 
       <p className="mt-4 text-xs font-medium uppercase tracking-[0.2em] text-ink/40">
-        Дорожная карта внедрения
+        Что предлагаем построить
       </p>
       <ol className="hero-roadmap mt-3">
         {content.roadmap.map((phase, index) => (
@@ -1820,9 +1778,7 @@ export function AiConsultantScene({
                               <strong className="block text-sm font-semibold text-ink">{service.title}</strong>
                               <span className="block text-xs leading-5 text-ink/52">{service.description}</span>
                             </span>
-                            <span className="ai-service-price">
-                              {service.price ? `от ${formatKzt(service.price)}` : service.id === "nfc" ? "бонус" : "по составу"}
-                            </span>
+                            <span className="ai-service-price">{priceLabel(service)}</span>
                           </li>
                         );
                       })}
@@ -2297,11 +2253,17 @@ const catalogModuleMatch: Partial<Record<ServiceId, string>> = {
  * is a single card: what it does + what it costs, positioned right before the calculator so the
  * flow reads Pricing -> Calculator -> Final cost -> CTA instead of Calculator -> Pricing. */
 function ModulesPricingScene() {
-  const { status, profile, content } = useBusiness();
+  const { status, profile, content, input } = useBusiness();
   const [scenarioId, setScenarioId] = useState<string | null>(null);
   const scenarioModule = modules.find((module) => module.id === scenarioId) ?? null;
   const personalized = status === "ready" && profile && content;
   const focusModules = content?.focusModules ?? [];
+  // Причина рекомендации — из ОДНОГО детерминированного источника (recommendCapabilities), не из AI.
+  // Показываем один раз рядом с предложением, а не дублируем на каждой карточке. У generic ниши
+  // нишевой причины НЕТ — не выдумываем (честность как на карточке анализа).
+  const recommendedNiche = personalized && input ? resolveNiche(input).id : null;
+  const recommendationReason =
+    recommendedNiche && recommendedNiche !== "generic" ? recommendCapabilities(recommendedNiche).reason : null;
 
   return (
     <section id="стоимость" className="scene pricing-scene relative flex items-center overflow-hidden">
@@ -2319,6 +2281,12 @@ function ModulesPricingScene() {
               ? `Отмечены модули, с которых стоит начать для «${profile.label}». Персональный расчёт — ниже.`
               : "Каждый модуль — понятный участок автоматизации со своей ценой. Персональный расчёт — ниже."}
           </p>
+          {recommendationReason ? (
+            <p className="pricing-recommend-reason mt-4 max-w-2xl" role="note">
+              <span className="pricing-recommend-reason-label">Почему</span>
+              {recommendationReason}
+            </p>
+          ) : null}
         </div>
 
         <div data-reveal className="card-field grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -2341,6 +2309,11 @@ function ModulesPricingScene() {
                 <div className="card-head flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
                   <Icon className="h-6 w-6 shrink-0 text-violet" />
                   <div className="card-head-tags flex min-w-0 flex-wrap items-center justify-end gap-2">
+                    {/* Ярлык категории: канал ≠ возможность ≠ основа — устраняет прежнюю ошибку,
+                        когда AI/Telegram/WhatsApp читались как три равных продукта. */}
+                    <span className={cn("product-kind", `product-kind-${service.kind}`)}>
+                      {PRODUCT_KIND_LABEL[service.kind]}
+                    </span>
                     {recommended ? <span className="hero-recommend-badge">Рекомендуем</span> : null}
                     {linkedModule ? (
                       <button type="button" className="capability-demo" onClick={() => setScenarioId(linkedModule.id)}>
@@ -2351,6 +2324,7 @@ function ModulesPricingScene() {
                 </div>
                 <h3 className="mt-6 text-2xl font-semibold">{service.title}</h3>
                 <p className="mt-2 text-base leading-7 text-ink/58">{service.description}</p>
+                <p className="mt-2 text-sm leading-6 text-ink/44">{service.forWhom}</p>
                 {linkedModule ? (
                   <ul className="mt-4 grid gap-1.5">
                     {linkedModule.what.slice(0, 3).map((item) => (
@@ -2361,9 +2335,9 @@ function ModulesPricingScene() {
                     ))}
                   </ul>
                 ) : null}
-                <p className="price-display mt-6 text-xl font-semibold">
-                  {service.price ? `от ${formatKzt(service.price)}` : service.id === "nfc" ? "бонус" : "по составу проекта"}
-                </p>
+                <p className="price-display mt-6 text-xl font-semibold">{priceLabel(service)}</p>
+                {/* Семантика цены: разово / подключение / включено — клиент не гадает (§17). */}
+                <p className="mt-1 text-xs leading-5 text-ink/44">{service.priceNote}</p>
               </article>
             );
           })}
