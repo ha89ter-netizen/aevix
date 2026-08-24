@@ -188,7 +188,6 @@ body {
 /* Prominent accent surfaces morph their color/fill/border when the channels swap, so the
    re-theme reads as a smooth transition rather than a hard cut. */
 .hero-badge svg,
-.hero-metric,
 .hero-scenario-dot,
 .faq-chevron,
 .nav-persona-chip,
@@ -1276,36 +1275,6 @@ body::before {
   border-color: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.3);
   background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.12);
   color: #5d45cc;
-}
-
-.hero-metric .price-display {
-  font-variant-numeric: tabular-nums;
-}
-
-/* AI confidence chip */
-.hero-confidence {
-  display: inline-flex;
-  align-items: center;
-  border-radius: var(--radius-pill);
-  border: 1px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.26);
-  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.1);
-  padding: 0.3rem 0.55rem;
-  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
-  font-size: 0.72rem;
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-  transition: color var(--motion-ambient) var(--ease-premium), background-color var(--motion-ambient) var(--ease-premium),
-    border-color var(--motion-ambient) var(--ease-premium);
-}
-
-.hero-confidence-hint {
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(180, 130, 40, 0.24);
-  background: rgba(251, 243, 224, 0.7);
-  padding: 0.5rem 0.75rem;
-  color: #8a6524;
-  font-size: 0.78rem;
-  line-height: 1.4;
 }
 
 /* Причина рекомендации у прайса: одна спокойная строка, не реклама (этап 7, Wave 4).
@@ -7142,13 +7111,29 @@ button.workspace-card:hover {
   background: #f7f8f9;
 }
 
-@media (max-width: 767px) {
+/* Планшет и телефон (≤1024px): панель AI-дизайнера ДОКАется снизу, а не висит справа поверх превью
+   (этап 7, Wave 5, §3). Прежде на планшете (~820px) фиксированный оверлей 21rem закрывал правые ~40%
+   превью — устройство было наполовину не видно. Внизу превью сохраняет ПОЛНУЮ ширину и прокручивается
+   над панелью. На десктопе (>1024px) панель остаётся боковым оверлеем — там ширины хватает. */
+@media (max-width: 1024px) {
   .designer-panel {
     top: auto;
     bottom: 0.75rem;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: min(30rem, calc(100vw - 1.5rem));
     max-height: min(24rem, calc(100svh - 8rem));
+    animation: designer-sheet-in var(--motion-slow) var(--ease-premium) both;
   }
+}
 
+@keyframes designer-sheet-in {
+  from { opacity: 0; transform: translate(-50%, 10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@media (max-width: 767px) {
   /* Переключатель размера превью на телефоне остаётся иконками: три подписи «Desktop / Tablet /
      Mobile» — это около 120px, которых на узком экране просто нет. Кнопки никуда не деваются и
      остаются подписанными для чтения с экрана — `title` и `aria-pressed` при них. */
@@ -8577,10 +8562,10 @@ a.shell-account:hover {
    читается сверху вниз. Illustration explains — text confirms. Живёт в прикладной (светлой) теме
    Workspace; ни маркетинговые (--mk-*), ни концептовые (--concept-*) токены сюда не заходят.
 
-   Ширину диктует не окно, а контейнер: страница внутри .workspace-project-scope, а панель
-   AI-дизайнера при открытии съедает 21rem справа (padding-right у scope). container-type на самой
-   истории ловит и то, и другое — сетка перестраивается, когда панель открыта, а не только когда
-   меняют окно.
+   Ширину диктует не окно, а контейнер (container-type на самой истории), поэтому сетка
+   перестраивается и по ширине окна, и по ширине рабочей области. (Панель AI-дизайнера ширину НЕ
+   резервирует — с этапа 7 Wave 5 это фиксированный оверлей на десктопе и нижний лист ≤1024px,
+   превью не схлопывается.)
    ========================================================================== */
 
 .process-story {

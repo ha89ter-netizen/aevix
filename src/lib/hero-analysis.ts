@@ -29,6 +29,10 @@ export type HeroBusinessProfile = {
   automations: string[];
   /** Detection confidence 0–100 (keyword-match strength). */
   confidence: number;
+  /** Была ли ниша РАСПОЗНАНА (этап 7, Wave 5). Отдельно от `category`: ниша может быть распознана
+   *  (legal/pet/medical/…), но не иметь своей rich display-категории — тогда `category:"generic"`,
+   *  но `recognized:true` и настоящее название. Только по-настоящему нераспознанное → generic-честность. */
+  recognized: boolean;
 };
 
 export type BusinessFaq = { q: string; a: string };
@@ -81,7 +85,7 @@ export const heroPlaceholderExamples = [
 ] as const;
 
 // Confidence is derived at detection time from keyword-match strength, so seeds omit it.
-type ProfileSeed = Omit<HeroBusinessProfile, "category" | "confidence"> & { keywords: string[] };
+type ProfileSeed = Omit<HeroBusinessProfile, "category" | "confidence" | "recognized"> & { keywords: string[] };
 
 const PROFILE_SEEDS: Record<Exclude<HeroBusinessCategory, "generic">, ProfileSeed> = {
   barbershop: {
@@ -206,6 +210,26 @@ const GENERIC_PROFILE: HeroBusinessProfile = {
   ],
   // Low confidence: nothing specific matched, so the UI invites more detail.
   confidence: 58,
+  recognized: false,
+};
+
+/**
+ * Ниши, которые РАСПОЗНАЮТСЯ, но не имеют своей rich display-категории (аккцент/иконка/автоматизации).
+ * Раньше они молча показывались как «Малый бизнес» (Wave 3/4 долг). Теперь показываем настоящее
+ * название + нейтральный сценарий (§5). Canonical niche identity при этом не меняется — только
+ * человекочитаемое имя на карточке. Generic (нераспознанное) остаётся generic.
+ */
+const RECOGNISED_NEUTRAL_DISPLAY: Partial<Record<NicheId, { label: string; descriptor: string }>> = {
+  medical: { label: "Медицинский центр", descriptor: "Приём пациентов и запись" },
+  legal: { label: "Юридическая компания", descriptor: "Консультации и сопровождение" },
+  education: { label: "Образовательный центр", descriptor: "Курсы, занятия и запись" },
+  pet: { label: "Зоосалон и ветклиника", descriptor: "Груминг, приём и запись" },
+  photo: { label: "Фотостудия", descriptor: "Съёмки, аренда и запись" },
+  cleaning: { label: "Клининговая компания", descriptor: "Уборка и выездные услуги" },
+  fitness: { label: "Фитнес-клуб", descriptor: "Тренировки, абонементы и запись" },
+  hotel: { label: "Отель", descriptor: "Номера и бронирование" },
+  realestate: { label: "Агентство недвижимости", descriptor: "Заявки, показы и сделки" },
+  construction: { label: "Строительная компания", descriptor: "Заявки, смета и работы" },
 };
 
 /**
@@ -240,8 +264,21 @@ const NICHE_TO_DISPLAY: Record<NicheId, HeroBusinessCategory> = {
 
 export function detectBusiness(input: string): HeroBusinessProfile {
   const resolution = resolveNiche(input);
+  // По-настоящему нераспознанное → честный generic.
+  if (resolution.id === "generic") return GENERIC_PROFILE;
   const category = NICHE_TO_DISPLAY[resolution.id];
-  if (category === "generic") return GENERIC_PROFILE;
+  if (category === "generic") {
+    // Ниша распознана, но без rich display-профиля: настоящее имя + нейтральная система (§5).
+    const neutral = RECOGNISED_NEUTRAL_DISPLAY[resolution.id];
+    return {
+      category: "generic",
+      label: neutral?.label ?? GENERIC_PROFILE.label,
+      descriptor: neutral?.descriptor ?? GENERIC_PROFILE.descriptor,
+      automations: GENERIC_PROFILE.automations,
+      confidence: nicheConfidence(resolution),
+      recognized: true,
+    };
+  }
   const seed = PROFILE_SEEDS[category];
   return {
     category,
@@ -249,6 +286,7 @@ export function detectBusiness(input: string): HeroBusinessProfile {
     descriptor: seed.descriptor,
     automations: seed.automations.slice(0, 5),
     confidence: nicheConfidence(resolution),
+    recognized: true,
   };
 }
 

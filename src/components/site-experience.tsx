@@ -917,8 +917,9 @@ function HeroAnalysisResult({
   onContinue: () => void;
 }) {
   const CategoryIcon = categoryIcons[profile.category];
-  // Nothing specific matched: be honest, don't fake niche expertise (Wave 4). generic ⟺ low confidence.
-  const isGeneric = profile.category === "generic";
+  // Честность только когда ниша НЕ распознана. Распознанная ниша без rich display-категории
+  // (legal/pet/…) показывает настоящее имя, а не «Малый бизнес» (этап 7, Wave 5, §5).
+  const isGeneric = !profile.recognized;
 
   return (
     <motion.div

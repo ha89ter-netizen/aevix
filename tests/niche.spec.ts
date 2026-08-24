@@ -243,6 +243,30 @@ test.describe("niche resolver · мульти-бизнес детерминир�
   }
 });
 
+test.describe("display label · распознанная ниша не показывается как generic (Wave 5, §5)", () => {
+  const SUPPORTED: Array<[string, string]> = [
+    ["юридическая компания", "Юридическая компания"],
+    ["ветклиника", "Зоосалон и ветклиника"],
+    ["медицинский центр", "Медицинский центр"],
+    ["фитнес-клуб", "Фитнес-клуб"],
+    ["образовательный центр", "Образовательный центр"],
+    ["клининговая компания", "Клининговая компания"],
+  ];
+  for (const [input, label] of SUPPORTED) {
+    test(`«${input}» → recognized, label «${label}» (не «Малый бизнес»)`, () => {
+      const p = detectBusiness(input);
+      expect(p.recognized).toBe(true);
+      expect(p.label).toBe(label);
+      expect(p.label).not.toBe("Малый бизнес");
+    });
+  }
+  test("нераспознанное → recognized:false, честный «Малый бизнес»", () => {
+    const p = detectBusiness("хочу больше клиентов");
+    expect(p.recognized).toBe(false);
+    expect(p.label).toBe("Малый бизнес");
+  });
+});
+
 test.describe("niche resolver · analysis === concept (одна identity)", () => {
   test("detectBusiness и businessKnowledgeFor не расходятся по базе", () => {
     const all = [...CASES.map(([i]) => i), ...NOT_AUTO_GENERIC, ...FALSE_POSITIVE_GENERIC];

@@ -765,6 +765,25 @@ test.describe("AI-дизайнер: превью и проект идут в н�
     await expect(page.locator(HEADING)).toHaveText("Стрижка за 30 минут");
   });
 
+  test("планшет 820px: панель докается снизу, превью держит ширину (§3, Wave 5)", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop", "один раз с форсированным tablet-viewport");
+    await page.setViewportSize({ width: 820, height: 1024 });
+    await openDesigner(page, "designer-tablet");
+    const panelBox = await page.locator(".designer-panel").boundingBox();
+    const stageBox = await page.locator(".concept-preview-stage").boundingBox();
+    expect(panelBox).not.toBeNull();
+    expect(stageBox).not.toBeNull();
+    // Панель докнута снизу (y в нижней половине), а не боковым оверлеем поверх правых ~40% превью.
+    expect(panelBox!.y).toBeGreaterThan(1024 * 0.45);
+    // Превью держит ширину страницы и НЕ схлопнуто (при старой резервации было бы ~128px).
+    expect(stageBox!.width).toBeGreaterThan(400);
+    // Панель не крадёт ширину у превью: превью шире узкого нижнего листа.
+    expect(stageBox!.width).toBeGreaterThan(panelBox!.width * 0.9);
+    // Правка всё ещё применяется и видна без reload.
+    await ask(page, "Замени заголовок на «Тест планшета»");
+    await expect(page.locator(HEADING)).toHaveText("Тест планшета");
+  });
+
   test("отмена возвращает прежний заголовок сразу, без перезагрузки", async ({ page }) => {
     await openDesigner(page, "designer-undo");
     await ask(page, "Замени заголовок на «Стрижка за 30 минут»");
