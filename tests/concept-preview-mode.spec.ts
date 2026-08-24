@@ -83,6 +83,19 @@ async function waitForStableScrollHeight(page: Page) {
 }
 
 test.describe("concept preview mode", () => {
+  test("демо-статус виден на всём концепте — и в редакторе, и в превью (post-release 2)", async ({ page }) => {
+    await openConceptExample(page);
+    const badge = page.locator(".concept-demo-badge");
+    await expect(badge).toBeVisible();
+    await expect(badge).toContainText("Демо-концепт");
+
+    // Статус относится ко ВСЕМУ концепту: в полноэкранном превью длинный disclaimer скрыт, а
+    // sticky-ярлык остаётся — именно там риск принять концепт за готовый сайт максимален.
+    await enterPreview(page);
+    await expect(page.locator(".concept-disclaimer")).toBeHidden();
+    await expect(page.locator(".concept-demo-badge")).toBeVisible();
+  });
+
   test("preview hides every editor panel", async ({ page }) => {
     await openConceptExample(page);
     await enterPreview(page);

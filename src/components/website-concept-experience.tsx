@@ -32,6 +32,7 @@ import { ConceptHero } from "@/components/concept/ConceptHero";
 import { ConceptServices } from "@/components/concept/ConceptServices";
 import { ConceptCatalogue } from "@/components/concept/ConceptCatalogue";
 import { buildCatalogue, cataloguePreview, pluralItems } from "@/lib/catalogue-model";
+import { CONCEPT_STATUS } from "@/lib/concept-status";
 import { SECTION_LABELS, useDesignerSelection } from "@/components/workspace/designer-selection";
 import { motionTransition } from "@/lib/motion";
 import {
@@ -573,6 +574,17 @@ function ConceptPreview({
       aria-label={`Превью сайта: ${concept.businessName}`}
       className={cn("concept-preview-stage", isPreview && "is-preview")}
     >
+      {/* Статус относится ко ВСЕМУ концепту и виден в ОБОИХ режимах — в т.ч. в полноэкранном превью,
+          где длинный disclaimer скрыт. Sticky-пилюля не даёт принять демо-концепт за готовый сайт.
+          Единый источник текста — CONCEPT_STATUS. */}
+      <div
+        className="concept-demo-badge"
+        title={CONCEPT_STATUS.summary}
+        aria-label={`${CONCEPT_STATUS.badge}. ${CONCEPT_STATUS.summary}`}
+      >
+        <Info className="h-3.5 w-3.5" aria-hidden="true" />
+        {CONCEPT_STATUS.badge}
+      </div>
       <motion.div
         layout
         className={cn("concept-device", `concept-device-${mode}`)}
@@ -1133,9 +1145,11 @@ export function WebsiteConceptExperience({
               ) : null}
             </div>
             {notice && !isPreview ? <p className="concept-notice">{notice}</p> : null}
+            {/* Одно короткое объяснение к статусу «Демо-концепт» — в редакторе. Текст из единого
+                источника CONCEPT_STATUS; в превью его роль играет доступное имя sticky-ярлыка. */}
             <div className="concept-disclaimer" hidden={isPreview}>
               <Info className="h-4 w-4" />
-              <p>Этот сайт является предварительным визуальным макетом, а не готовым продуктом. Здесь показаны дизайн, структура и общий пользовательский опыт. Формы, оплата, запись, интеграции и другие бизнес-функции подключаются на этапе полноценной разработки.</p>
+              <p>{CONCEPT_STATUS.summary}</p>
             </div>
             {isBuilding ? (
               <div className="concept-pipeline-status" aria-live="polite" hidden={isPreview}>

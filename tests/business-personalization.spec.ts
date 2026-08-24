@@ -215,6 +215,20 @@ test.describe("site personalisation", () => {
     return contact;
   }
 
+  test("AEVIX «сайт» показывает 30 дней сопровождения; только он, и это НЕ демо (post-release 2)", async ({ page }) => {
+    await mockSuccess(page);
+    await gotoHydrated(page);
+    await page.locator("#стоимость").scrollIntoViewIfNeeded();
+    const notes = page.locator(".pricing-scene .product-support-note");
+    // Условие есть только у продукта «сайт» — другие продукты его не наследуют.
+    await expect(notes).toHaveCount(1);
+    await expect(notes).toContainText("30 дней");
+    // Цены продуктов AEVIX НЕ маркируются как «Демо-цены» — это семантика generated business.
+    await expect(page.locator(".pricing-scene").getByText("Демо-цены")).toHaveCount(0);
+    // И никаких запрещённых обещаний рядом.
+    await expect(page.locator(".pricing-scene").getByText("24/7")).toHaveCount(0);
+  });
+
   test("lead: submit → email → success, БЕЗ WhatsApp (post-release 1)", async ({ page }) => {
     await analyzeBarber(page);
     // analyzeBarber waits only for .hero-result; business-context holds a ~2.1s minimum "analyzing"

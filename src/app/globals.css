@@ -2733,6 +2733,56 @@ body::before {
   color: #4a83ab;
 }
 
+/* «Демо-концепт» — спокойный sticky-ярлык на всём превью, виден и в редакторе, и в полноэкранном
+   режиме (post-release pass 2). Не банер во весь экран: маленькая пилюля в углу, которая липнет к
+   верху при прокрутке. Белая подложка — читается над любым hero; на mobile остаётся мелкой. */
+.concept-demo-badge {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.55rem;
+  padding: 0.28rem 0.62rem;
+  border-radius: 999px;
+  border: 1px solid rgba(9, 8, 7, 0.12);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  color: rgba(9, 8, 7, 0.72);
+  font-size: 0.72rem;
+  font-weight: 620;
+  box-shadow: 0 4px 14px rgba(9, 8, 7, 0.1);
+}
+.concept-demo-badge svg {
+  color: #4a83ab;
+}
+
+/* Реальное условие «сайта»: 30 дней сопровождения включено. Зелёный trust-тон (не акцент, не демо). */
+.product-support-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: 8px;
+  background: rgba(31, 122, 84, 0.08);
+  border: 1px solid rgba(31, 122, 84, 0.2);
+  color: #1f7a54;
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* Тот же смысл коротким trust-note у CTA «Разработать этот концепт». */
+.concept-sidebar-support {
+  margin: 0 0 0.6rem;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: rgba(9, 8, 7, 0.62);
+}
+
 .concept-preview-stage {
   width: 100%;
   height: 100%;

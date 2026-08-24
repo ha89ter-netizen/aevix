@@ -181,6 +181,11 @@ function priceLabel(product: { price: number; priceModel: string; priceNote: str
   return `от ${formatKzt(product.price)}`;
 }
 
+/** Границы включённого сопровождения одной подсказкой — честно про что входит и что нет. */
+function supportScopeTitle(support: NonNullable<AevixProduct["includedSupport"]>): string {
+  return `Входит: ${support.includes.join(", ")}. Не входит: ${support.excludes.join(", ")}.`;
+}
+
 const initialEstimateForm: EstimateForm = {
   businessType: "Барбершоп",
   selectedServices: ["ai", "whatsapp"],
@@ -2339,6 +2344,14 @@ function ModulesPricingScene() {
                 <p className="price-display mt-6 text-xl font-semibold">{priceLabel(service)}</p>
                 {/* Семантика цены: разово / подключение / включено — клиент не гадает (§17). */}
                 <p className="mt-1 text-xs leading-5 text-ink/44">{service.priceNote}</p>
+                {/* Реальное условие «сайта»: 30 дней сопровождения включено. Из канонической модели
+                    (только у продукта с includedSupport — другие его НЕ наследуют). */}
+                {service.includedSupport ? (
+                  <p className="product-support-note" title={supportScopeTitle(service.includedSupport)}>
+                    <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {service.includedSupport.summary}
+                  </p>
+                ) : null}
               </article>
             );
           })}

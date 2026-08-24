@@ -14,6 +14,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { WebsiteConcept } from "@/lib/website-concept";
+import { PRODUCT_BY_ID } from "@/lib/aevix-products";
 import { motionTransition } from "@/lib/motion";
 
 /**
@@ -150,6 +151,11 @@ export function ConceptSidebar({
         </div>
 
         <div className="concept-sidebar-footer">
+          {/* Trust-note у CTA разработки: реальное условие «сайта» из канонической модели. Это цена
+              и условие ПРОДУКТА AEVIX (разработка), а не демо-данные концепта. */}
+          {PRODUCT_BY_ID.get("site")?.includedSupport ? (
+            <p className="concept-sidebar-support">{PRODUCT_BY_ID.get("site")!.includedSupport!.summary}</p>
+          ) : null}
           <Button type="button" onClick={onContact} className="w-full justify-center" disabled={isBuilding}>
             <MessageCircle className="mr-2 h-4 w-4" /> Разработать этот концепт
           </Button>

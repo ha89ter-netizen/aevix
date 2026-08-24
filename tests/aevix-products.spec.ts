@@ -5,6 +5,7 @@ import {
   FIRST_PROJECT_DISCOUNT,
   recommendCapabilities,
 } from "../src/lib/aevix-products";
+import { CONCEPT_STATUS } from "../src/lib/concept-status";
 
 /**
  * Каноническая модель услуг AEVIX (этап 7, Wave 4) — семантика продукта, не деталь рендера.
@@ -67,6 +68,45 @@ test.describe("AEVIX products · честность", () => {
   test("скидка на первый проект — один источник, реалистичное число", () => {
     expect(FIRST_PROJECT_DISCOUNT).toBeGreaterThan(0);
     expect(FIRST_PROJECT_DISCOUNT).toBeLessThan(0.5);
+  });
+});
+
+test.describe("AEVIX products · 30 дней сопровождения (post-release 2)", () => {
+  test("включённое сопровождение есть ТОЛЬКО у сайта, 30 дней", () => {
+    const site = PRODUCT_BY_ID.get("site")!;
+    expect(site.includedSupport?.durationDays).toBe(30);
+    expect(site.includedSupport?.summary).toContain("30");
+    // Другие продукты НЕ наследуют условие сайта.
+    for (const p of AEVIX_PRODUCTS) {
+      if (p.id !== "site") expect(p.includedSupport, `${p.id} не должен иметь includedSupport`).toBeUndefined();
+    }
+  });
+
+  test("границы честны: чинят баги и мелкие правки, а не «любые изменения бесплатно»", () => {
+    const s = PRODUCT_BY_ID.get("site")!.includedSupport!;
+    // Есть и что входит, и что НЕ входит.
+    expect(s.includes.length).toBeGreaterThan(0);
+    expect(s.excludes.length).toBeGreaterThan(0);
+    const all = [s.summary, ...s.includes, ...s.excludes].join(" ").toLowerCase();
+    // Никаких запрещённых обещаний.
+    for (const banned of ["24/7", "круглосуточ", "безлимит", "unlimited", "пожизнен", "мгновенн", "sla", "гаранти", "любые изменения бесплатно"]) {
+      expect(all, `не должно содержать «${banned}»`).not.toContain(banned);
+    }
+    // Явно исключены крупные функции / редизайн / внешний scope.
+    expect(s.excludes.join(" ").toLowerCase()).toMatch(/функц|редизайн|интеграц|объём/);
+  });
+});
+
+test.describe("concept status · единый честный статус демо-концепта (post-release 2)", () => {
+  test("ярлык «Демо-концепт» + объяснение про демо-данные, без обесценивания", () => {
+    expect(CONCEPT_STATUS.badge.toLowerCase()).toContain("демо");
+    const summary = CONCEPT_STATUS.summary.toLowerCase();
+    expect(summary).toMatch(/пример|демонстрац/);
+    expect(summary).toContain("цены");
+    // Не обесцениваем концепт.
+    for (const bad of ["плохая", "сырой", "мусор", "много багов", "простая версия"]) {
+      expect(summary).not.toContain(bad);
+    }
   });
 });
 
