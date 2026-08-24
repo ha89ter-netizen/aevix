@@ -2968,19 +2968,7 @@ function FaqScene() {
   );
 }
 
-// Best-effort backup record of the lead: the visible action is opening WhatsApp with a
-// prefilled message, but that's lost entirely if the visitor never presses send there or
-// closes the tab. This fires in the background and never blocks or surfaces errors to the
-// visitor — WhatsApp stays the primary, visible path.
-function sendLeadEmail(lead: { name: string; contact: string; business: string; task: string; niche: string }) {
-  fetch("/api/lead", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(lead),
-  }).catch(() => {
-    // Silently degrade — the visitor already has the WhatsApp draft open.
-  });
-}
+type LeadStatus = "idle" | "sending" | "sent" | "error";
 
 function ContactScene() {
   const { status, profile, content, input } = useBusiness();
@@ -2990,7 +2978,9 @@ function ContactScene() {
   const [contact, setContact] = useState("");
   const [business, setBusiness] = useState("");
   const [task, setTask] = useState("");
-  const [sent, setSent] = useState(false);
+  // Honeypot: люди этого поля не видят и не заполняют; заполненное = бот (см. api/lead).
+  const [company, setCompany] = useState("");
+  const [leadStatus, setLeadStatus] = useState<LeadStatus>("idle");
   const syncedRef = useRef("");
 
   // Prefill the business field with what the visitor already described in the Hero.
@@ -3003,28 +2993,33 @@ function ContactScene() {
 
   const canSend = name.trim().length > 0 && contact.trim().length > 0;
 
-  const submit = (event: React.FormEvent) => {
+  const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!canSend) return;
-    const trimmedName = name.trim();
-    const trimmedContact = contact.trim();
-    const trimmedBusiness = business.trim();
-    const trimmedTask = task.trim();
+    // Защита от двойного submit: пока запрос в полёте, повторный клик игнорируется — иначе двойной
+    // клик отправил бы два одинаковых письма.
+    if (!canSend || leadStatus === "sending") return;
+    setLeadStatus("sending");
     const niche = personalized ? profile.label : "";
-    const lines = [
-      "Заявка с сайта AEVIX",
-      `Имя: ${trimmedName}`,
-      `Контакт: ${trimmedContact}`,
-      trimmedBusiness ? `Бизнес: ${trimmedBusiness}` : null,
-      trimmedTask ? `Задача: ${trimmedTask}` : null,
-      niche ? `Ниша: ${niche}` : null,
-    ].filter(Boolean);
-    const url = `${contacts.whatsapp.href}?text=${encodeURIComponent(lines.join("\n"))}`;
-    // window.open must run synchronously in the click handler — anything awaited before it
-    // (like the email call below) would lose the user-gesture context and get popup-blocked.
-    window.open(url, "_blank", "noopener,noreferrer");
-    setSent(true);
-    sendLeadEmail({ name: trimmedName, contact: trimmedContact, business: trimmedBusiness, task: trimmedTask, niche });
+    try {
+      const response = await fetch("/api/lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          contact: contact.trim(),
+          business: business.trim(),
+          task: task.trim(),
+          niche,
+          company, // honeypot
+        }),
+      });
+      // Success ТОЛЬКО после реального подтверждения сервера — не оптимистично. При любой неудаче
+      // остаёмся в error, а введённые данные в полях сохраняются для Retry.
+      const data = response.ok ? ((await response.json().catch(() => null)) as { ok?: boolean } | null) : null;
+      setLeadStatus(data?.ok ? "sent" : "error");
+    } catch {
+      setLeadStatus("error");
+    }
   };
 
   return (
@@ -3062,16 +3057,25 @@ function ContactScene() {
             </div>
 
             <div className="contact-form-card">
-              {sent ? (
+              {leadStatus === "sent" ? (
                 <div className="contact-sent" role="status">
                   <span className="contact-sent-mark">
                     <Check className="h-6 w-6" />
                   </span>
-                  <p className="text-lg font-semibold text-porcelain">Заявка открыта в WhatsApp</p>
+                  <p className="text-lg font-semibold text-porcelain">Заявка отправлена</p>
                   <p className="mt-2 text-sm text-porcelain/58">
-                    Отправьте подготовленное сообщение — мы ответим в течение рабочего дня.
+                    Мы получили ваши данные и свяжемся с вами.
                   </p>
-                  <button type="button" className="contact-sent-again" onClick={() => setSent(false)}>
+                  <button
+                    type="button"
+                    className="contact-sent-again"
+                    onClick={() => {
+                      setLeadStatus("idle");
+                      setName("");
+                      setContact("");
+                      setTask("");
+                    }}
+                  >
                     Отправить ещё одну заявку
                   </button>
                 </div>
@@ -3117,13 +3121,34 @@ function ContactScene() {
                       placeholder="Запись, ответы клиентам, напоминания…"
                     />
                   </label>
-                  <Button type="submit" disabled={!canSend} className="lead-submit w-full">
-                    <MessageCircle className="mr-2 h-4 w-4" />
-                    {personalized && content ? content.ctaLabel : "Отправить заявку"}
-                    <ArrowRight className="ml-2 h-4 w-4" />
+                  {/* Honeypot: вне потока, скрыт от людей и скринридеров, ловит ботов. */}
+                  <input
+                    className="lead-hp"
+                    type="text"
+                    name="company"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    aria-hidden="true"
+                    value={company}
+                    onChange={(event) => setCompany(event.target.value)}
+                  />
+                  {leadStatus === "error" ? (
+                    <p className="lead-error" role="alert">
+                      Не удалось отправить заявку. Попробуйте ещё раз.
+                    </p>
+                  ) : null}
+                  <Button type="submit" disabled={!canSend || leadStatus === "sending"} className="lead-submit w-full">
+                    {leadStatus === "sending"
+                      ? "Отправляем…"
+                      : leadStatus === "error"
+                        ? "Попробовать снова"
+                        : personalized && content
+                          ? content.ctaLabel
+                          : "Отправить заявку"}
+                    {leadStatus === "sending" ? null : <ArrowRight className="ml-2 h-4 w-4" />}
                   </Button>
                   <p className="lead-note">
-                    Заявка уйдёт в WhatsApp AEVIX. Или напишите напрямую:{" "}
+                    Заявка придёт нам на почту. Или напишите напрямую:{" "}
                     <a href={contacts.telegram.href} target="_blank" rel="noreferrer">Telegram</a>
                     {" · "}
                     <a href={contacts.email.href}>почта</a>.

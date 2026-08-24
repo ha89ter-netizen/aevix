@@ -5,8 +5,12 @@ export const runtime = "nodejs";
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 5;
-const LEAD_NOTIFICATION_EMAIL = "ha89ter@gmail.com";
+// Отправитель по умолчанию — sandbox-адрес Resend. ВАЖНО: он доставляет ТОЛЬКО на адрес владельца
+// учётки Resend и НЕ является production-ready sender для писем произвольным адресатам. Для прода
+// нужен отправитель с подтверждённого домена через `LEAD_EMAIL_FROM` (см. CLAUDE.md).
 const DEFAULT_FROM = "AEVIX <onboarding@resend.dev>";
+// Получатель заявок (`LEADS_TO_EMAIL`) — ОБЯЗАТЕЛЬНАЯ server-side конфигурация, читается в POST на
+// каждый запрос. Хардкод-фолбэка на личный адрес НЕТ: без переменной письмо не отправляется вовсе.
 
 // See the identical note in api/business-analysis/route.ts: per-instance only, not a hard cap.
 const requestBuckets = new Map<string, { count: number; resetAt: number }>();
@@ -134,6 +138,14 @@ function renderLeadText(lead: LeadPayload) {
 
 export async function POST(request: Request) {
   const body = await parseRequestBody(request);
+
+  // Honeypot: скрытое поле `company` видят только боты (человек его не видит и не заполняет). Если
+  // заполнено — тихо отвечаем «ок», НЕ отправляя письмо: бот не понимает, что отфильтрован, и не
+  // повторяет. Тихое средство без CAPTCHA (§6).
+  if (body && typeof body === "object" && typeof (body as { company?: unknown }).company === "string" && (body as { company: string }).company.trim()) {
+    return NextResponse.json({ ok: true });
+  }
+
   const lead = validateLead(body);
 
   if (!lead) {
@@ -148,20 +160,22 @@ export async function POST(request: Request) {
   }
 
   const apiKey = process.env.RESEND_API_KEY;
+  const recipient = process.env.LEADS_TO_EMAIL;
 
-  if (!apiKey) {
-    // Lead capture is a best-effort backup channel behind the visible WhatsApp/Telegram flow —
-    // a missing key must never surface as a hard error to the visitor, it just means the email
-    // copy of this lead was not sent.
-    console.error("Lead email skipped: RESEND_API_KEY is not configured");
-    return NextResponse.json({ sent: false });
+  // Доставка заявки — ОБЯЗАТЕЛЬНАЯ конфигурация: нужен и ключ, и получатель. Нет любого из двух →
+  // контролируемый config-failure: НЕ пытаемся слать письмо (и уж точно не на скрытый захардкоженный
+  // адрес), возвращаем 503, клиент показывает обычный честный error-state. В логи — только факт «не
+  // настроено», без payload заявки (§10, privacy).
+  if (!apiKey || !recipient) {
+    console.error("Lead email failed: delivery is not configured (RESEND_API_KEY / LEADS_TO_EMAIL)");
+    return NextResponse.json({ error: "Не удалось отправить заявку. Попробуйте ещё раз." }, { status: 503 });
   }
 
   try {
     const resend = new Resend(apiKey);
     const { error } = await resend.emails.send({
       from: process.env.LEAD_EMAIL_FROM || DEFAULT_FROM,
-      to: LEAD_NOTIFICATION_EMAIL,
+      to: recipient,
       replyTo: lead.contact.includes("@") ? lead.contact : undefined,
       subject: `Новая заявка с сайта AEVIX — ${lead.name}`,
       html: renderLeadHtml(lead),
@@ -169,13 +183,14 @@ export async function POST(request: Request) {
     });
 
     if (error) {
-      console.error("Lead email failed", error);
-      return NextResponse.json({ sent: false }, { status: 502 });
+      // Логируем факт ошибки провайдера, но НЕ payload заявки (телефон/имя не уходят в логи, §10).
+      console.error("Lead email failed: provider error");
+      return NextResponse.json({ error: "Не удалось отправить заявку. Попробуйте ещё раз." }, { status: 502 });
     }
 
-    return NextResponse.json({ sent: true });
-  } catch (err) {
-    console.error("Lead email failed", err);
-    return NextResponse.json({ sent: false }, { status: 502 });
+    return NextResponse.json({ ok: true });
+  } catch {
+    console.error("Lead email failed: unexpected error");
+    return NextResponse.json({ error: "Не удалось отправить заявку. Попробуйте ещё раз." }, { status: 502 });
   }
 }

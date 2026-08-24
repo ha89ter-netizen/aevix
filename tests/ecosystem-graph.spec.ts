@@ -208,6 +208,31 @@ test.describe("живая система · на экране", () => {
     await expect(page.locator(".eco-node.is-dimmed")).toHaveCount(0);
   });
 
+  test("ядро AEVIX постоянно светится — glow не зависит от motion (post-release 1)", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop", "браузерная проверка ядра");
+    await page.goto(ENTRY);
+    const core = page.locator(".eco-node.is-core");
+    await expect(core).toHaveCount(1);
+    await expect(core.getByText("AEVIX")).toBeVisible();
+    // Постоянный светящийся слой — статический ::after с градиентом (не анимация, не второе ядро).
+    const glow = await core.evaluate((el) => getComputedStyle(el, "::after").backgroundImage);
+    expect(glow).toContain("gradient");
+    expect(glow).not.toBe("none");
+  });
+
+  test("ядро остаётся главным и светящимся при prefers-reduced-motion", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop", "браузерная проверка ядра");
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto(ENTRY);
+    const core = page.locator(".eco-node.is-core");
+    await expect(core).toBeVisible();
+    await expect(core.getByText("AEVIX")).toBeVisible();
+    // Glow — постоянное состояние, а не анимация: остаётся и при reduced-motion (motion не
+    // единственный источник визуальной активности ядра).
+    const glow = await core.evaluate((el) => getComputedStyle(el, "::after").backgroundImage);
+    expect(glow).toContain("gradient");
+  });
+
   test("сцена — одна остановка табуляции, внутри ходят стрелками", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "desktop", "проверка клавиатуры");
     await page.goto(ENTRY);

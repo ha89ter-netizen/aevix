@@ -206,48 +206,97 @@ test.describe("site personalisation", () => {
     await expect(firstItem.getByText(/Как клиенты будут записываться/)).toBeVisible();
   });
 
-  test("contact form prefills the described business and captures a lead", async ({ page }) => {
-    await analyzeBarber(page);
-    // analyzeBarber only waits for .hero-result to appear, which happens as soon as status
-    // leaves "idle" — business-context.tsx holds a deliberate ~2.1s minimum "analyzing" state
-    // regardless of API speed, so the niche isn't attached to the lead until status flips to
-    // "ready". Wait for that before touching the form, or the email below is submitted mid-race
-    // with an empty niche.
-    await expect(page.locator(".hero-personal-case")).toBeVisible();
+  // Хелпер: заполнить обязательные поля заявки.
+  async function fillLead(page: Page) {
     const contact = page.locator("#контакты");
     await contact.scrollIntoViewIfNeeded();
-
-    // Business field is prefilled with what was described in the Hero.
-    await expect(contact.locator(".lead-textarea")).toHaveValue(BARBER_TEXT);
-
-    // Submit is gated on name + contact.
-    const submit = contact.locator(".lead-submit");
-    await expect(submit).toBeDisabled();
     await contact.locator(".lead-field", { hasText: "Имя" }).locator(".lead-input").fill("Иван");
     await contact.locator(".lead-field", { hasText: "Telegram" }).locator(".lead-input").first().fill("@ivan");
-    await expect(submit).toBeEnabled();
+    return contact;
+  }
 
-    // Submitting hands off to WhatsApp (stubbed), shows the confirmation state, and — as a
-    // backup so the lead isn't lost if WhatsApp is never sent — fires a background email.
+  test("lead: submit → email → success, БЕЗ WhatsApp (post-release 1)", async ({ page }) => {
+    await analyzeBarber(page);
+    // analyzeBarber waits only for .hero-result; business-context holds a ~2.1s minimum "analyzing"
+    // state, so wait for the personalised case (status "ready") before the niche attaches to the lead.
+    await expect(page.locator(".hero-personal-case")).toBeVisible();
+
+    // Записываем любые window.open — после submit их быть НЕ должно (WhatsApp ушёл из flow).
     await page.evaluate(() => {
-      window.open = () => null;
+      (window as unknown as { __opens: unknown[] }).__opens = [];
+      window.open = ((...a: unknown[]) => {
+        (window as unknown as { __opens: unknown[] }).__opens.push(a);
+        return null;
+      }) as typeof window.open;
     });
     await page.route("**/api/lead", (route: Route) =>
-      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ sent: true }) }),
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) }),
     );
+
+    const contact = page.locator("#контакты");
+    await contact.scrollIntoViewIfNeeded();
+    await expect(contact.locator(".lead-textarea")).toHaveValue(BARBER_TEXT); // prefill из Hero
+    const submit = contact.locator(".lead-submit");
+    await expect(submit).toBeDisabled(); // validation: без имени/контакта submit невозможен
+    await fillLead(page);
+    await expect(submit).toBeEnabled();
+
     const leadRequest = page.waitForRequest(
       (request) => request.url().includes("/api/lead") && request.method() === "POST",
     );
     await submit.click();
     await expect(contact.locator(".contact-sent")).toBeVisible();
+    await expect(contact.getByText("Заявка отправлена")).toBeVisible();
 
     const request = await leadRequest;
-    expect(request.postDataJSON()).toMatchObject({
-      name: "Иван",
-      contact: "@ivan",
-      business: BARBER_TEXT,
-      niche: "Барбершоп",
+    expect(request.postDataJSON()).toMatchObject({ name: "Иван", contact: "@ivan", business: BARBER_TEXT, niche: "Барбершоп" });
+
+    // Никакого WhatsApp/redirect/новой вкладки.
+    expect(await page.evaluate(() => (window as unknown as { __opens: unknown[] }).__opens)).toEqual([]);
+  });
+
+  test("lead: провайдер упал → честная ошибка, данные целы, Retry работает", async ({ page }) => {
+    await analyzeBarber(page);
+    await expect(page.locator(".hero-personal-case")).toBeVisible();
+
+    let fail = true;
+    await page.route("**/api/lead", (route: Route) =>
+      fail
+        ? route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "boom" }) })
+        : route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) }),
+    );
+    const contact = await fillLead(page);
+    const nameInput = contact.locator(".lead-field", { hasText: "Имя" }).locator(".lead-input");
+    await contact.locator(".lead-submit").click();
+
+    // Честная ошибка, НЕ ложное «отправлено».
+    await expect(contact.locator(".lead-error")).toBeVisible();
+    await expect(contact.locator(".contact-sent")).toHaveCount(0);
+    // Введённые данные сохранились.
+    await expect(nameInput).toHaveValue("Иван");
+
+    // Retry: сервер теперь принимает → успех.
+    fail = false;
+    await contact.locator(".lead-submit").click();
+    await expect(contact.locator(".contact-sent")).toBeVisible();
+  });
+
+  test("lead: двойной клик не шлёт два письма", async ({ page }) => {
+    await analyzeBarber(page);
+    await expect(page.locator(".hero-personal-case")).toBeVisible();
+
+    let count = 0;
+    await page.route("**/api/lead", async (route: Route) => {
+      count += 1;
+      await new Promise((resolve) => setTimeout(resolve, 400)); // держим запрос в полёте
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
     });
+    const contact = await fillLead(page);
+    const submit = contact.locator(".lead-submit");
+    await submit.click();
+    await submit.click({ force: true }).catch(() => {}); // второй клик во время «Отправляем…»
+    await expect(contact.locator(".contact-sent")).toBeVisible();
+    expect(count).toBe(1);
   });
 
   test("reset returns the site to its neutral state", async ({ page }) => {
