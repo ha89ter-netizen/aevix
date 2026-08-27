@@ -22,7 +22,7 @@ import type { NicheId } from "./niche";
 /** Реальная акция: первый проект клиента — со скидкой. Одно число, один источник. */
 export const FIRST_PROJECT_DISCOUNT = 0.1;
 
-export type ProductKind = "core" | "capability" | "channel" | "addon";
+export type ProductKind = "core" | "capability" | "channel" | "product" | "addon";
 
 /** Семантика цены — чтобы клиент не гадал «разово или каждый месяц». */
 export type Recurrence =
@@ -49,17 +49,22 @@ export type AevixProduct = {
   /** Базовая цена в тенге; 0 для included/bonus. */
   price: number;
   recurrence: Recurrence;
-  /** Короткая честная пометка семантики цены: «разово», «подключение API», «включено». */
+  /** Короткая честная пометка семантики цены: «разово», «+50 000 ₸ к AI», «включено». */
   priceNote: string;
-  /** Реальное условие включённого сопровождения, если оно есть у продукта (post-release pass 2).
-   *  Живёт ЗДЕСЬ, в канонической модели — не хардкодом по компонентам. Есть только у продуктов, к
-   *  которым реально относится (сейчас — «сайт»); другие продукты его НЕ наследуют. */
-  includedSupport?: IncludedSupport;
+  /** Зависимость от другого продукта (Pricing pass). Telegram/WhatsApp — каналы AI-консультанта:
+   *  сами по себе не продаются, работают ПОВЕРХ ядра. UI и калькулятор используют это, чтобы канал
+   *  не выглядел самостоятельным дешёвым «ботом» вместо/наравне с ядром. */
+  dependsOn?: string;
+  /** Что реально входит в scope этого продукта (Pricing pass). Объявлено ДАННЫМИ, а не парой
+   *  захардкоженных id в калькуляторе: комплексная автоматизация делает клиентский контур сама,
+   *  поэтому выбранная рядом CRM — та же работа, и второй раз она не тарифицируется. */
+  includesInScope?: string[];
 };
 
 /**
- * Включённое сопровождение — честная граница, не «поддержка всего подряд».
- * Меняется в одном месте: срок, что входит, что НЕ входит.
+ * Включённое сопровождение — честная граница, не «поддержка всего подряд». ОДНА политика на все
+ * оплачиваемые решения AEVIX (Pricing pass): чинит баги и вносит мелкие правки в рамках проекта,
+ * но не делает новые крупные функции / редизайн / работы вне scope. Меняется в одном месте.
  */
 export type IncludedSupport = {
   durationDays: number;
@@ -71,11 +76,34 @@ export type IncludedSupport = {
   excludes: string[];
 };
 
+/** Каноническая политика сопровождения — ОДИН источник, относится ко всем платным решениям. */
+export const SUPPORT_POLICY: IncludedSupport = {
+  durationDays: 30,
+  summary: "30 дней сопровождения после сдачи — на все оплачиваемые решения",
+  includes: [
+    "исправление обнаруженных ошибок",
+    "небольшие корректировки в рамках согласованного проекта",
+  ],
+  excludes: [
+    "новые крупные функции и разделы",
+    "полный редизайн после сдачи",
+    "новые интеграции и работы вне согласованного объёма",
+    "бесконечные правки",
+  ],
+};
+
+/** Политика сопровождения относится к ОПЛАЧИВАЕМЫМ решениям (реальная цена > 0). Включённые каналы
+ *  (Telegram) и бонусы (NFC) отдельным сопровождением не тарифицируются — они часть оплаченного. */
+export function hasIncludedSupport(product: AevixProduct): boolean {
+  return (product.priceModel === "from" || product.priceModel === "fixed") && product.price > 0;
+}
+
 /** Человекочитаемый ярлык категории для UI. */
 export const PRODUCT_KIND_LABEL: Record<ProductKind, string> = {
   core: "Основа",
   capability: "Возможность",
   channel: "Канал",
+  product: "Продукт",
   addon: "Бонус",
 };
 
@@ -88,80 +116,71 @@ export const AEVIX_PRODUCTS: AevixProduct[] = [
     id: "ai",
     title: "AI-консультант",
     kind: "core",
-    description: "Интеллект системы: понимает вопрос клиента, уточняет задачу и передаёт сотруднику уже готовое обращение.",
-    forWhom: "Основа для любого бизнеса — с него начинается автоматизация общения.",
-    priceModel: "from",
+    description: "Основа AI-автоматизации общения: понимает вопрос клиента, уточняет задачу и передаёт сотруднику уже готовое обращение.",
+    forWhom: "Ядро для любого бизнеса — с него начинается автоматизация общения.",
+    priceModel: "fixed",
     price: 120_000,
     recurrence: "one-time",
-    priceNote: "разовая настройка, от",
+    priceNote: "разовая настройка",
   },
   {
     id: "site",
     title: "Сайт / лендинг",
-    kind: "channel",
-    description: "Канал: рабочая точка входа, где клиент понимает услугу и оставляет заявку, а ассистент подключён прямо на странице.",
+    kind: "product",
+    description: "Самостоятельный продукт — разработка сайта: рабочая точка входа, где клиент понимает услугу и оставляет заявку. При желании на страницу подключается AI-консультант.",
     forWhom: "Нужен, если клиенты приходят из поиска, рекламы или по ссылке.",
     priceModel: "from",
     price: 100_000,
     recurrence: "one-time",
     priceNote: "разработка, от",
-    includedSupport: {
-      durationDays: 30,
-      summary: "30 дней сопровождения включено",
-      includes: [
-        "исправление обнаруженных ошибок сайта",
-        "небольшие корректировки в рамках согласованного проекта",
-      ],
-      excludes: [
-        "новые крупные функции и разделы",
-        "полный редизайн после сдачи",
-        "интеграции и услуги вне согласованного объёма",
-      ],
-    },
   },
   {
     id: "telegram",
     title: "Telegram",
     kind: "channel",
-    description: "Канал: тот же ассистент отвечает в Telegram. Bot API бесплатен — подключение не требует отдельной оплаты.",
+    description: "Канал AI-консультанта: тот же ассистент отвечает в Telegram. Входит в базовую стоимость AI-консультанта, отдельно не тарифицируется.",
     forWhom: "Если аудитория и заявки уже идут через Telegram.",
     priceModel: "included",
     price: 0,
     recurrence: "included",
-    priceNote: "включено в основу",
+    priceNote: "включён в AI-консультанта",
+    dependsOn: "ai",
   },
   {
     id: "whatsapp",
     title: "WhatsApp",
     kind: "channel",
-    description: "Канал: ассистент в WhatsApp. Business API требует верифицированный номер и провайдера — отсюда разовое подключение.",
+    description: "Дополнительный канал AI-консультанта: тот же ассистент в WhatsApp. Business API требует верифицированный номер и провайдера — отсюда разовая доплата к ядру, а не отдельный AI-продукт.",
     forWhom: "Если клиенты привыкли писать именно в WhatsApp.",
-    priceModel: "from",
-    price: 60_000,
+    priceModel: "fixed",
+    price: 50_000,
     recurrence: "one-time",
-    priceNote: "подключение Business API, разово",
+    priceNote: "+50 000 ₸ к AI-консультанту",
+    dependsOn: "ai",
   },
   {
     id: "crm",
     title: "CRM",
     kind: "capability",
-    description: "Возможность: заявки, статусы и история клиентов в одном рабочем контуре — видно, где застрял процесс.",
-    forWhom: "Когда данные разбросаны по чатам, таблицам и заметкам.",
-    priceModel: "custom",
-    price: 0,
+    description: "Клиенты, заявки, статусы и история взаимодействия в одном контуре — видно, где находится каждый клиент и заявка в процессе.",
+    forWhom: "Когда данные о клиентах и заявках разбросаны по чатам, таблицам и заметкам.",
+    priceModel: "fixed",
+    price: 200_000,
     recurrence: "one-time",
-    priceNote: "по составу проекта",
+    priceNote: "разовое внедрение",
   },
   {
     id: "automation",
     title: "Комплексная автоматизация",
     kind: "capability",
-    description: "Возможность: связывает запись, напоминания, статусы и CRM в один сценарий, который работает без ручного контроля.",
+    description: "Индивидуальная система под конкретный бизнес: связывает несколько процессов и модулей в один сценарий, работающий без ручного контроля. Это не ещё одна CRM.",
     forWhom: "Когда процессов несколько и их нужно свести в одну систему.",
     priceModel: "from",
     price: 350_000,
     recurrence: "one-time",
     priceNote: "разработка сценария, от",
+    // Индивидуальный контур строится вместе с клиентской базой и статусами — это и есть CRM-часть.
+    includesInScope: ["crm"],
   },
   {
     id: "nfc",
@@ -178,6 +197,37 @@ export const AEVIX_PRODUCTS: AevixProduct[] = [
 
 export const PRODUCT_BY_ID = new Map(AEVIX_PRODUCTS.map((p) => [p.id, p]));
 
+/**
+ * Замыкание зависимостей выбранной конфигурации (Pricing pass): канал не существует без своего
+ * ядра. Функция чистая и живёт ЗДЕСЬ, а не в калькуляторе, потому что это правило продукта, а не
+ * деталь одного экрана: её обязаны применять и переключатель, и восстановление сохранённой
+ * конфигурации проекта (иначе старый набор с «висячим» WhatsApp вернулся бы после перезагрузки).
+ */
+export function withDependencies(ids: string[]): string[] {
+  const next = [...ids];
+  for (const id of ids) {
+    const dependsOn = PRODUCT_BY_ID.get(id)?.dependsOn;
+    if (dependsOn && !next.includes(dependsOn)) next.push(dependsOn);
+  }
+  return next;
+}
+
+/**
+ * Что из выбранного уже входит в scope другого выбранного продукта — и потому НЕ тарифицируется
+ * второй раз (Pricing pass). Возвращает поглощённые id, а не готовую сумму: цену считает
+ * калькулятор, а знание «эта работа уже внутри той» принадлежит продуктовой модели.
+ */
+export function absorbedByScope(ids: string[]): string[] {
+  const selected = new Set(ids);
+  const absorbed = new Set<string>();
+  for (const id of ids) {
+    for (const inner of PRODUCT_BY_ID.get(id)?.includesInScope ?? []) {
+      if (inner !== id && selected.has(inner)) absorbed.add(inner);
+    }
+  }
+  return [...absorbed];
+}
+
 function formatKztPlain(n: number): string {
   return n.toLocaleString("ru-RU").replace(/ /g, " ");
 }
@@ -185,17 +235,24 @@ function formatKztPlain(n: number): string {
 /** Прайс-контекст для промпта AI-консультанта — из ОДНОЙ модели, чтобы бот не называл устаревшие
  *  цены и не путал канал с возможностью (единый источник, этап 7, Wave 4). */
 export function productPriceContext(): string {
-  return AEVIX_PRODUCTS.map((p) => {
+  const lines = AEVIX_PRODUCTS.map((p) => {
     const price =
       p.priceModel === "included"
-        ? "включено в основу"
+        ? "включено в AI-консультанта"
         : p.priceModel === "bonus"
           ? "бонус"
           : p.priceModel === "custom"
             ? "по составу проекта"
-            : `от ${formatKztPlain(p.price)} ₸`;
-    return `- ${p.title} (${PRODUCT_KIND_LABEL[p.kind]}) — ${price}: ${p.description}`;
-  }).join("\n");
+            : p.priceModel === "fixed"
+              ? `${formatKztPlain(p.price)} ₸`
+              : `от ${formatKztPlain(p.price)} ₸`;
+    const dep = p.dependsOn ? " (канал AI-консультанта, не отдельный продукт)" : "";
+    return `- ${p.title} (${PRODUCT_KIND_LABEL[p.kind]}) — ${price}${dep}: ${p.description}`;
+  });
+  lines.push(
+    `- Сопровождение: ${SUPPORT_POLICY.summary}. Входит: ${SUPPORT_POLICY.includes.join(", ")}. Не входит: ${SUPPORT_POLICY.excludes.join(", ")}. Без круглосуточной поддержки.`,
+  );
+  return lines.join("\n");
 }
 
 /** Реальная акция одной строкой — из того же единственного числа. */

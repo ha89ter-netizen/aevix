@@ -1349,6 +1349,11 @@ body::before {
   background: rgba(176, 106, 18, 0.1);
   border-color: rgba(176, 106, 18, 0.24);
 }
+.product-kind-product {
+  color: #1f6f8b;
+  background: rgba(31, 111, 139, 0.1);
+  border-color: rgba(31, 111, 139, 0.24);
+}
 .product-kind-addon {
   color: rgba(15, 15, 20, 0.5);
   background: rgba(15, 15, 20, 0.05);
@@ -2773,6 +2778,39 @@ body::before {
   font-size: 0.74rem;
   font-weight: 600;
   line-height: 1.35;
+}
+
+/* Подсказка калькулятора: зависимость канала от ядра / CRM в scope автоматизации (Pricing pass). */
+.calc-note {
+  margin-top: 0.25rem;
+  border-radius: 12px;
+  border: 1px solid rgba(107, 70, 229, 0.18);
+  background: rgba(107, 70, 229, 0.06);
+  padding: 0.55rem 0.8rem;
+  color: rgba(9, 8, 7, 0.66);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+/* Единый policy-блок сопровождения под сеткой прайса (Pricing pass): одна честная политика на все
+   оплачиваемые решения, а не повтор строки на каждой карточке. Спокойный, не банер. */
+.pricing-support-policy {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  max-width: 46rem;
+  margin-top: 1.75rem;
+  padding: 0.85rem 1.1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(9, 8, 7, 0.1);
+  background: rgba(9, 8, 7, 0.03);
+  color: rgba(9, 8, 7, 0.66);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+.pricing-support-policy strong {
+  color: rgba(9, 8, 7, 0.86);
+  font-weight: 640;
 }
 
 /* Тот же смысл коротким trust-note у CTA «Разработать этот концепт». */

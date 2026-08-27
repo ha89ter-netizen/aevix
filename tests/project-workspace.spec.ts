@@ -932,3 +932,39 @@ test.describe("project navigation responsiveness", () => {
     expect(errors).toEqual([]);
   });
 });
+
+test.describe("сохранённый расчёт · инварианты конфигурации переживают восстановление", () => {
+  test("канал без ядра чинится при открытии — «висячего» WhatsApp не бывает (Pricing pass §2)", async ({ page }) => {
+    // Расчёт мог быть сохранён ДО появления зависимостей: канал без AI-консультанта. Такое
+    // состояние не должно пережить восстановление — иначе инвариант держится только на
+    // обработчике клика, а сохранённый проект возвращает конфигурацию, которой не бывает.
+    await seedStorage(page, [
+      seededProject({
+        id: "legacy-pricing",
+        pricing: {
+          form: {
+            businessType: "Барбершоп",
+            selectedServices: ["whatsapp"],
+            branchCount: "1",
+            manualWork: "",
+            currentServices: "",
+            contactName: "",
+            contactHandle: "",
+            contactEmail: "",
+          },
+          result: null,
+        },
+      }),
+    ]);
+    await page.goto("/app/projects/legacy-pricing/pricing");
+
+    const open = page.getByRole("button", { name: "Открыть калькулятор" });
+    await expect(open).toBeVisible();
+    await open.click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: "Решения", exact: true }).click();
+    await expect(dialog.getByRole("button", { name: /^WhatsApp/ })).toHaveAttribute("aria-pressed", "true");
+    // Ядро доведено на входе, а не только по клику.
+    await expect(dialog.getByRole("button", { name: /^AI-консультант/ })).toHaveAttribute("aria-pressed", "true");
+  });
+});

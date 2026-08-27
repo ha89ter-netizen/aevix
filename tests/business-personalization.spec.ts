@@ -215,17 +215,225 @@ test.describe("site personalisation", () => {
     return contact;
   }
 
-  test("AEVIX «сайт» показывает 30 дней сопровождения; только он, и это НЕ демо (post-release 2)", async ({ page }) => {
+  test("business context переживает F5 (Pricing pass §6)", async ({ page }) => {
+    await analyzeBarber(page);
+    await expect(page.locator(".hero-result")).toBeVisible();
+    // F5 — контекст должен восстановиться из localStorage (ниша выводится из сохранённого текста).
+    await page.reload();
+    await expect(page.locator(".hero-result")).toBeVisible();
+    await expect(page.locator(".hero-result").getByText("Барбершоп", { exact: true })).toBeVisible();
+  });
+
+  test("Calculator не спрашивает сферу второй раз, если контекст известен (Pricing pass §4)", async ({ page }) => {
+    await analyzeBarber(page);
+    await expect(page.locator(".hero-personal-case")).toBeVisible();
+    // Секция калькулятора — GSAP data-reveal (visibility:hidden до показа): доводим её в вид, чтобы
+    // кнопка попала в дерево доступности.
+    await page.locator(".pricing-compact-cta").scrollIntoViewIfNeeded();
+    const open = page.getByRole("button", { name: "Открыть калькулятор" });
+    await expect(open).toBeVisible();
+    await open.click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    // Открылись сразу на «Решениях» (сфера уже известна) — карточка ядра видна, вопрос про сферу пропущен.
+    await expect(dialog.getByRole("button", { name: /^AI-консультант/ })).toBeVisible();
+    // Но сфера доступна для изменения и показывает распознанное.
+    await dialog.getByRole("button", { name: "Бизнес", exact: true }).click();
+    await expect(dialog.getByText(/Определили по вашему описанию/)).toBeVisible();
+  });
+
+  test("выбор WhatsApp в калькуляторе включает AI-ядро — канал не покупается без ядра (Pricing pass §8)", async ({ page }) => {
+    await mockSuccess(page);
+    await gotoHydrated(page);
+    await page.locator(".pricing-compact-cta").scrollIntoViewIfNeeded();
+    const open = page.getByRole("button", { name: "Открыть калькулятор" });
+    await expect(open).toBeVisible();
+    await open.click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: "Решения", exact: true }).click();
+    const wa = dialog.getByRole("button", { name: /^WhatsApp/ });
+    await wa.click();
+    await expect(wa).toHaveAttribute("aria-pressed", "true");
+    // Ядро (AI-консультант) добавилось автоматически — канал не покупается без ядра.
+    await expect(dialog.getByRole("button", { name: /^AI-консультант/ })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  test("нельзя снять AI-ядро, пока выбран зависимый канал — с объяснением (Pricing pass §2)", async ({ page }) => {
+    await mockSuccess(page);
+    await gotoHydrated(page);
+    await page.locator(".pricing-compact-cta").scrollIntoViewIfNeeded();
+    const open = page.getByRole("button", { name: "Открыть калькулятор" });
+    await expect(open).toBeVisible();
+    await open.click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: "Решения", exact: true }).click();
+    const ai = dialog.getByRole("button", { name: /^AI-консультант/ });
+    await dialog.getByRole("button", { name: /^WhatsApp/ }).click(); // включает и WhatsApp, и ядро
+    await expect(ai).toHaveAttribute("aria-pressed", "true");
+    // Снять ядро при активном канале нельзя — конфигурация не меняется, есть объяснение.
+    await ai.click();
+    await expect(ai).toHaveAttribute("aria-pressed", "true");
+    await expect(dialog.getByText(/нужен для канала/)).toBeVisible();
+  });
+
+  test("CRM + Комплексная автоматизация: CRM не считается дважды (Pricing pass §3)", async ({ page }) => {
+    await mockSuccess(page);
+    await gotoHydrated(page);
+    await page.locator(".pricing-compact-cta").scrollIntoViewIfNeeded();
+    const open = page.getByRole("button", { name: "Открыть калькулятор" });
+    await expect(open).toBeVisible();
+    await open.click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: "Решения", exact: true }).click();
+    await dialog.getByRole("button", { name: /^CRM/ }).click();
+    await dialog.getByRole("button", { name: /^Комплексная автоматизация/ }).click();
+    // Честная семантика: CRM входит в scope автоматизации, отдельно не суммируется.
+    await expect(dialog.getByText(/CRM входит в комплексную автоматизацию/)).toBeVisible();
+  });
+
+  test("business context не переходит другому аккаунту на том же устройстве (Pricing pass §4)", async ({ page }) => {
+    // Контекст сохранён под аккаунтом A; текущая сессия — аноним (другая identity).
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        "aevix.business-context",
+        JSON.stringify({ acc: "user-A", input: "У меня агентство недвижимости" }),
+      );
+    });
+    await mockSuccess(page);
+    await gotoHydrated(page);
+    // Контекст A НЕ восстановлен: результат не показан и ключ вычищен (не «висит» для следующего).
+    await expect(page.locator(".hero-result")).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem("aevix.business-context"))).toBeNull();
+  });
+
+  test("CRM поверх автоматизации не удорожает расчёт, а снятие автоматизации возвращает её цену (Pricing pass §3)", async ({ page }) => {
+    await mockSuccess(page);
+    await gotoHydrated(page);
+    await page.locator(".pricing-compact-cta").scrollIntoViewIfNeeded();
+    const open = page.getByRole("button", { name: "Открыть калькулятор" });
+    await expect(open).toBeVisible();
+    await open.click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: "Решения", exact: true }).click();
+
+    // Итоговая сумма считается тем же estimate, что показывает калькулятор, — читаем её, а не
+    // подпись: подпись может быть верной при неверном счёте (урок «теста, который не может упасть»).
+    const total = page.locator(".pricing-compact-summary strong");
+    await dialog.getByRole("button", { name: /^Комплексная автоматизация/ }).click();
+    const withAutomation = await total.textContent();
+
+    await dialog.getByRole("button", { name: /^CRM/ }).click();
+    // CRM выбрана и видна в конфигурации, но её работа уже внутри автоматизации — цена та же.
+    await expect(dialog.getByRole("button", { name: /^CRM/ })).toHaveAttribute("aria-pressed", "true");
+    await expect(dialog.getByText(/CRM входит в комплексную автоматизацию/)).toBeVisible();
+    await expect(total).toHaveText(withAutomation!);
+
+    // Обратный переход: сняли автоматизацию — CRM снова самостоятельная работа и снова стоит денег.
+    await dialog.getByRole("button", { name: /^Комплексная автоматизация/ }).click();
+    await expect(dialog.getByText(/CRM входит в комплексную автоматизацию/)).toHaveCount(0);
+    await expect(total).not.toHaveText(withAutomation!);
+  });
+
+  test("контекст пользователя A не достаётся пользователю B на том же устройстве (Pricing pass §4)", async ({ page }) => {
+    // Тот же сценарий, но следующий — не аноним, а ДРУГОЙ вошедший: именно он не должен увидеть
+    // чужое описание бизнеса подставленным в свой расчёт.
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        "aevix.business-context",
+        JSON.stringify({ acc: "user-A", input: "У меня агентство недвижимости" }),
+      );
+    });
+    await page.route("**/api/auth/session", (route: Route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ user: { id: "user-B", email: "b@example.com", name: "Бета" }, available: true }),
+      }),
+    );
+    await mockSuccess(page);
+    await gotoHydrated(page);
+    await expect(page.locator(".hero-result")).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem("aevix.business-context"))).toBeNull();
+  });
+
+  test("свой контекст вошедший видит после перезагрузки — чистка бьёт по чужому, а не по любому (Pricing pass §4)", async ({ page }) => {
+    // Обратная сторона того же правила: если бы чистилось всё подряд, проверка выше была бы
+    // зелёной и при полностью сломанном восстановлении.
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        "aevix.business-context",
+        JSON.stringify({ acc: "user-A", input: "У меня барбершоп на 3 мастера" }),
+      );
+    });
+    await page.route("**/api/auth/session", (route: Route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ user: { id: "user-A", email: "a@example.com", name: "Альфа" }, available: true }),
+      }),
+    );
+    await mockSuccess(page);
+    await gotoHydrated(page);
+    await expect(page.locator(".hero-result")).toBeVisible();
+    await expect(page.locator(".hero-result").getByText("Барбершоп", { exact: true })).toBeVisible();
+  });
+
+  test("аноним, который вошёл, не теряет только что введённый контекст — он перевешивается на аккаунт (Pricing pass §4)", async ({ page }) => {
+    // Вход — не смена человека: описание бизнеса ввёл он сам минуту назад. Стирать его на входе
+    // значит спросить сферу второй раз ровно в момент регистрации.
+    let signedIn = false;
+    await page.route("**/api/auth/session", (route: Route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          user: signedIn ? { id: "user-A", email: "a@example.com", name: "Альфа" } : null,
+          available: true,
+        }),
+      }),
+    );
+    await page.route("**/api/auth/password", (route: Route) => {
+      signedIn = true;
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
+    });
+    await page.route("**/api/projects", (route: Route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ projects: [] }) }),
+    );
+
+    await analyzeBarber(page);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem("aevix.business-context")!).acc)).toBeNull();
+
+    // Переход по ссылке в шапке, а не `goto`: вход — это клиентская навигация внутри той же
+    // вкладки, провайдер при ней остаётся смонтированным. Полная перезагрузка проверяла бы другой
+    // сценарий (холодный старт с уже открытой сессией), где контекст неизвестного происхождения
+    // намеренно НЕ восстанавливается.
+    await page.locator(".shell-header-login").click();
+    await expect(page).toHaveURL(/\/app\/login/);
+    await page.getByLabel("Почта").fill("a@example.com");
+    await page.getByLabel("Пароль").fill("PassWord123");
+    await page.getByRole("button", { name: "Войти", exact: true }).click();
+
+    // Контекст остался и теперь принадлежит аккаунту — значит переживёт и перезагрузку.
+    await expect
+      .poll(async () => page.evaluate(() => JSON.parse(localStorage.getItem("aevix.business-context") ?? "null")?.acc ?? null))
+      .toBe("user-A");
+    expect(
+      await page.evaluate(() => JSON.parse(localStorage.getItem("aevix.business-context")!).input as string),
+    ).toContain("барбершоп");
+  });
+
+  test("сопровождение — ОДИН policy-блок на все оплачиваемые, не повтор на каждой карточке (Pricing pass)", async ({ page }) => {
     await mockSuccess(page);
     await gotoHydrated(page);
     await page.locator("#стоимость").scrollIntoViewIfNeeded();
-    const notes = page.locator(".pricing-scene .product-support-note");
-    // Условие есть только у продукта «сайт» — другие продукты его не наследуют.
-    await expect(notes).toHaveCount(1);
-    await expect(notes).toContainText("30 дней");
+    const policy = page.locator(".pricing-scene .pricing-support-policy");
+    // Ровно один общий блок, а не строка на каждой из карточек.
+    await expect(policy).toHaveCount(1);
+    await expect(policy).toContainText("30 дней");
+    await expect(policy).toContainText("оплачиваемые решения");
     // Цены продуктов AEVIX НЕ маркируются как «Демо-цены» — это семантика generated business.
     await expect(page.locator(".pricing-scene").getByText("Демо-цены")).toHaveCount(0);
-    // И никаких запрещённых обещаний рядом.
+    // Никакого 24/7.
     await expect(page.locator(".pricing-scene").getByText("24/7")).toHaveCount(0);
   });
 

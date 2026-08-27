@@ -61,7 +61,17 @@ import {
   type HeroBusinessProfile,
 } from "@/lib/hero-analysis";
 import { ANALYSIS_SEQUENCE, useBusiness } from "@/lib/business-context";
-import { AEVIX_PRODUCTS, PRODUCT_KIND_LABEL, recommendCapabilities, type AevixProduct } from "@/lib/aevix-products";
+import {
+  AEVIX_PRODUCTS,
+  FIRST_PROJECT_DISCOUNT,
+  PRODUCT_BY_ID,
+  PRODUCT_KIND_LABEL,
+  SUPPORT_POLICY,
+  absorbedByScope,
+  recommendCapabilities,
+  withDependencies,
+  type AevixProduct,
+} from "@/lib/aevix-products";
 import { resolveNiche } from "@/lib/niche";
 import { motionTransition } from "@/lib/motion";
 
@@ -105,7 +115,9 @@ export type BusinessType = "Барбершоп" | "Салон красоты" | 
 export type BranchCount = "1" | "2–5" | "6–10" | "больше 10";
 
 export type EstimateForm = {
-  businessType: BusinessType;
+  /** Свободная строка: пресеты — из businessTypeOptions, но контекст с лендинга может задать
+   *  распознанную нишу (например «Агентство недвижимости»), которой нет среди 6 пресетов. */
+  businessType: string;
   selectedServices: ServiceId[];
   branchCount: BranchCount;
   manualWork: string;
@@ -178,17 +190,18 @@ function priceLabel(product: { price: number; priceModel: string; priceNote: str
   if (product.priceModel === "included") return "Включено";
   if (product.priceModel === "bonus") return "Бонус";
   if (product.priceModel === "custom") return "По составу проекта";
+  if (product.priceModel === "fixed") return formatKzt(product.price);
   return `от ${formatKzt(product.price)}`;
 }
 
-/** Границы включённого сопровождения одной подсказкой — честно про что входит и что нет. */
-function supportScopeTitle(support: NonNullable<AevixProduct["includedSupport"]>): string {
-  return `Входит: ${support.includes.join(", ")}. Не входит: ${support.excludes.join(", ")}.`;
-}
+/** Границы политики сопровождения одной подсказкой — честно про что входит и что нет. */
+const SUPPORT_SCOPE_TITLE = `Входит: ${SUPPORT_POLICY.includes.join(", ")}. Не входит: ${SUPPORT_POLICY.excludes.join(", ")}.`;
 
 const initialEstimateForm: EstimateForm = {
   businessType: "Барбершоп",
-  selectedServices: ["ai", "whatsapp"],
+  // Начинаем с ядра (AI-консультант). Каналы (Telegram включён, WhatsApp +50k) добавляются поверх —
+  // выбор канала явно доопределяет ядро, а не заменяет его.
+  selectedServices: ["ai"],
   branchCount: "1",
   manualWork: "",
   currentServices: "",
@@ -557,15 +570,34 @@ function getServiceTitle(id: ServiceId) {
   return serviceCatalog.find((service) => service.id === id)?.title ?? id;
 }
 
+/**
+ * Приводит конфигурацию к правилам продукта (Pricing pass §2). Нужна не только переключателю:
+ * сохранённый в проекте расчёт мог быть собран ДО появления зависимостей и содержать «висячий»
+ * канал без ядра — восстановление такой конфигурации вернуло бы состояние, которого не должно
+ * существовать. Инвариант держится на входе, а не только в обработчике клика.
+ */
+function normalizeForm(form: EstimateForm): EstimateForm {
+  const services = withDependencies(form.selectedServices) as ServiceId[];
+  return services.length === form.selectedServices.length ? form : { ...form, selectedServices: services };
+}
+
 function calculateEstimate(form: EstimateForm) {
   const selected = serviceCatalog.filter((service) => form.selectedServices.includes(service.id));
-  const baseTotal = selected.reduce((sum, service) => sum + service.price, 0);
+  // Работа, которая уже входит в scope другого выбранного решения, не тарифицируется второй раз:
+  // CRM внутри комплексной автоматизации — та же работа, а не 200k + 350k. Правило объявлено
+  // ДАННЫМИ в канонической модели (`includesInScope`), здесь только считается.
+  const absorbed = absorbedByScope(form.selectedServices);
+  const crmInAutomation = absorbed.includes("crm");
+  const baseTotal = selected.reduce(
+    (sum, service) => (absorbed.includes(service.id) ? sum : sum + service.price),
+    0,
+  );
   const hasComplexity = form.selectedServices.includes("automation") || form.selectedServices.includes("crm");
   const branchMultiplier =
     form.branchCount === "2–5" ? 1.2 : form.branchCount === "6–10" ? 1.4 : 1;
   const requiresCustom = form.branchCount === "больше 10";
   const adjustedTotal = Math.round(baseTotal * branchMultiplier);
-  const discount = Math.round(baseTotal * 0.1);
+  const discount = Math.round(baseTotal * FIRST_PROJECT_DISCOUNT);
   const discountedTotal = adjustedTotal - discount;
   const rangeMin = Math.max(0, discountedTotal);
   const rangeMax = Math.max(rangeMin, adjustedTotal);
@@ -585,6 +617,7 @@ function calculateEstimate(form: EstimateForm) {
     rangeMin,
     rangeMax,
     rangeText,
+    crmInAutomation,
     requiresCustom,
     requiresClarification: hasComplexity || form.currentServices.trim().length > 0,
   };
@@ -2342,19 +2375,22 @@ function ModulesPricingScene() {
                   </ul>
                 ) : null}
                 <p className="price-display mt-6 text-xl font-semibold">{priceLabel(service)}</p>
-                {/* Семантика цены: разово / подключение / включено — клиент не гадает (§17). */}
+                {/* Семантика цены: разово / +50k / включено / по составу — клиент не гадает. */}
                 <p className="mt-1 text-xs leading-5 text-ink/44">{service.priceNote}</p>
-                {/* Реальное условие «сайта»: 30 дней сопровождения включено. Из канонической модели
-                    (только у продукта с includedSupport — другие его НЕ наследуют). */}
-                {service.includedSupport ? (
-                  <p className="product-support-note" title={supportScopeTitle(service.includedSupport)}>
-                    <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    {service.includedSupport.summary}
-                  </p>
-                ) : null}
               </article>
             );
           })}
+        </div>
+
+        {/* ОДИН policy-блок сопровождения на всю поверхность (Pricing pass): относится ко ВСЕМ
+            оплачиваемым решениям, а не повторяется строкой на каждой карточке. Единый источник —
+            SUPPORT_POLICY. Никакого 24/7. */}
+        <div data-reveal className="pricing-support-policy" title={SUPPORT_SCOPE_TITLE}>
+          <ShieldCheck className="h-4 w-4 shrink-0 text-violet" aria-hidden="true" />
+          <p>
+            <strong>{SUPPORT_POLICY.summary}.</strong>{" "}
+            Входит: {SUPPORT_POLICY.includes.join(", ")}. Не входит: {SUPPORT_POLICY.excludes.join(", ")}.
+          </p>
         </div>
       </div>
       {scenarioModule ? (
@@ -2376,17 +2412,25 @@ export function PricingCalculatorScene({
    * "priced" project. Works exactly the same with no props (used standalone on the landing page). */
   onPricingChange?: (form: EstimateForm, result: EstimateResult) => void;
 } = {}) {
-  const [form, setForm] = useState<EstimateForm>(initialForm ?? initialEstimateForm);
+  // Уже известный business context с лендинга: не спрашиваем сферу второй раз (Pricing pass §4).
+  // Ниша — из единого источника (resolveNiche/detectBusiness внутри business-context), здесь только
+  // читаем распознанную метку. Явный выбор в калькуляторе всегда сильнее автоопределения.
+  const { status: businessStatus, profile: businessProfile } = useBusiness();
+  const contextBusiness =
+    businessStatus === "ready" && businessProfile?.recognized ? businessProfile.label : null;
+
+  const [form, setForm] = useState<EstimateForm>(() =>
+    normalizeForm(
+      initialForm ?? { ...initialEstimateForm, businessType: contextBusiness ?? initialEstimateForm.businessType },
+    ),
+  );
   const [step, setStep] = useState(0);
-  const [aiEstimate, setAiEstimate] = useState<EstimateResult | null>(null);
-  const [isEstimating, setEstimating] = useState(false);
-  const [estimateError, setEstimateError] = useState<string | null>(null);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
   const localEstimate = calculateEstimate(form);
-  // Memoized so its reference only changes when `aiEstimate`/`form` genuinely change — otherwise
-  // it's a fresh object every render, which would make the effect below fire (and, since it
-  // triggers a parent re-render via onPricingChange, loop) on every single render.
-  const finalEstimate = useMemo(() => aiEstimate ?? buildFallbackEstimate(form), [aiEstimate, form]);
+  // Калькулятор, а не AI-продавец (§3): считаем ВЫБРАННУЮ конфигурацию детерминированно, без сетевого
+  // запроса за «рекомендованной ценой для вашего бизнеса». Memo — чтобы ссылка менялась только при
+  // смене form (иначе onPricingChange-эффект зациклил бы родителя).
+  const finalEstimate = useMemo(() => buildFallbackEstimate(form), [form]);
   const requestText = buildRequestText(form, finalEstimate);
   const wizardSteps = ["Бизнес", "Решения", "Масштаб", "Задача", "Результат"];
   const canShowResult = form.selectedServices.length > 0;
@@ -2397,76 +2441,62 @@ export function PricingCalculatorScene({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, finalEstimate, canShowResult]);
 
+  const openCalculator = () => {
+    // Если сферу уже знаем из контекста — подставляем её и начинаем со «Решений», пропуская
+    // повторный вопрос. Пользователь может вернуться на шаг «Бизнес» и изменить выбор.
+    if (!initialForm && contextBusiness) {
+      setForm((current) => ({ ...current, businessType: contextBusiness }));
+      setStep(1);
+    }
+    setCalculatorOpen(true);
+  };
+
   const updateForm = (patch: Partial<EstimateForm>) => {
     setForm((current) => ({ ...current, ...patch }));
-    setAiEstimate(null);
-    setEstimateError(null);
   };
+
+  // Короткое объяснение, почему нельзя снять ядро при активном канале (§2). Гасится сам через таймер.
+  const [dependencyHint, setDependencyHint] = useState<string | null>(null);
 
   const toggleService = (serviceId: ServiceId) => {
     setForm((current) => {
       const exists = current.selectedServices.includes(serviceId);
-      const nextServices = exists
+
+      // Двусторонняя зависимость: нельзя снять продукт, от которого зависит выбранный канал —
+      // иначе остался бы «висячий» WhatsApp/Telegram без ядра. Явно не даём и объясняем причину,
+      // никаких скрытых изменений конфигурации (§2).
+      if (exists) {
+        const dependents = current.selectedServices.filter(
+          (id) => PRODUCT_BY_ID.get(id)?.dependsOn === serviceId,
+        );
+        if (dependents.length) {
+          const names = dependents.map((id) => PRODUCT_BY_ID.get(id)?.title ?? id).join(", ");
+          const self = PRODUCT_BY_ID.get(serviceId)?.title ?? serviceId;
+          setDependencyHint(`«${self}» нужен для канала ${names} — сначала снимите канал.`);
+          return current; // конфигурацию не меняем
+        }
+      }
+
+      let nextServices = exists
         ? current.selectedServices.filter((id) => id !== serviceId)
         : [...current.selectedServices, serviceId];
+
+      // Каналы (Telegram/WhatsApp) работают ПОВЕРХ ядра: выбор канала явно включает AI-консультанта,
+      // а не притворяется самостоятельным дешёвым «ботом» (§8). Никаких скрытых добавлений — Core
+      // виден в списке позиций.
+      if (!exists) nextServices = withDependencies(nextServices) as ServiceId[];
+      setDependencyHint(null);
 
       return {
         ...current,
         selectedServices: nextServices.length ? nextServices : current.selectedServices,
       };
     });
-    setAiEstimate(null);
-    setEstimateError(null);
   };
 
-  const requestAiEstimate = async () => {
-    if (!canShowResult || isEstimating) return;
-
-    setEstimating(true);
-    setEstimateError(null);
-    const fallback = buildFallbackEstimate(form);
-
-    try {
-      const response = await fetch("/api/business-analysis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          estimateContext: {
-            businessType: form.businessType,
-            selectedServices: form.selectedServices.map(getServiceTitle),
-            branchCount: form.branchCount,
-            manualWork: form.manualWork,
-            currentServices: form.currentServices,
-            localRange: localEstimate.rangeText,
-          },
-        }),
-      });
-      const data = (await response.json()) as {
-        estimate?: EstimateResult;
-        error?: string;
-      };
-
-      if (!response.ok || !data.estimate) {
-        throw new Error(data.error || "AI-рекомендация временно недоступна.");
-      }
-
-      setAiEstimate(data.estimate);
-    } catch (error) {
-      setAiEstimate(fallback);
-      setEstimateError(
-        error instanceof Error
-          ? `${error.message} Показан локальный расчет по прозрачной логике.`
-          : "Показан локальный расчет по прозрачной логике.",
-      );
-    } finally {
-      setEstimating(false);
-    }
-  };
-
+  // Просто переход к следующему шагу: никакого AI-запроса за «рекомендованной ценой» (§3). Итог —
+  // детерминированный расчёт выбранной конфигурации (finalEstimate) — считается синхронно.
   const nextStep = () => {
-    if (step === wizardSteps.length - 2) {
-      void requestAiEstimate();
-    }
     setStep((current) => Math.min(current + 1, wizardSteps.length - 1));
   };
 
@@ -2487,7 +2517,7 @@ export function PricingCalculatorScene({
             <span>{form.selectedServices.length} модулей</span>
             <strong>{localEstimate.rangeText}</strong>
           </div>
-          <Button type="button" onClick={() => setCalculatorOpen(true)}>
+          <Button type="button" onClick={openCalculator}>
             Открыть калькулятор <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
@@ -2535,21 +2565,41 @@ export function PricingCalculatorScene({
 
             <div className="mt-6 min-h-[24rem]">
               {step === 0 ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {businessTypeOptions.map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      aria-pressed={form.businessType === option}
-                      onClick={() => updateForm({ businessType: option })}
-                      className={cn(
-                        "interactive-surface rounded-[1.35rem] border p-4 text-left text-lg font-semibold transition duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/30",
-                        form.businessType === option ? "border-violet/32 bg-violet/10 shadow-object" : "border-ink/8 bg-white/56 hover:bg-white",
-                      )}
-                    >
-                      {option}
-                    </button>
-                  ))}
+                <div className="grid gap-4">
+                  {/* Если сферу распознали из описания — показываем это, а не спрашиваем заново. Явный
+                      выбор ниже всегда сильнее автоопределения (§4/§5). */}
+                  {contextBusiness ? (
+                    <p className="rounded-2xl border border-violet/14 bg-violet/8 px-4 py-3 text-sm text-ink/64">
+                      Определили по вашему описанию: <strong className="text-ink">{form.businessType}</strong>. Можно оставить или выбрать другую сферу.
+                    </p>
+                  ) : null}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {businessTypeOptions.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        aria-pressed={form.businessType === option}
+                        onClick={() => updateForm({ businessType: option })}
+                        className={cn(
+                          "interactive-surface rounded-[1.35rem] border p-4 text-left text-lg font-semibold transition duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/30",
+                          form.businessType === option ? "border-violet/32 bg-violet/10 shadow-object" : "border-ink/8 bg-white/56 hover:bg-white",
+                        )}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Другая сфера: свободный ввод. Отдельного словаря ниш в калькуляторе нет —
+                      identity, если понадобится, берётся каноническим resolveNiche над этим текстом. */}
+                  <label className="grid gap-2">
+                    <span className="text-sm font-medium text-ink/62">Другая сфера — впишите свою</span>
+                    <input
+                      value={businessTypeOptions.includes(form.businessType as BusinessType) ? "" : form.businessType}
+                      onChange={(event) => updateForm({ businessType: event.target.value })}
+                      className="rounded-2xl border border-ink/8 bg-white/70 px-4 py-3 text-sm outline-none transition focus:border-violet/35"
+                      placeholder="Например: агентство недвижимости, стоматология, автосервис"
+                    />
+                  </label>
                 </div>
               ) : null}
 
@@ -2575,6 +2625,16 @@ export function PricingCalculatorScene({
                       </button>
                     );
                   })}
+                  {/* Почему нельзя снять ядро при активном канале (§2). */}
+                  {dependencyHint ? (
+                    <p className="calc-note sm:col-span-2" role="status">{dependencyHint}</p>
+                  ) : null}
+                  {/* CRM входит в scope автоматизации — отдельно не суммируется (§3). */}
+                  {localEstimate.crmInAutomation ? (
+                    <p className="calc-note sm:col-span-2">
+                      CRM входит в комплексную автоматизацию — отдельно её стоимость не добавляем.
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -2659,7 +2719,7 @@ export function PricingCalculatorScene({
               {step === 4 ? (
                 <div className="grid gap-4">
                   <div className="rounded-[1.5rem] border border-violet/14 bg-violet/[0.055] p-5">
-                    <p className="text-sm uppercase tracking-[0.22em] text-violet">Предварительная конфигурация</p>
+                    <p className="text-sm uppercase tracking-[0.22em] text-violet">Выбранная конфигурация</p>
                     <div className="mt-4 flex flex-wrap gap-2">
                       {finalEstimate.recommendedModules.map((module) => (
                         <span key={module} className="rounded-full border border-ink/8 bg-white/74 px-3 py-2 text-sm text-ink/72">
@@ -2670,11 +2730,11 @@ export function PricingCalculatorScene({
                   </div>
                   <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
                     <div className="rounded-[1.5rem] border border-ink/8 bg-white/74 p-5">
-                      <p className="text-sm text-ink/46">Ориентировочная стоимость</p>
+                      <p className="text-sm text-ink/46">Стоимость выбранной конфигурации</p>
                       <p className="mt-3 text-4xl font-semibold tracking-[-0.05em]">{finalEstimate.estimatedRange}</p>
                       {oldPrice && newPrice ? (
                         <div className="mt-5 grid gap-2 text-sm text-ink/58">
-                          <p>Скидка на базовую стоимость первых проектов: 10%.</p>
+                          <p>Скидка на базовую стоимость первых проектов: {Math.round(FIRST_PROJECT_DISCOUNT * 100)}%.</p>
                           <p>Старая цена: <span className="line-through">{formatKzt(oldPrice)}</span></p>
                           <p>Новая цена: <span className="font-semibold text-ink">{formatKzt(newPrice)}</span></p>
                           <p>Экономия: <span className="font-semibold text-violet">{formatKzt(localEstimate.discount)}</span></p>
@@ -2702,15 +2762,10 @@ export function PricingCalculatorScene({
                       </div>
                     </div>
                   </div>
-                  {estimateError ? (
-                    <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
-                      {estimateError}
-                    </p>
-                  ) : null}
                   <div className="rounded-[1.5rem] border border-ink/8 bg-white/74 p-5">
                     <p className="text-sm uppercase tracking-[0.22em] text-ink/38">Отправить расчёт</p>
                     <p className="mt-3 text-sm leading-6 text-ink/58">
-                      Заявка сформируется из введенных данных. Контакты не передаются в AI-рекомендацию.
+                      Заявка сформируется из введённых данных.
                     </p>
                     <div className="mt-4 grid gap-3 sm:grid-cols-3">
                       {canSendRequest ? (
@@ -2772,18 +2827,16 @@ export function PricingCalculatorScene({
                 Назад
               </Button>
               <div className="text-sm text-ink/52">
-                {localEstimate.requiresCustom ? "Для сети больше 10 точек нужен индивидуальный расчет." : `Локальный ориентир: ${localEstimate.rangeText}`}
+                {localEstimate.requiresCustom ? "Для сети больше 10 точек нужен индивидуальный расчёт." : `Расчёт выбранной конфигурации: ${localEstimate.rangeText}`}
               </div>
               {step < wizardSteps.length - 1 ? (
-                <Button type="button" onClick={nextStep} disabled={!canShowResult || isEstimating}>
-                  {isEstimating ? <LoadingDots className="mr-2" /> : null}
+                <Button type="button" onClick={nextStep} disabled={!canShowResult}>
                   {step === wizardSteps.length - 2 ? "Показать результат" : "Далее"}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               ) : (
-                <Button type="button" onClick={() => void requestAiEstimate()} disabled={isEstimating}>
-                  {isEstimating ? <LoadingDots className="mr-2" /> : <RotateCcw className="mr-2 h-4 w-4" />}
-                  Обновить план
+                <Button type="button" variant="glass" onClick={() => setCalculatorOpen(false)}>
+                  Готово
                 </Button>
               )}
             </div>
