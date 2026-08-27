@@ -135,11 +135,16 @@ test.describe("процесс · адаптив без переполнения 
 });
 
 test.describe("процесс · структура, честность, доступность", () => {
-  test("семантический порядок: ol со списком шагов, один h1", async ({ page }) => {
+  test("семантический порядок: ol со списком шагов, ровно один h1 на странице", async ({ page }) => {
     await open(page, BUSINESSES.salon);
     await expect(page.locator("ol.process-grid")).toHaveCount(1);
     expect(await page.locator(".process-grid > li").count()).toBe(BUSINESSES.salon.length);
-    expect(await page.locator(".process-story h1").count()).toBe(1);
+    // Заголовок документа на странице ровно один — его объявляет оболочка. Раздел «Процесс»
+    // приносил второй, и страница получала два h1; теперь его собственный заголовок — h2, а
+    // заголовки карточек — h3, то есть иерархия не рвётся.
+    expect(await page.locator("h1").count()).toBe(1);
+    expect(await page.locator(".process-story h1").count()).toBe(0);
+    expect(await page.locator(".process-story h2.process-title").count()).toBe(1);
   });
 
   test("маркировка: это предложение AEVIX, а не реальные данные клиента", async ({ page }) => {

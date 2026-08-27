@@ -10,6 +10,7 @@ import { displayNameOf } from "@/components/shell/shell-header-account";
 import { WorkspacePageHeader } from "@/components/workspace/page-header";
 import { projectHref } from "@/components/shell/shell-nav";
 import { formatProjectDate } from "@/components/workspace/project-meta";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 function ProjectCard({
   project,
@@ -27,6 +28,7 @@ function ProjectCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const status = getProjectStatus(project, generatingId);
 
   // Close on any click outside the menu — a dropdown that only closes via its own button
@@ -56,6 +58,7 @@ function ProjectCard({
           <button
             type="button"
             className="workspace-icon-button"
+            ref={menuTriggerRef}
             aria-label={`Действия с проектом «${project.name}»`}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
@@ -93,6 +96,11 @@ function ProjectCard({
                 className="is-danger"
                 onClick={() => {
                   setMenuOpen(false);
+                  // Пункт меню исчезает вместе с меню, поэтому вернуть фокус в него после диалога
+                  // невозможно — примитив запомнил бы элемент, которого уже нет в документе, и
+                  // фокус после Escape остался бы в никуда. Возвращаем его на кнопку меню ДО
+                  // открытия: её диалог и запомнит.
+                  menuTriggerRef.current?.focus();
                   onDeleteRequest();
                 }}
               >
@@ -213,39 +221,28 @@ export default function ProjectsPage() {
         </div>
       ) : null}
 
-      {pendingDelete ? (
-        <div className="workspace-confirm-backdrop" role="presentation" onClick={() => setPendingDelete(null)}>
-          <div
-            className="workspace-confirm"
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="delete-project-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <p id="delete-project-title" className="workspace-confirm-title">
-              Удалить проект «{pendingDelete.name}»?
-            </p>
-            <p className="workspace-confirm-desc">
-              Будут удалены все его данные: AI-анализ, дизайн и расчёт стоимости. Это действие нельзя отменить.
-            </p>
-            <div className="workspace-confirm-actions">
-              <button type="button" className="workspace-confirm-cancel" onClick={() => setPendingDelete(null)}>
-                Отмена
-              </button>
-              <button
-                type="button"
-                className="workspace-confirm-delete"
-                onClick={() => {
-                  remove(pendingDelete.id);
-                  setPendingDelete(null);
-                }}
-              >
-                Удалить проект
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {/* Через общий примитив, а не своей разметкой (правило проекта о диалогах). Своя разметка
+          здесь и стояла: она не закрывалась по Escape, не переводила фокус внутрь и позволяла
+          уйти табом на кнопки за спиной окна — и всё это на необратимом удалении. Позиция у неё
+          держалась только на том, что сегодня ни один предок не создаёт содержащий блок для
+          `position: fixed`; первый же `backdrop-filter` выше по дереву вернул бы старый дефект.
+          Примитив рендерится порталом в `document.body` и берёт на себя фокус, Escape и возврат
+          фокуса. Первым фокус получает «Отмена» — промах по Enter не должен удалять проект. */}
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        destructive
+        icon={<Trash2 className="h-5 w-5" />}
+        title={pendingDelete ? `Удалить проект «${pendingDelete.name}»?` : ""}
+        description="Будут удалены все его данные: AI-анализ, дизайн и расчёт стоимости. Это действие нельзя отменить."
+        cancelLabel="Отмена"
+        confirmLabel="Удалить проект"
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (!pendingDelete) return;
+          remove(pendingDelete.id);
+          setPendingDelete(null);
+        }}
+      />
     </div>
   );
 }

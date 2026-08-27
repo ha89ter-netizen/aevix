@@ -37,9 +37,17 @@ export function ShellSidebar({
   const mode = shellModeFor(pathname);
   const projectId = projectIdFromPath(pathname);
   const { status, profile, content, reset } = useBusiness();
-  const { getProject } = useProjects();
+  const { getProject, isLoaded: projectsLoaded } = useProjects();
   const personalized = status === "ready" && profile && content;
   const project = projectId ? getProject(projectId) : null;
+  /**
+   * Разделы проекта показываются, только когда проект действительно есть. По несуществующей
+   * ссылке содержимое честно отвечало «Проект не найден», но панель рядом продолжала предлагать
+   * пять рабочих вкладок — интерактивная оболочка вокруг отсутствующих данных. Пока список
+   * ещё читается (`!projectsLoaded`), вкладки остаются: иначе они мигали бы на каждой загрузке
+   * настоящего проекта.
+   */
+  const showProjectSections = Boolean(projectId) && (!projectsLoaded || Boolean(project));
 
   return (
     <>
@@ -136,6 +144,7 @@ export function ShellSidebar({
 
             {project ? <p className="shell-project-name">{project.name}</p> : null}
 
+            {showProjectSections ? (
             <nav className="shell-nav" aria-label="Разделы проекта">
               {projectNavItems(projectId).map((item) => {
                 const active = pathname === item.href;
@@ -153,6 +162,7 @@ export function ShellSidebar({
                 );
               })}
             </nav>
+            ) : null}
             </div>
 
             <div className="shell-sidebar-foot">

@@ -19,6 +19,7 @@ import {
 import {
   conceptColors,
   MAX_CONCEPT_COLORS,
+  MIN_CONCEPT_SECTIONS,
   type ConceptColorId,
   type ConceptGoal,
   type ConceptSectionType,
@@ -129,7 +130,11 @@ export default function CreateProjectPage() {
 
   const canLeaveBusiness = name.trim().length > 0;
   const canLeaveGoals = goals.length > 0;
-  const canSubmit = canLeaveBusiness && canLeaveGoals && structure.length > 0 && !submitting;
+  // Тот же предел, что проверяет сервер (`MIN_CONCEPT_SECTIONS`) — иначе кнопка разрешала бы
+  // отправить состояние, которое маршрут заведомо отвергнет, а человек получил бы локальный
+  // концепт вместо AI-концепта и ни одного слова об этом.
+  const canSubmit =
+    canLeaveBusiness && canLeaveGoals && structure.length >= MIN_CONCEPT_SECTIONS && !submitting;
 
   const start = () => {
     if (!canSubmit) return;
@@ -241,7 +246,7 @@ export default function CreateProjectPage() {
             <button
               type="button"
               className="workspace-create-submit"
-              disabled={!structure.length}
+              disabled={structure.length < MIN_CONCEPT_SECTIONS}
               onClick={() => setStep(3)}
             >
               Дальше <ArrowRight className="h-4 w-4" />

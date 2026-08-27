@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { Menu, Sparkles } from "lucide-react";
 import { useBusiness } from "@/lib/business-context";
 import { useProjects } from "@/lib/projects";
-import { projectIdFromPath, projectSectionLabel, shellTitle } from "./shell-nav";
+import { projectIdFromPath, projectSectionLabel, shellModeFor, shellTitle } from "./shell-nav";
 import { ShellHeaderAccount } from "./shell-header-account";
 import { SaveStatus } from "@/components/workspace/save-status";
 
@@ -24,6 +24,7 @@ export function ShellHeader({ onOpenSidebar, onGoHome }: { onOpenSidebar: () => 
   const projectId = projectIdFromPath(pathname);
   const project = projectId ? getProject(projectId) : null;
   const title = shellTitle(pathname, project?.name);
+  const mode = shellModeFor(pathname);
   const section = projectSectionLabel(pathname);
 
   return (
@@ -32,16 +33,25 @@ export function ShellHeader({ onOpenSidebar, onGoHome }: { onOpenSidebar: () => 
         <button type="button" className="shell-menu-button" onClick={onOpenSidebar} aria-label="Открыть навигацию">
           <Menu className="h-[18px] w-[18px]" />
         </button>
-        {/* Always returns to the Hero, from anywhere in the product — never to Projects, never
-            to whichever section happens to be nearest. */}
-        <button type="button" className="shell-brand" onClick={onGoHome} aria-label="AEVIX, вернуться на главную">
+        {/* Знак бренда — глобальный «домой» продукта, и дом здесь входной экран: из любой точки
+            и лендинга, и Workspace. Прокрутку лендинга вверх делает пункт «Главная» в навигации,
+            и перегружать ею логотип нельзя — тогда пути на `/` в продукте не остаётся вовсе. */}
+        <button type="button" className="shell-brand" onClick={onGoHome} aria-label="AEVIX, на входной экран">
           <span className="shell-brand-mark">AX</span>
           <span className="shell-brand-name">AEVIX</span>
         </button>
       </div>
 
       <div className="shell-header-center">
-        <h1 className="shell-title">{title}</h1>
+        {/* Заголовком документа подпись становится только там, где у содержания своего нет:
+            в Workspace и внутри проекта. На лендинге h1 принадлежит герою, и вторым h1 шапка
+            переименовывала всю страницу в «Главная» — для экранного диктора и поисковика
+            главным заголовком становилась служебная подпись раздела. Вид не меняется. */}
+        {mode === "landing" ? (
+          <p className="shell-title">{title}</p>
+        ) : (
+          <h1 className="shell-title">{title}</h1>
+        )}
         {section && project ? <span className="shell-title-section">{section}</span> : null}
       </div>
 

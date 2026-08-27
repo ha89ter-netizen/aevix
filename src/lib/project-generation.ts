@@ -21,28 +21,29 @@ import {
  *
  * The stage labels below are honest: each one is emitted when that step actually STARTS, and the
  * next one only appears when the previous step has really finished. Nothing is padded to look
- * busy — if the concept comes back in 300ms, the run moves on in 300ms.
+ * busy — if the concept comes back in 300ms, the run moves on in 300ms. And each label marks a
+ * boundary that really exists: the two network waits, then the synchronous assembly.
  */
 
-export type GenerationStageId =
-  | "analyze"
-  | "industry"
-  | "structure"
-  | "content"
-  | "imagery"
-  | "design"
-  | "pricing"
-  | "workspace";
+/**
+ * Фазы генерации — ровно те границы, которые система действительно может наблюдать.
+ *
+ * Было восемь подписей, из которых время занимали ДВЕ: `analyze` и `structure` — единственные
+ * два сетевых шага. Остальные шесть синхронные и проскакивали одним кадром в самом конце. На
+ * замере это выглядело так: активная строка менялась дважды за 16–50 секунд, а потом шесть
+ * галочек ставились разом. Список честно перечислял, что делает код, но врал о том, сколько это
+ * стоит по времени, — восемь пунктов обещают равномерное движение, которого нет.
+ *
+ * Теперь фаз три, и каждая — настоящая граница: два ожидания ответа и сборка проекта из уже
+ * полученного. Ни процентов, ни искусственных задержек: если концепт вернётся за 300мс, фаза
+ * закончится за 300мс.
+ */
+export type GenerationStageId = "analyze" | "concept" | "assemble";
 
-export const generationStages: Array<{ id: GenerationStageId; label: string }> = [
-  { id: "analyze", label: "Анализируем бизнес" },
-  { id: "industry", label: "Изучаем нишу" },
-  { id: "structure", label: "Собираем структуру сайта" },
-  { id: "content", label: "Генерируем контент" },
-  { id: "imagery", label: "Подбираем изображения" },
-  { id: "design", label: "Проектируем интерфейс" },
-  { id: "pricing", label: "Считаем стоимость" },
-  { id: "workspace", label: "Готовим рабочее пространство" },
+export const generationStages: Array<{ id: GenerationStageId; label: string; hint: string }> = [
+  { id: "analyze", label: "Разбираем бизнес", hint: "AI читает описание и собирает разбор" },
+  { id: "concept", label: "Собираем сайт", hint: "AI пишет структуру и тексты страниц" },
+  { id: "assemble", label: "Готовим рабочее пространство", hint: "Связываем разбор, сайт, процесс и расчёт" },
 ];
 
 export type ProjectBrief = {
@@ -125,9 +126,10 @@ function buildEstimateForm(brief: ProjectBrief): EstimateForm {
 function conceptInputFrom(brief: ProjectBrief): WebsiteConceptInput {
   const knowledge = businessKnowledgeFor(brief.businessType, brief.name);
   return {
-    // The concept schema keeps its own closed list of business types; the project's free-text
-    // niche is passed through as the label, which is what the knowledge layer actually matches on.
-    businessType: brief.businessType as WebsiteConceptInput["businessType"],
+    // Ниша идёт как есть — приведения типа здесь больше нет, схема концепта принимает строку.
+    // Пустой она быть не может: у нераспознанного бизнеса берётся ярлык базы знаний, иначе
+    // серверная проверка отвергла бы бриф, а человек получил бы локальный концепт молча.
+    businessType: brief.businessType || knowledge.label,
     businessName: brief.name,
     styleIds: brief.styleIds,
     styleId: brief.styleIds[0] ?? knowledge.styles[0] ?? "minimal",
@@ -233,16 +235,19 @@ export async function runProjectGeneration(
   onStage: (id: GenerationStageId) => void,
   signal: AbortSignal,
 ): Promise<GeneratedProject> {
+  // Фаза 1 — единственное сетевое ожидание разбора.
   onStage("analyze");
   const analysis = (await fetchAnalysis(brief, signal)) ?? buildFallbackAnalysis(brief);
 
-  onStage("industry");
+  // Фаза 2 — второе и последнее сетевое ожидание.
+  onStage("concept");
   const knowledge = businessKnowledgeFor(brief.businessType, brief.name);
-
-  onStage("structure");
   const concept = await fetchConcept(brief, signal);
 
-  onStage("content");
+  // Фаза 3 — всё дальнейшее синхронно: связываем полученное с личностью проекта и считаем
+  // стоимость локально. Отдельных подписей у этих шагов больше нет — они не занимают времени,
+  // и объявлять их этапами значило бы обещать движение там, где его нет.
+  onStage("assemble");
   // The concept response already carries copy for every page; this step is where it is bound to
   // the project's own identity rather than the generator's defaults.
   const design: WebsiteConcept = {
@@ -259,13 +264,8 @@ export async function runProjectGeneration(
     offers: concept.offers ?? { products: [...knowledge.products], services: [...knowledge.services] },
   };
 
-  onStage("imagery");
-  onStage("design");
-
-  onStage("pricing");
   const form = buildEstimateForm(brief);
   const pricing = { form, result: buildFallbackEstimate(form) };
 
-  onStage("workspace");
   return { analysis, design, pricing };
 }

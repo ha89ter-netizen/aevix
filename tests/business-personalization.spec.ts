@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route } from "./support/fixtures";
 import { SITE } from "./support/routes";
+import { landingSections } from "../src/components/shell/shell-nav";
 
 /**
  * Once a business is recognised it becomes the source of state for the whole page: the Hero
@@ -422,6 +423,90 @@ test.describe("site personalisation", () => {
     ).toContain("барбершоп");
   });
 
+  test("распознанное показывается ДО ответа сети — мёртвого ожидания больше нет (Journey pass §3)", async ({ page }) => {
+    /**
+     * Сторож против измеренного дефекта: повествование заканчивалось на 1,56с, а ответ приходил
+     * на 7,35с, и всё это время висела неподвижная надпись «Перестраиваем интерфейс». Ниша при
+     * этом была известна локально с первого кадра.
+     *
+     * Ответ здесь задержан на 6 секунд НАМЕРЕННО: на прежней реализации карточка не появилась бы
+     * до конца этой задержки, и проверка бы упала. Порог в 3 секунды — с запасом ниже задержки и
+     * заметно выше локальной фазы.
+     */
+    await page.route("**/api/business-analysis", async (route: Route) => {
+      await new Promise((resolve) => setTimeout(resolve, 6000));
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ result: { summary: "Подробный разбор барбершопа." } }),
+      });
+    });
+    await gotoHydrated(page);
+    await page.locator(FIELD).fill(BARBER_TEXT);
+
+    const started = Date.now();
+    await page.locator(FIELD).press("Enter");
+    await expect(page.locator(RESULT).getByText("Барбершоп", { exact: true })).toBeVisible({ timeout: 5000 });
+    const shown = Date.now() - started;
+    expect(shown, `распознанное показано через ${shown}мс`).toBeLessThan(3000);
+
+    // Пока сеть едет, ожидание названо честно — и это единственное, чего мы ещё не знаем.
+    await expect(page.locator(".hero-enriching")).toBeVisible();
+    // Всё остальное на карточке уже есть: оно получено локально, а не ждёт сети.
+    await expect(page.locator(".hero-understanding")).toBeVisible();
+
+    // Ответ пришёл — строка ожидания уходит, разбор занимает своё место.
+    await expect(page.getByText("Подробный разбор барбершопа.")).toBeVisible({ timeout: 15000 });
+    await expect(page.locator(".hero-enriching")).toHaveCount(0);
+  });
+
+  test("шаги разбора называют только настоящую работу — никакого рынка и конкурентов", async ({ page }) => {
+    // Требование продукта: интерфейс не заявляет аналитической работы, которой система не делает.
+    await mockSuccess(page);
+    await gotoHydrated(page);
+    await page.locator(FIELD).fill(BARBER_TEXT);
+    await page.locator(FIELD).press("Enter");
+    await expect(page.locator(RESULT)).toBeVisible();
+    const text = (await page.locator(RESULT).innerText()).toLowerCase();
+    for (const invented of ["конкурент", "рынок", "рынка", "трафик", "аудитори", "%"]) {
+      expect(text, `карточка не должна обещать «${invented}»`).not.toContain(invented);
+    }
+  });
+
+  test("отказ сети оставляет честный разбор, а не вечное ожидание (Journey pass §3)", async ({ page }) => {
+    await page.route("**/api/business-analysis", (route: Route) =>
+      route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "нет" }) }),
+    );
+    await gotoHydrated(page);
+    await page.locator(FIELD).fill(BARBER_TEXT);
+    await page.locator(FIELD).press("Enter");
+
+    // Локально известное на месте…
+    await expect(page.locator(RESULT).getByText("Барбершоп", { exact: true })).toBeVisible({ timeout: 5000 });
+    // …строка ожидания исчезает (мы больше не ждём), а отказ назван прямо и с повтором.
+    await expect(page.locator(".hero-enriching")).toHaveCount(0, { timeout: 15000 });
+    await expect(page.getByText(/AI-сервис временно недоступен/)).toBeVisible();
+    await expect(page.getByRole("button", { name: /Повторить с AI/ })).toBeVisible();
+  });
+
+  test("«Изменить» работает и во время ожидания сети — мёртвых кнопок нет", async ({ page }) => {
+    await page.route("**/api/business-analysis", async (route: Route) => {
+      await new Promise((resolve) => setTimeout(resolve, 8000));
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ result: { summary: "Поздний разбор." } }) });
+    });
+    await gotoHydrated(page);
+    await page.locator(FIELD).fill(BARBER_TEXT);
+    await page.locator(FIELD).press("Enter");
+    await expect(page.locator(RESULT)).toBeVisible({ timeout: 5000 });
+
+    await page.getByRole("button", { name: "Изменить" }).click();
+    await expect(page.locator(RESULT)).toHaveCount(0);
+    // Запоздалый ответ не имеет права воскресить сброшенный разбор.
+    await page.waitForTimeout(9000);
+    await expect(page.locator(RESULT)).toHaveCount(0);
+    await expect(page.getByText("Поздний разбор.")).toHaveCount(0);
+  });
+
   test("сопровождение — ОДИН policy-блок на все оплачиваемые, не повтор на каждой карточке (Pricing pass)", async ({ page }) => {
     await mockSuccess(page);
     await gotoHydrated(page);
@@ -619,15 +704,12 @@ test.describe("product navigation", () => {
   test("the sidebar lists every landing section and nothing else", async ({ page }) => {
     await gotoHydrated(page);
     await openNav(page);
-    await expect(page.locator(".shell-sidebar .shell-nav-item")).toHaveText([
-      "Главная",
-      "Возможности",
-      "Как работает",
-      "Кейсы",
-      "Цены",
-      "FAQ",
-      "Контакты",
-    ]);
+    // Ожидание — из канонического реестра разделов, а не из второй копии списка. Копия здесь и
+    // жила: она разошлась со страницей и осталась зелёной, пока меню три пункта подряд везло
+    // против направления чтения. Что реестр совпадает с разметкой, доказывает navigation.spec.
+    await expect(page.locator(".shell-sidebar .shell-nav-item")).toHaveText(
+      landingSections.filter((section) => section.label).map((section) => section.label!),
+    );
     // Nothing personalised yet, so no persona panel.
     await expect(page.locator(".shell-persona")).toHaveCount(0);
   });

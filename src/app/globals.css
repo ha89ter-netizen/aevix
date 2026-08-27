@@ -8257,76 +8257,6 @@ a.shell-account:hover {
   margin-top: 1.1rem;
 }
 
-/* ---- Delete confirmation ---- */
-
-.workspace-confirm-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 90;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(9, 8, 7, 0.4);
-  padding: 1rem;
-}
-
-.workspace-confirm {
-  width: min(26rem, 100%);
-  border-radius: var(--radius-lg);
-  background: #fff;
-  box-shadow: 0 30px 70px rgba(9, 8, 7, 0.25);
-  padding: 1.5rem;
-}
-
-.workspace-confirm-title {
-  color: #111214;
-  font-size: 1.05rem;
-  font-weight: 660;
-  letter-spacing: -0.01em;
-}
-
-.workspace-confirm-desc {
-  margin-top: 0.5rem;
-  color: rgba(9, 8, 7, 0.55);
-  font-size: 0.86rem;
-  line-height: 1.5;
-}
-
-.workspace-confirm-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 1.25rem;
-}
-
-.workspace-confirm-cancel {
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--line);
-  padding: 0.55rem 1.1rem;
-  color: #111214;
-  font-size: 0.84rem;
-  font-weight: 600;
-  transition: background var(--motion-base) var(--ease-premium);
-}
-
-.workspace-confirm-cancel:hover {
-  background: rgba(9, 8, 7, 0.05);
-}
-
-.workspace-confirm-delete {
-  border-radius: var(--radius-pill);
-  background: #b91c1c;
-  padding: 0.55rem 1.1rem;
-  color: #fff;
-  font-size: 0.84rem;
-  font-weight: 620;
-  transition: background var(--motion-base) var(--ease-premium);
-}
-
-.workspace-confirm-delete:hover {
-  background: #991b1b;
-}
-
 /* ---- Create Project form ---- */
 
 .workspace-create-form {
@@ -11048,4 +10978,31 @@ a.shell-account:hover {
 .concept-site[data-family="structured"] .concept-service-columns article {
   padding: 1.1rem 1.25rem;
   border-bottom: 1px solid var(--concept-border);
+}
+
+/* Ожидание подробного разбора на карточке героя (Journey pass). Строка существует ровно столько,
+   сколько идёт сетевой запрос, и говорит о единственном, чего система пока не знает: всё
+   остальное на карточке получено локальным резолвером. Тихая, не баннер. */
+.hero-enriching {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: rgba(9, 8, 7, 0.5);
+}
+
+/* Подсказка под активной фазой генерации (Journey pass): объясняет, чего ждём, пока идёт
+   единственное длинное ожидание. Появляется только у активной фазы — у остальных объяснять
+   нечего. */
+.generation-stage-body {
+  display: grid;
+  gap: 0.15rem;
+}
+.generation-stage-hint {
+  color: rgba(9, 8, 7, 0.45);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  font-weight: 450;
 }

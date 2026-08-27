@@ -68,7 +68,9 @@ export function ProcessStory({ steps }: { steps: string[] }) {
           <span className="process-tag">Предложение AEVIX</span>
           Демонстрационный сценарий по итогам AI-анализа
         </p>
-        <h1 className="process-title">Как работает ваш бизнес</h1>
+        {/* Заголовок раздела, а не документа: имя страницы уже объявлено шапкой оболочки, и второй
+            h1 переименовывал бы страницу в её же подпись. Вид не меняется — стиль по классу. */}
+        <h2 className="process-title">Как работает ваш бизнес</h2>
         <p className="process-lede">
           От первого действия клиента до результата — так AEVIX предлагает вести работу этого бизнеса.
         </p>
@@ -91,7 +93,7 @@ export function ProcessStory({ steps }: { steps: string[] }) {
                 <ProcessIllustration type={stage.type} revealed={isRevealed} />
               </div>
               <div className="process-card-copy">
-                <h2 className="process-card-title">{stage.title}</h2>
+                <h3 className="process-card-title">{stage.title}</h3>
                 <span className="process-card-caption">{stage.caption}</span>
               </div>
             </li>
@@ -102,7 +104,7 @@ export function ProcessStory({ steps }: { steps: string[] }) {
       {/* Спокойный смысловой финал: 2–3 системных эффекта, выведенных ИЗ состава процесса, а не
           одинаковых для всех. Не карточки, не FAQ, не огромный CTA. */}
       <aside className="process-why" aria-label="Почему именно так">
-        <h2 className="process-why-title">Почему именно так</h2>
+        <h3 className="process-why-title">Почему именно так</h3>
         <ul className="process-why-list">
           {principles.map((principle) => (
             <li key={principle.key}>{principle.text}</li>

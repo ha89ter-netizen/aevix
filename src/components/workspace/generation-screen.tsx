@@ -5,9 +5,13 @@ import { cn } from "@/lib/utils";
 import { generationStages, type GenerationStageId } from "@/lib/project-generation";
 
 /**
- * Shown while a project is being generated. Each line corresponds to a real step in
- * `runProjectGeneration` and lights up when that step actually begins — a step that completes in
- * 200ms is ticked off in 200ms. Nothing here waits on a timer to look like it is thinking.
+ * Shown while a project is being generated. Each line is a phase `runProjectGeneration` can
+ * actually observe — the two network waits and the synchronous assembly — and lights up when
+ * that phase really begins. Nothing waits on a timer to look like it is thinking, and there is
+ * no percentage: the wait depends on someone else's service, so a number would be invented.
+ *
+ * Подсказка под активной фазой объясняет, чего именно ждём. На замере ожидание длится 16–50
+ * секунд, и всё это время раньше висела одна неподвижная строка без объяснения.
  */
 export function GenerationScreen({ stage, projectName }: { stage: GenerationStageId; projectName: string }) {
   const currentIndex = generationStages.findIndex((item) => item.id === stage);
@@ -34,7 +38,10 @@ export function GenerationScreen({ stage, projectName }: { stage: GenerationStag
               <span className="generation-stage-icon">
                 {done ? <Check className="h-3.5 w-3.5" /> : active ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
               </span>
-              <span>{item.label}</span>
+              <span className="generation-stage-body">
+                {item.label}
+                {active ? <span className="generation-stage-hint">{item.hint}</span> : null}
+              </span>
             </li>
           );
         })}

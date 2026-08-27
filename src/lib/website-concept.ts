@@ -31,6 +31,26 @@ export const conceptSectionTypes = [
   "faq",
 ] as const;
 
+/**
+ * Минимальный состав структуры — ОДИН контракт на клиент и сервер.
+ *
+ * Число не взято из валидатора: три — это то, из чего сайт вообще состоит. Тот же состав
+ * зашит в двух независимых местах, и оба появились раньше этой константы:
+ *   · `recommendStructure` держит основой «о компании» и «контакты» и всегда добавляет к ним
+ *     то, что бизнес предлагает, — его комментарий говорит прямо: «без „о компании“ и
+ *     „контактов“ сайта не бывает ни у кого»;
+ *   · маршрут генерации требует от модели ядро `services · about · contacts · (booking|pricing)`,
+ *     пересечённое с подтверждённым человеком.
+ * То есть «что предлагаем · кто мы · как связаться» — не порог валидатора, а минимальный
+ * осмысленный сайт. Меньше трёх разделов маршрут отвергал и раньше, но мастер об этом не знал:
+ * человек удалял разделы до двух, кнопка оставалась активной, запрос получал 400 и молча
+ * подменялся локальным концептом. Теперь предел один и на обеих сторонах.
+ *
+ * Предложение мастера никогда не начинается ниже пяти разделов, поэтому ограничение видно
+ * только тому, кто целенаправленно вычищает структуру.
+ */
+export const MIN_CONCEPT_SECTIONS = 3;
+
 export const conceptSectionOptions = [
   { id: "services", label: "Услуги" },
   { id: "pricing", label: "Цены" },
@@ -113,7 +133,18 @@ export type ConceptLayoutId = (typeof conceptLayouts)[number]["id"];
 export const MAX_CONCEPT_COLORS = 5;
 
 export type WebsiteConceptInput = {
-  businessType: ConceptBusinessType;
+  /**
+   * Ниша бизнеса свободной строкой, а не одной из семи фишек мастера.
+   *
+   * `conceptBusinessTypes` — словарь ПОДСКАЗОК на первом шаге, и им он и остаётся. Но продукт
+   * распознаёт двадцать ниш каноническим резолвером, и мастер честно отдаёт сюда его ярлык:
+   * «Автосервис», «Клиника», «Юрист». Пока здесь стоял закрытый союз, `conceptInputFrom`
+   * пробивал его приведением типа, а серверная проверка отвергала запрос — и человек с любой
+   * нишей вне тех семи молча получал локальный концепт вместо AI-концепта, без единого слова
+   * об этом. Ответ модели проверяется здесь же свободной строкой (`validateWebsiteConcept`), то
+   * есть закрытый список на входе был не замыслом, а недосмотром.
+   */
+  businessType: string;
   businessName: string;
   styleId: ConceptStyleId;
   /** 1-5 colors, in priority order: [0] is primary, [1] secondary, [2] carries the focus/tertiary
@@ -226,10 +257,13 @@ export function validateWebsiteConceptInput(value: unknown): WebsiteConceptInput
   if (!value || typeof value !== "object") return null;
   const candidate = value as Partial<WebsiteConceptInput>;
   const businessName = cleanText(candidate.businessName, 80);
+  // Ниша — свободная строка той же чистки, что имя бизнеса: пустую не принимаем, длинную и
+  // небезопасную тоже. Закрытого списка здесь больше нет — см. комментарий у типа.
+  const businessType = cleanText(candidate.businessType, 80);
   const customColors = cleanOptionalText(candidate.customColors, 180);
   const wishes = cleanOptionalText(candidate.wishes, 700);
   const goals = cleanKnownArray(candidate.goals, conceptGoals, 1, conceptGoals.length);
-  const sections = cleanKnownArray(candidate.sections, conceptSectionTypes, 3, conceptSectionTypes.length);
+  const sections = cleanKnownArray(candidate.sections, conceptSectionTypes, MIN_CONCEPT_SECTIONS, conceptSectionTypes.length);
   const colorIds = cleanKnownArray(
     candidate.colorIds,
     conceptColors.map((color) => color.id) as readonly ConceptColorId[],
@@ -237,12 +271,11 @@ export function validateWebsiteConceptInput(value: unknown): WebsiteConceptInput
     MAX_CONCEPT_COLORS,
   );
 
-  if (!isOneOf(candidate.businessType, conceptBusinessTypes)) return null;
   if (!isOneOf(candidate.styleId, conceptStyles.map((style) => style.id))) return null;
-  if (!businessName || customColors === null || wishes === null || !goals || !sections || !colorIds) return null;
+  if (!businessName || !businessType || customColors === null || wishes === null || !goals || !sections || !colorIds) return null;
 
   return {
-    businessType: candidate.businessType,
+    businessType,
     businessName,
     styleId: candidate.styleId,
     colorIds,

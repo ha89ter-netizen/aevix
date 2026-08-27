@@ -56,16 +56,59 @@ export type ShellNavItem = {
   icon?: LucideIcon;
 };
 
-/** The public site, in the order a visitor reads it. Every target is a real section id. */
-export const landingNavItems: ShellNavItem[] = [
-  { href: "#главная", label: "Главная" },
-  { href: "#что-такое-aevix", label: "Возможности" },
-  { href: "#процесс", label: "Как работает" },
-  { href: "#результаты", label: "Кейсы" },
-  { href: "#стоимость", label: "Цены" },
-  { href: "#faq", label: "FAQ" },
-  { href: "#контакты", label: "Контакты" },
+/**
+ * Канонический список разделов лендинга — ЕДИНСТВЕННЫЙ источник о его структуре.
+ *
+ * Порядок здесь обязан совпадать с порядком, в котором `LandingExperience` рендерит сцены: это
+ * оглавление страницы, а оглавление, переставляющее главы, врёт о структуре. Прежний список был
+ * отдельной копией и разошёлся с реальностью — «Как работает» стояло третьим пунктом, а на
+ * странице лежало на 8713px, ниже «Кейсов» (6967) и «Цен» (4241). Посетитель, идущий по меню
+ * сверху вниз, трижды подряд ехал против направления чтения.
+ *
+ * Здесь перечислены ВСЕ разделы, а не только попавшие в меню. Причина в подсветке: наблюдатель
+ * следит именно за этим списком, и раздел, о котором список не знает, оставлял активным
+ * предыдущий пункт. На замере это давало «Главную» в меню, пока человек читал демонстрацию
+ * AI-консультанта и раздел о задачах, — около 2400 пикселей прокрутки с врущим индикатором.
+ *
+ * `menu: false` означает «раздел существует, в меню его не выносим» — тогда подсветка отдаётся
+ * пункту из `representedBy`. Пустого пункта ради счёта заводить не нужно.
+ */
+export type LandingSection = {
+  /** Настоящий id секции в разметке лендинга. */
+  id: string;
+  /** Подпись в меню; у разделов вне меню её нет. */
+  label?: string;
+  /** Какой пункт меню подсвечивать, пока читают этот раздел (для разделов вне меню). */
+  representedBy?: string;
+};
+
+export const landingSections: LandingSection[] = [
+  { id: "главная", label: "Главная" },
+  { id: "что-такое-aevix", label: "Возможности" },
+  { id: "ai-анализ", label: "AI-разбор" },
+  { id: "проблемы", label: "До и после" },
+  { id: "стоимость", label: "Цены" },
+  { id: "результаты", label: "Кейсы" },
+  // Раздел об основателе — часть рассказа о продукте, отдельным пунктом меню он не нужен;
+  // подсветка на нём остаётся у «Кейсов», предыдущего раздела того же рассказа.
+  { id: "кто-мы", representedBy: "результаты" },
+  { id: "процесс", label: "Как работает" },
+  { id: "faq", label: "FAQ" },
+  { id: "контакты", label: "Контакты" },
 ];
+
+/** Пункты меню — производная от реестра, а не вторая копия правды. */
+export const landingNavItems: ShellNavItem[] = landingSections
+  .filter((section): section is LandingSection & { label: string } => Boolean(section.label))
+  .map((section) => ({ href: `#${section.id}`, label: section.label }));
+
+/** Какому пункту меню принадлежит раздел — для честной подсветки положения. */
+export function navHrefForSection(sectionId: string): string | null {
+  const section = landingSections.find((item) => item.id === sectionId);
+  if (!section) return null;
+  if (section.label) return `#${section.id}`;
+  return section.representedBy ? `#${section.representedBy}` : null;
+}
 
 export const workspaceNavItems: ShellNavItem[] = [
   { href: "/app/projects", label: "Проекты", icon: FolderKanban },

@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route } from "./support/fixtures";
 import { SITE } from "./support/routes";
+import { ANALYSIS_SEQUENCE } from "../src/lib/business-context";
 
 /**
  * Hero business-analysis field.
@@ -150,10 +151,12 @@ test.describe("hero analysis field", () => {
     await field.fill(BARBER_TEXT);
     await field.press("Enter");
 
-    // Analysing state: the four-beat narrative sequence, ending on the interface rebuild.
+    // Локальная фаза: такты называют работу, которая ДЕЙСТВИТЕЛЬНО происходит на устройстве, и
+    // их количество берётся из источника, а не из копии — иначе проверка снова закодировала бы
+    // прежний список и покраснела бы на честной правке, а не на дефекте.
     await expect(page.locator(".hero-loading-mark")).toBeVisible();
-    await expect(page.locator(".hero-sequence-step")).toHaveCount(4);
-    await expect(page.getByText("Перестраиваем интерфейс")).toBeVisible();
+    await expect(page.locator(".hero-sequence-step")).toHaveCount(ANALYSIS_SEQUENCE.length);
+    await expect(page.getByText(ANALYSIS_SEQUENCE[ANALYSIS_SEQUENCE.length - 1])).toBeVisible();
 
     // Success state: recognised business + Understanding rows (Known/Inferred/Proposed) + 5-phase
     // proposed system. NO fabricated metric tiles or numeric confidence (Wave 4 removed them).

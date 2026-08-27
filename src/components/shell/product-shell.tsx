@@ -8,9 +8,8 @@ import { useBusiness } from "@/lib/business-context";
 import { ConsultationModal } from "@/components/site-experience";
 import { ShellHeader } from "./shell-header";
 import { ShellSidebar } from "./shell-sidebar";
-import { landingNavItems, publicRoutes, shellModeFor } from "./shell-nav";
+import { landingNavItems, landingSections, navHrefForSection, publicRoutes, shellModeFor } from "./shell-nav";
 
-const HOME_SECTION = "главная";
 
 /**
  * The single frame every AEVIX route renders inside — landing, Workspace and an open project
@@ -91,11 +90,16 @@ export function ProductShell({ children }: { children: ReactNode }) {
    */
   useScrollLock(sidebarOpen && !isWide);
 
-  // Highlights the section currently in view, but only on the landing where sections exist.
+  /**
+   * Подсветка положения. Наблюдение идёт за ВСЕМИ разделами реестра, а не только за пунктами
+   * меню: раздел, о котором наблюдатель не знает, оставлял активным предыдущий пункт, и меню
+   * сообщало «Главная», пока человек читал совсем другое. Раздел вне меню отдаёт подсветку
+   * своему представителю (`navHrefForSection`), а не молчит.
+   */
   useEffect(() => {
     if (mode !== "landing") return;
-    const sections = landingNavItems
-      .map((item) => document.querySelector<HTMLElement>(item.href))
+    const sections = landingSections
+      .map((item) => document.getElementById(item.id))
       .filter((section): section is HTMLElement => Boolean(section));
     if (!sections.length) return;
     const observer = new IntersectionObserver(
@@ -103,7 +107,8 @@ export function ProductShell({ children }: { children: ReactNode }) {
         const visible = entries
           .filter((entry) => entry.isIntersecting)
           .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (visible?.target.id) setActiveSection(`#${visible.target.id}`);
+        const href = visible?.target.id ? navHrefForSection(visible.target.id) : null;
+        if (href) setActiveSection(href);
       },
       { rootMargin: "-30% 0px -55% 0px", threshold: [0, 0.15, 0.35, 0.6] },
     );
@@ -123,29 +128,23 @@ export function ProductShell({ children }: { children: ReactNode }) {
   }, []);
 
   /**
-   * Логотип ведёт на главную сайта, а не на входной экран.
+   * Логотип — единственный глобальный «домой», и дом продукта — входной экран.
    *
-   * Входной экран — это первое впечатление, и возвращаться в него из продукта незачем: человек
-   * его уже видел и шёл дальше. От логотипа ждут «домой», а дом здесь — начало содержательного
-   * сайта, то есть его первый экран.
+   * Раньше он на лендинге просто прокручивал страницу вверх, а из Workspace вёл на `/platform`.
+   * В сумме это означало, что на `/` не ведёт НИ ОДНА ссылка во всём продукте: попасть туда
+   * можно было один раз, а вернуться — только набрав адрес руками. Между тем входной экран
+   * несёт локализацию и живую карту возможностей, то есть это отдельная поверхность, а не
+   * заставка.
    *
-   * Флаг «доскроллить до героя» тут не ставится: `/platform` и так открывается сверху, а флаг,
-   * не отработавший сразу, выстрелил бы позже неожиданной прокруткой посреди чтения.
+   * Прокрутка к первому экрану лендинга никуда не делась: за неё отвечает пункт «Главная» в
+   * навигации — обычное поведение якоря, которое не обязано занимать собой знак бренда.
+   *
+   * Переход клиентский: оболочка, провайдеры и описанный бизнес остаются смонтированными.
    */
   const goHome = useCallback(() => {
-    if (mode === "landing" && sidebarOpen) {
-      pendingScroll.current = `#${HOME_SECTION}`;
-      setSidebarOpen(false);
-      return;
-    }
     setSidebarOpen(false);
-    if (mode === "landing") {
-      scrollToSection(`#${HOME_SECTION}`);
-      return;
-    }
-    // Клиентский переход: оболочка, провайдеры и описанный бизнес остаются смонтированными.
-    router.push(publicRoutes.site);
-  }, [mode, router, scrollToSection, sidebarOpen]);
+    router.push(publicRoutes.entry);
+  }, [router]);
 
   /**
    * Куда прокрутить, когда выдвижная панель закроется.

@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route } from "./support/fixtures";
+import { MIN_CONCEPT_SECTIONS } from "../src/lib/website-concept";
 
 /**
  * The Workspace's project system: every business worked on in AEVIX becomes a Project that
@@ -26,6 +27,18 @@ function seededProject(overrides: Record<string, unknown> = {}) {
     pricing: null,
     ...overrides,
   };
+}
+
+/** На десктопе панель закреплена, ниже 1024px живёт за гамбургером. */
+async function openNav(page: Page) {
+  const menu = page.locator(".shell-menu-button");
+  if (await menu.isVisible()) {
+    await expect(async () => {
+      await menu.click();
+      await expect(page.locator(".shell-sidebar")).toBeVisible({ timeout: 1500 });
+    }).toPass({ timeout: 20_000 });
+  }
+  await expect(page.locator(".shell-sidebar")).toBeVisible();
 }
 
 async function seedStorage(page: Page, projects: unknown[]) {
@@ -966,5 +979,236 @@ test.describe("сохранённый расчёт · инварианты ко�
     await expect(dialog.getByRole("button", { name: /^WhatsApp/ })).toHaveAttribute("aria-pressed", "true");
     // Ядро доведено на входе, а не только по клику.
     await expect(dialog.getByRole("button", { name: /^AI-консультант/ })).toHaveAttribute("aria-pressed", "true");
+  });
+});
+
+test.describe("удаление проекта · канонический диалог, а не своя разметка", () => {
+  /**
+   * Сторож против дефекта, который тут и стоял: подтверждение удаления рисовалось собственной
+   * разметкой в дереве страницы. Escape его не закрывал, фокус в окно не переводился, а табом
+   * можно было уйти на кнопки за спиной модального окна и нажать их — и всё это на необратимом
+   * действии. По центру оно оказывалось лишь потому, что сегодня ни один предок не создаёт
+   * содержащий блок для `position: fixed`; первый же `backdrop-filter` выше по дереву вернул бы
+   * ровно тот баг, из-за которого правило о примитиве и появилось.
+   *
+   * Каждая проверка ниже краснела на прежней реализации.
+   */
+  async function openDeleteDialog(page: Page) {
+    await page.getByRole("button", { name: /Действия с проектом/ }).first().click();
+    await page.getByRole("menuitem", { name: "Удалить" }).click();
+    await expect(page.locator(".dialog-panel")).toBeVisible();
+  }
+
+  test.beforeEach(async ({ page }) => {
+    await seedStorage(page, [seededProject({ id: "to-delete", name: "Проект под удаление" })]);
+    await page.goto("/app/projects");
+    await expect(page.getByText("Проект под удаление")).toBeVisible();
+  });
+
+  test("диалог живёт порталом в body, а не внутри разметки страницы", async ({ page }) => {
+    await openDeleteDialog(page);
+    // Прежняя разметка была потомком страницы и зависела от предков; примитив — прямой ребёнок
+    // body, поэтому `position: fixed` у него не может быть перехвачен ничьим содержащим блоком.
+    const parentIsBody = await page.evaluate(
+      () => document.querySelector(".dialog-scrim")?.parentElement === document.body,
+    );
+    expect(parentIsBody).toBe(true);
+    await expect(page.locator(".dialog-panel")).toHaveAttribute("aria-modal", "true");
+  });
+
+  test("фокус входит в диалог и стоит на отмене — промах по Enter не удаляет", async ({ page }) => {
+    await openDeleteDialog(page);
+    const focused = await page.evaluate(() => {
+      const el = document.activeElement as HTMLElement | null;
+      const panel = document.querySelector(".dialog-panel");
+      return { inside: Boolean(panel && el && panel.contains(el)), text: (el?.textContent ?? "").trim() };
+    });
+    expect(focused.inside).toBe(true);
+    expect(focused.text).toBe("Отмена");
+
+    // Enter по стоящему фокусу — это отмена, а не удаление. Проект обязан остаться.
+    await page.keyboard.press("Enter");
+    await expect(page.locator(".dialog-panel")).toHaveCount(0);
+    await expect(page.getByText("Проект под удаление")).toBeVisible();
+  });
+
+  test("Escape закрывает и НЕ удаляет", async ({ page }) => {
+    await openDeleteDialog(page);
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".dialog-panel")).toHaveCount(0);
+    await expect(page.getByText("Проект под удаление")).toBeVisible();
+    await page.reload();
+    await expect(page.getByText("Проект под удаление")).toBeVisible();
+  });
+
+  test("Tab и Shift+Tab не выпускают фокус за спину окна", async ({ page }, testInfo) => {
+    // Только десктоп, и не из соображений удобства: в эмуляции сенсорного телефона Chromium
+    // уводит Tab за пределы документа целиком (`document.hasFocus()` становится false, фокус
+    // уходит в хром браузера), поэтому там измерялась бы эмуляция, а не ловушка. У самого
+    // телефона физического Tab нет — проверять на нём нечего. На десктопе проверка настоящая и
+    // на прежней разметке краснела.
+    test.skip(testInfo.project.name !== "desktop", "клавиатурная навигация — десктопный сценарий");
+    await openDeleteDialog(page);
+    // Предусловие, а не проверка: фокус переводится эффектом после отрисовки, и Tab, нажатый
+    // раньше этого, мерил бы гонку, а не ловушку. Сам перевод проверяется отдельным тестом.
+    await expect(page.locator(".dialog-cancel")).toBeFocused();
+    // Смена фокуса — отдельное событие браузера, и чтение сразу после нажатия иногда застаёт
+    // момент между blur и focus. Ждём, где фокус ОСТАНОВИЛСЯ, и проверяем именно это: на прежней
+    // разметке он останавливался снаружи и там же и оставался.
+    const focusedNameAfter = async (key: string) => {
+      await page.keyboard.press(key);
+      return expect
+        .poll(
+          () =>
+            page.evaluate(() => {
+              const el = document.activeElement as HTMLElement | null;
+              const panel = document.querySelector(".dialog-panel");
+              if (!panel || !el || el === document.body) return null;
+              return panel.contains(el) ? (el.textContent ?? "").trim() : `СНАРУЖИ: ${(el.textContent ?? el.tagName).trim().slice(0, 24)}`;
+            }),
+          { timeout: 2000 },
+        )
+        .not.toBeNull();
+    };
+    const where = async () =>
+      page.evaluate(() => {
+        const el = document.activeElement as HTMLElement | null;
+        const panel = document.querySelector(".dialog-panel");
+        if (!panel) return "ДИАЛОГА НЕТ";
+        if (!el || el === document.body) return "BODY";
+        return panel.contains(el) ? "внутри" : `СНАРУЖИ: ${el.className || el.tagName}`;
+      });
+
+    // По кругу в обе стороны — на прежней разметке фокус уходил на страницу уже со второго Tab.
+    for (let i = 0; i < 5; i++) {
+      await focusedNameAfter("Tab");
+      expect(await where(), `Tab #${i + 1}`).toBe("внутри");
+    }
+    for (let i = 0; i < 5; i++) {
+      await focusedNameAfter("Shift+Tab");
+      expect(await where(), `Shift+Tab #${i + 1}`).toBe("внутри");
+    }
+  });
+
+  test("фокус возвращается на кнопку, из которой диалог открыли", async ({ page }) => {
+    const trigger = page.getByRole("button", { name: /Действия с проектом/ }).first();
+    await trigger.click();
+    await page.getByRole("menuitem", { name: "Удалить" }).click();
+    await expect(page.locator(".dialog-panel")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".dialog-panel")).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  });
+
+  test("подтверждение действительно удаляет и переживает перезагрузку", async ({ page }) => {
+    await openDeleteDialog(page);
+    await page.getByRole("button", { name: "Удалить проект" }).click();
+    await expect(page.getByText("Проект под удаление")).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByText("Проект под удаление")).toHaveCount(0);
+  });
+});
+
+test.describe("несуществующий проект · оболочки вокруг пустоты быть не должно", () => {
+  const MISSING = "/app/projects/такого-точно-нет";
+
+  test("показывает «Проект не найден» и путь к списку, без рабочих вкладок", async ({ page }) => {
+    await seedStorage(page, [seededProject({ id: "real-one", name: "Настоящий" })]);
+    await page.goto(MISSING);
+
+    await expect(page.getByText("Проект не найден")).toBeVisible();
+    await expect(page.getByRole("link", { name: /К списку проектов/ })).toBeVisible();
+    // Панель предлагала пять рабочих вкладок для проекта, которого нет.
+    await openNav(page);
+    await expect(page.locator(".shell-sidebar nav[aria-label='Разделы проекта']")).toHaveCount(0);
+    // Но выход к списку из панели остаётся — тупика быть не должно.
+    await expect(page.locator(".shell-sidebar .shell-back")).toBeVisible();
+  });
+
+  test("то же самое после перезагрузки и по прямой ссылке на раздел", async ({ page }) => {
+    await seedStorage(page, [seededProject({ id: "real-one", name: "Настоящий" })]);
+    await page.goto(`${MISSING}/design`);
+    await expect(page.getByText("Проект не найден")).toBeVisible();
+    await expect(page.locator(".shell-sidebar nav[aria-label='Разделы проекта']")).toHaveCount(0);
+
+    await page.reload();
+    await expect(page.getByText("Проект не найден")).toBeVisible();
+    await expect(page.locator(".shell-sidebar nav[aria-label='Разделы проекта']")).toHaveCount(0);
+  });
+
+  test("настоящий проект вкладки показывает — проверка отличает пустоту от поломки", async ({ page }) => {
+    await seedStorage(page, [seededProject({ id: "real-one", name: "Настоящий" })]);
+    await page.goto("/app/projects/real-one");
+    await openNav(page);
+    await expect(page.locator(".shell-sidebar nav[aria-label='Разделы проекта']")).toBeVisible();
+    await expect(page.getByText("Проект не найден")).toHaveCount(0);
+  });
+});
+
+test.describe("мастер · структуру нельзя увести ниже того, что примет сервер", () => {
+  /**
+   * Дефект живого обхода: мастер отпускал бриф с одним-двумя разделами, а маршрут генерации
+   * требовал `MIN_CONCEPT_SECTIONS`. Кнопка была активной, запрос получал 400, и вместо
+   * AI-концепта молча приходил локальный — без отказа и без объяснения.
+   *
+   * Здесь проверяется сам интерфейс: до предела удалять можно, ниже — нет, и на пределе
+   * дальнейший путь открыт. Число берётся из контракта, а не переписывается сюда.
+   */
+  async function openStructureStep(page: Page) {
+    await page.goto("/app/new");
+    const field = page.getByPlaceholder("Например: Барбершоп FORMA");
+    const next = page.getByRole("button", { name: /Дальше/ });
+    await expect(async () => {
+      await field.fill("Структура Тест");
+      await expect(next).toBeEnabled({ timeout: 500 });
+    }).toPass({ timeout: 15_000 });
+    await next.click();
+    await page.getByRole("button", { name: "Получать заявки", exact: true }).click();
+    await page.getByRole("button", { name: /Показать структуру/ }).click();
+    await expect(page.locator(".brief-structure-row").first()).toBeVisible();
+  }
+
+  test("предложение мастера с самого начала не ниже минимума", async ({ page }) => {
+    await openStructureStep(page);
+    const rows = await page.locator(".brief-structure-row").count();
+    expect(rows, `предложено ${rows} разделов`).toBeGreaterThanOrEqual(MIN_CONCEPT_SECTIONS);
+  });
+
+  test("удаление останавливается ровно на минимуме, и путь дальше остаётся открыт", async ({ page }) => {
+    await openStructureStep(page);
+    const rows = page.locator(".brief-structure-row");
+    const remove = page.locator(".brief-structure-remove");
+
+    // Удаляем, пока кнопки живы. Пределом должен стать контракт, а не конец списка.
+    for (let guard = 0; guard < 12; guard++) {
+      if (await remove.first().isDisabled()) break;
+      await remove.first().click();
+      await page.waitForTimeout(120);
+    }
+
+    await expect(rows).toHaveCount(MIN_CONCEPT_SECTIONS);
+    // Ниже — нельзя, и каждая кнопка удаления об этом говорит.
+    const count = await remove.count();
+    for (let i = 0; i < count; i++) await expect(remove.nth(i)).toBeDisabled();
+    // При этом состояние валидное: мастер не запирает человека на шаге.
+    await expect(page.getByRole("button", { name: /Дальше/ })).toBeEnabled();
+  });
+
+  test("на минимуме проект создаётся до конца — сервер такую структуру принимает", async ({ page }) => {
+    await openStructureStep(page);
+    const remove = page.locator(".brief-structure-remove");
+    for (let guard = 0; guard < 12; guard++) {
+      if (await remove.first().isDisabled()) break;
+      await remove.first().click();
+      await page.waitForTimeout(120);
+    }
+    await expect(page.locator(".brief-structure-row")).toHaveCount(MIN_CONCEPT_SECTIONS);
+
+    await page.getByRole("button", { name: /Дальше/ }).click();
+    await page.getByRole("button", { name: /Дальше/ }).click();
+    await page.getByRole("button", { name: /Создать проект/ }).click();
+    await page.waitForURL(/\/app\/projects\/[^/]+$/);
+    // Проект дошёл до рабочего состояния: минимальная структура не тупик.
+    await expect(page.locator(".overview-card-grid")).toBeVisible({ timeout: 30_000 });
   });
 });

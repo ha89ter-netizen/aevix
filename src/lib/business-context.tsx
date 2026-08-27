@@ -20,16 +20,30 @@ import { useAuth } from "@/lib/auth-context";
 
 export type BusinessStatus = "idle" | "analyzing" | "ready";
 
-/** The narrative shown while analysing; the last beat is the interface rebuild itself. */
+/**
+ * Три такта локальной фазы. Каждый назван по работе, которая ДЕЙСТВИТЕЛЬНО происходит на
+ * устройстве: принять текст, определить нишу каноническим резолвером, перестроить страницу под
+ * неё. Ни один такт не описывает работу, которой нет, — «изучаем рынок» и «анализируем
+ * конкурентов» здесь появиться не может, потому что таких шагов в системе не существует.
+ *
+ * Раньше тактов было четыре и они шли по таймеру до самого сетевого ответа. На замере это давало
+ * от 5,8 до 10,7 секунды неподвижной надписи «Перестраиваем интерфейс»: повествование
+ * заканчивалось на 1,56с, а ответ приходил на 7,35с. Локальный резолвер при этом знал нишу с
+ * первого кадра и молчал. Теперь локальная фаза заканчивается собой, а не ожиданием сети.
+ */
 export const ANALYSIS_SEQUENCE = [
-  "Анализируем бизнес",
-  "Понимаем процессы",
-  "Проектируем автоматизацию",
+  "Читаем описание",
+  "Определяем сферу",
   "Перестраиваем интерфейс",
 ] as const;
 
-/** Minimum time the analysing sequence stays on screen, so the narrative reads deliberately. */
-const MIN_SEQUENCE_MS = 2100;
+/**
+ * Пол локальной фазы. Не имитация работы: сам разбор занимает единицы миллисекунд, и без пола
+ * три такта мелькнули бы одним кадром. Это порог читаемости, и он намеренно короткий — экран
+ * ждёт человека, а не сеть.
+ */
+const LOCAL_PHASE_MS = 900;
+const LOCAL_BEAT_MS = 300;
 
 /**
  * Сохранённый business context (Pricing pass). Храним ТОЛЬКО исходный текст пользователя и id
@@ -91,6 +105,13 @@ type BusinessContextValue = {
   content: BusinessContent | null;
   summary: string | null;
   degraded: boolean;
+  /**
+   * Подробный разбор ещё едет с сервера, а всё локально известное уже на экране (Journey pass).
+   * Отдельный флаг, а не третий статус: страница персонализируется по `profile`, и растягивать
+   * ради ожидания сети общий `status` значило бы задержать её ровно на то время, которое мы и
+   * убираем. Разделение честное: KNOWN LOCALLY уже показано, REMOTE помечено ожидающим.
+   */
+  summaryPending: boolean;
   /** The description the visitor submitted. */
   input: string;
   analyze: (message: string) => Promise<void>;
@@ -112,7 +133,13 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
   const [degraded, setDegraded] = useState(false);
   const [input, setInput] = useState("");
   const [consultationOpen, setConsultationOpen] = useState(false);
-  const runningRef = useRef(false);
+  const [summaryPending, setSummaryPending] = useState(false);
+  /**
+   * Номер запуска разбора. Пришедший ответ применяется, ТОЛЬКО если его запуск всё ещё
+   * последний, — иначе «Изменить» или повторный ввод во время ожидания сети получили бы поверх
+   * себя устаревший разбор. Тот же приём, что защищает порядок сохранений (этап 7, Wave 2).
+   */
+  const runIdRef = useRef(0);
 
   const { user, isLoaded: authLoaded } = useAuth();
   const accountId = user?.id ?? null;
@@ -161,6 +188,8 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
 
     // Настоящая смена identity (выход или вход другим) — transient-контекст не переходит дальше.
     clearStoredContext();
+    runIdRef.current += 1;
+    setSummaryPending(false);
     setStatus("idle");
     setStage(0);
     setProfile(null);
@@ -171,9 +200,11 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
 
   const analyze = useCallback(async (message: string) => {
     const text = message.trim();
-    if (!text || runningRef.current) return;
-    runningRef.current = true;
+    if (!text) return;
+    const runId = ++runIdRef.current;
 
+    // Локальный резолвер. Сети здесь нет вовсе — ниша известна с первого кадра, и именно это
+    // знание раньше лежало неиспользованным всё время сетевого ожидания.
     const detected = detectBusiness(text);
     setInput(text);
     try {
@@ -187,46 +218,49 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
     setDegraded(false);
     setStage(0);
     setStatus("analyzing");
+    setSummaryPending(true);
 
-    // Advance the narrative beats while the request is in flight.
     const stageTimers = [
-      window.setTimeout(() => setStage(1), 500),
-      window.setTimeout(() => setStage(2), 1000),
-      window.setTimeout(() => setStage(3), 1500),
+      window.setTimeout(() => setStage(1), LOCAL_BEAT_MS),
+      window.setTimeout(() => setStage(2), LOCAL_BEAT_MS * 2),
     ];
 
-    const startedAt = performance.now();
-    let nextSummary: string | null = null;
-    let failed = false;
+    // Сеть уходит ПАРАЛЛЕЛЬНО локальной фазе и больше её не держит. Раньше показ распознанного
+    // ждал этот ответ, и всё ожидание уходило в неподвижный последний такт.
+    const remote = (async (): Promise<{ summary: string | null; failed: boolean }> => {
+      try {
+        const response = await fetch("/api/business-analysis", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text }),
+        });
+        const data = (await response.json()) as {
+          analysis?: string;
+          result?: { summary?: string };
+          error?: string;
+        };
+        if (!response.ok) throw new Error(data.error || "analysis failed");
+        return { summary: data.result?.summary ?? data.analysis ?? null, failed: false };
+      } catch {
+        // graceful fallback: local recognition still drives the site
+        return { summary: null, failed: true };
+      }
+    })();
 
-    try {
-      const response = await fetch("/api/business-analysis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
-      });
-      const data = (await response.json()) as {
-        analysis?: string;
-        result?: { summary?: string };
-        error?: string;
-      };
-      if (!response.ok) throw new Error(data.error || "analysis failed");
-      nextSummary = data.result?.summary ?? data.analysis ?? null;
-    } catch {
-      failed = true; // graceful fallback: local recognition still drives the site
-    }
-
-    const elapsed = performance.now() - startedAt;
-    if (elapsed < MIN_SEQUENCE_MS) {
-      await new Promise((resolve) => window.setTimeout(resolve, MIN_SEQUENCE_MS - elapsed));
-    }
+    await new Promise((resolve) => window.setTimeout(resolve, LOCAL_PHASE_MS));
+    if (runIdRef.current !== runId) return;
 
     stageTimers.forEach((timer) => window.clearTimeout(timer));
     setStage(ANALYSIS_SEQUENCE.length - 1);
+    // Локально известное — на экран. Подробный разбор помечен ожидающим, а не выдуман.
+    setStatus("ready");
+
+    const { summary: nextSummary, failed } = await remote;
+    // Разбор мог устареть, пока шёл: человек нажал «Изменить» или описал бизнес заново.
+    if (runIdRef.current !== runId) return;
     setSummary(nextSummary);
     setDegraded(failed);
-    setStatus("ready");
-    runningRef.current = false;
+    setSummaryPending(false);
   }, []);
 
   const retry = useCallback(async () => {
@@ -235,7 +269,10 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
   }, [analyze, input]);
 
   const reset = useCallback(() => {
-    if (runningRef.current) return;
+    // Сброс доступен и во время ожидания сети: карточка с кнопкой «Изменить» теперь видна уже
+    // тогда, а неработающая кнопка хуже отсутствующей. Устаревший ответ отсекается по runId.
+    runIdRef.current += 1;
+    setSummaryPending(false);
     setStatus("idle");
     setStage(0);
     setProfile(null);
@@ -253,6 +290,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       content: profile ? getBusinessContent(profile.category) : null,
       summary,
       degraded,
+      summaryPending,
       input,
       analyze,
       retry,
@@ -261,7 +299,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       openConsultation,
       closeConsultation,
     }),
-    [status, stage, profile, summary, degraded, input, analyze, retry, reset, consultationOpen, openConsultation, closeConsultation],
+    [status, stage, profile, summary, degraded, summaryPending, input, analyze, retry, reset, consultationOpen, openConsultation, closeConsultation],
   );
 
   return <BusinessContext.Provider value={value}>{children}</BusinessContext.Provider>;

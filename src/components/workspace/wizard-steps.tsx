@@ -11,6 +11,7 @@ import {
   conceptGoals,
   conceptStyles,
   MAX_CONCEPT_COLORS,
+  MIN_CONCEPT_SECTIONS,
   type ConceptColorId,
   type ConceptGoal,
   type ConceptSectionType,
@@ -163,6 +164,9 @@ export function StructureStep({
   onAdd: (type: ConceptSectionType, title: string) => void;
 }) {
   const extras = availableSections(structure);
+  // Ниже минимума удалять нечего: такую структуру сервер не примет, и кнопка, которая молча
+  // ведёт в отказ, хуже отсутствующей.
+  const atMinimum = structure.length <= MIN_CONCEPT_SECTIONS;
   return (
     <div className="workspace-field">
       {/* Блок понимания: что AEVIX принял во внимание, прежде чем предлагать структуру.
@@ -194,8 +198,13 @@ export function StructureStep({
       </div>
 
       <span className="workspace-field-label">Рекомендуемая структура</span>
+      {/* Обещание должно совпадать с тем, что разрешено на самом деле. Раньше здесь стояло просто
+          «удалить … раздел», а маршрут генерации отвергал структуру меньше `MIN_CONCEPT_SECTIONS`
+          — человек вычищал разделы, кнопка оставалась активной, и вместо AI-концепта молча
+          приходил локальный. Предел назван прямо и тем же числом, что проверяет сервер. */}
       <span className="workspace-field-hint">
-        Вы можете изменить её перед генерацией — удалить, переименовать, переставить или добавить раздел.
+        Вы можете изменить её перед генерацией — удалить, переименовать, переставить или добавить
+        раздел. Минимум для сайта — {MIN_CONCEPT_SECTIONS} раздела: что предлагаете, кто вы и как связаться.
       </span>
 
       <ol className="brief-structure">
@@ -230,6 +239,8 @@ export function StructureStep({
               type="button"
               className="brief-structure-remove"
               aria-label={`Удалить раздел «${section.title}»`}
+              disabled={atMinimum}
+              title={atMinimum ? `Минимум ${MIN_CONCEPT_SECTIONS} раздела — меньше сайт не соберётся` : undefined}
               onClick={() => onRemove(index)}
             >
               <X className="h-3.5 w-3.5" />

@@ -20,6 +20,7 @@ import {
   CreditCard,
   Globe2,
   LayoutDashboard,
+  Loader2,
   Scissors,
   ShoppingBag,
   Sparkle,
@@ -941,6 +942,7 @@ function HeroAnalysisResult({
   profile,
   content,
   summary,
+  summaryPending,
   degraded,
   onRetry,
   onReset,
@@ -949,6 +951,8 @@ function HeroAnalysisResult({
   profile: HeroBusinessProfile;
   content: BusinessContent;
   summary: string | null;
+  /** Подробный разбор ещё едет с сервера; всё остальное на карточке — уже известное локально. */
+  summaryPending: boolean;
   degraded: boolean;
   onRetry: () => void;
   onReset: () => void;
@@ -994,6 +998,16 @@ function HeroAnalysisResult({
           ? "Не удалось уверенно определить тип бизнеса. Уточните нишу или задачу — и разбор станет конкретнее. Пока показываем нейтральный сценарий."
           : (summary ?? `${profile.descriptor}.`)}
       </p>
+
+      {/* Единственное, чего мы ещё не знаем, — и об этом сказано прямо. Всё, что выше и ниже,
+          получено локальным резолвером и базой знаний ниши, поэтому ждать ради него нечего.
+          Строка исчезает сама, когда ответ приходит или когда честно не приходит (degraded). */}
+      {summaryPending ? (
+        <p className="hero-enriching" role="status" aria-live="polite">
+          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden="true" />
+          Готовим подробный разбор — он дополнит эту карточку
+        </p>
+      ) : null}
 
       {/* Known / Inferred / Proposed — три РАЗНЫЕ категории уверенности, смешивать нельзя (Wave 4).
           Никаких процентов автоматизации, часов и «выручки +N%»: это были выдуманные числа без
@@ -1092,7 +1106,7 @@ function HeroAnalysisSequence({ stage }: { stage: number }) {
 }
 
 export function HeroAnalyzer() {
-  const { status, stage, profile, content, summary, degraded, analyze, retry, reset } = useBusiness();
+  const { status, stage, profile, content, summary, summaryPending, degraded, analyze, retry, reset } = useBusiness();
   const [input, setInput] = useState("");
   const [focused, setFocused] = useState(false);
   const [emptyHint, setEmptyHint] = useState(false);
@@ -1269,6 +1283,7 @@ export function HeroAnalyzer() {
             profile={profile}
             content={content}
             summary={summary}
+            summaryPending={summaryPending}
             degraded={degraded}
             onRetry={() => void retry()}
             onReset={handleReset}
