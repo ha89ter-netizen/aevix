@@ -150,8 +150,8 @@ export const contacts = {
   },
   email: {
     label: "Email",
-    value: "ha89ter@gmail.com",
-    href: "mailto:ha89ter@gmail.com",
+    value: "hello@aevix.org",
+    href: "mailto:hello@aevix.org",
   },
 };
 
