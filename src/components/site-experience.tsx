@@ -16,11 +16,11 @@ import {
   ChevronDown,
   Clock3,
   Coffee,
-  Command,
   CreditCard,
   Globe2,
   LayoutDashboard,
   Loader2,
+  PencilLine,
   Scissors,
   ShoppingBag,
   Sparkle,
@@ -828,45 +828,6 @@ function scrollToSection(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function MagneticShell({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  const onMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    if (window.matchMedia("(max-width: 767px)").matches) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    const rx = ((y / rect.height) - 0.5) * -4;
-    const ry = ((x / rect.width) - 0.5) * 5;
-    event.currentTarget.style.setProperty("--rx", `${rx}deg`);
-    event.currentTarget.style.setProperty("--ry", `${ry}deg`);
-  };
-
-  const onLeave = () => {
-    if (!ref.current) return;
-    ref.current.style.setProperty("--rx", "0deg");
-    ref.current.style.setProperty("--ry", "0deg");
-  };
-
-  return (
-    <div
-      ref={ref}
-      onPointerMove={onMove}
-      onPointerLeave={onLeave}
-      className={cn("perspective-card transition-transform duration-300", className)}
-    >
-      {children}
-    </div>
-  );
-}
-
 function LoadingDots({ className }: { className?: string }) {
   return (
     <span className={cn("aevix-loading-dots", className)} aria-hidden="true">
@@ -938,6 +899,23 @@ const categoryIcons: Record<HeroBusinessCategory, IconComponent> = {
   generic: Store,
 };
 
+/**
+ * Быстрые примеры ниш под полем ввода.
+ *
+ * Чип НЕ задаёт нишу напрямую: он подставляет описание в поле и запускает обычный разбор, а
+ * личность бизнеса по-прежнему определяет единственный резолвер. Иначе у продукта появился бы
+ * второй источник niche identity — ровно то, что однажды развело анализ и концепт (QA-2).
+ * Здесь лежит только затравочный текст, а не знание о нише.
+ */
+const HERO_NICHE_CHIPS: Array<{ label: string; example: string }> = [
+  { label: "Барбершоп", example: "У меня барбершоп на 3 мастера, запись веду вручную" },
+  { label: "Салон красоты", example: "Салон красоты на 4 мастера и одного администратора" },
+  { label: "Кофейня", example: "Кофейня, гости пишут в Instagram и Telegram" },
+  { label: "Стоматология", example: "Стоматология, пациенты записываются по телефону" },
+  { label: "Автосервис", example: "Автосервис, заявки на ремонт приходят в разные чаты" },
+  { label: "Магазин", example: "Интернет-магазин, заявки теряются в переписке" },
+];
+
 function HeroAnalysisResult({
   profile,
   content,
@@ -964,36 +942,34 @@ function HeroAnalysisResult({
   const isGeneric = !profile.recognized;
 
   return (
-    <motion.div
+    <motion.article
       initial={{ opacity: 0, y: 18, filter: "blur(6px)" }}
       animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
       transition={motionTransition.slower}
-      className="hero-result glass-panel relative mx-auto w-full max-w-xl overflow-hidden p-5 md:p-6"
+      className="hero-result hero-card"
       role="status"
       aria-live="polite"
     >
-      <div className="flex items-center justify-between gap-3 border-b border-ink/8 pb-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet/12 text-violet">
-            <CategoryIcon className="h-5 w-5" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-violet">
-              {isGeneric ? "Тип бизнеса не распознан" : "AEVIX понял"}
-            </p>
-            <p className="truncate text-lg font-semibold leading-tight text-ink">{profile.label}</p>
-          </div>
+      <header className="hero-card-head">
+        <span className="hero-card-mark">
+          <CategoryIcon className="h-5 w-5" />
+        </span>
+        <div className="min-w-0">
+          <p className="hero-card-eyebrow">{isGeneric ? "Тип бизнеса не распознан" : "AEVIX понял"}</p>
+          <h2 className="hero-card-title">{profile.label}</h2>
+          <p className="hero-card-sub">
+            {profile.descriptor}
+            {" · "}
+            {isGeneric ? "Добавьте деталей — разбор станет точнее" : "Разбор собран под эту нишу"}
+          </p>
         </div>
-        <button
-          type="button"
-          onClick={onReset}
-          className="shrink-0 rounded-full border border-ink/10 bg-white/70 px-3 py-1.5 text-xs font-medium text-ink/60 transition hover:border-violet/24 hover:text-ink"
-        >
+        <button type="button" onClick={onReset} className="hero-card-reset">
+          <RotateCcw className="h-3.5 w-3.5" />
           Изменить
         </button>
-      </div>
+      </header>
 
-      <p className="mt-4 text-sm leading-6 text-ink/68">
+      <p className="hero-card-summary">
         {isGeneric
           ? "Не удалось уверенно определить тип бизнеса. Уточните нишу или задачу — и разбор станет конкретнее. Пока показываем нейтральный сценарий."
           : (summary ?? `${profile.descriptor}.`)}
@@ -1009,91 +985,102 @@ function HeroAnalysisResult({
         </p>
       ) : null}
 
-      {/* Known / Inferred / Proposed — три РАЗНЫЕ категории уверенности, смешивать нельзя (Wave 4).
-          Никаких процентов автоматизации, часов и «выручки +N%»: это были выдуманные числа без
-          источника — убраны. Здесь только то, что понято, что ОБЫЧНО полезно (inference из ниши,
-          с явной оговоркой), и что AEVIX предлагает построить. */}
-      <div className="hero-understanding mt-4 space-y-3">
-        {!isGeneric ? (
-          <div className="hero-understanding-row">
-            <p className="hero-understanding-label">Что поняли</p>
-            <p className="hero-understanding-text">{profile.descriptor}</p>
-          </div>
-        ) : null}
+      {/* Три РАЗЛИЧИМЫЕ категории уверенности, смешивать их нельзя (Wave 4). Первая колонка
+          названа «Обычно сейчас», а не «Сейчас»: это вывод из ниши, а не факт об этом бизнесе,
+          и снимать оговорку значит выдавать догадку за знание. Никаких процентов и часов —
+          выдуманные числа отсюда убраны и не возвращаются. */}
+      <div className="hero-understanding hero-card-grid">
         <div className="hero-understanding-row">
-          <p className="hero-understanding-label">Обычно вручную</p>
+          <p className="hero-understanding-label">Обычно сейчас</p>
           <p className="hero-understanding-text">{content.caseBefore}</p>
         </div>
-        <div className="hero-understanding-row">
-          <p className="hero-understanding-label">AEVIX предлагает</p>
+        <div className="hero-understanding-row is-accent">
+          <p className="hero-understanding-label">Станет</p>
           <p className="hero-understanding-text">{content.caseAutomated}</p>
+        </div>
+        <div className="hero-understanding-row">
+          <p className="hero-understanding-label">Результат</p>
+          <p className="hero-understanding-text">{content.caseResult}</p>
         </div>
       </div>
 
-      <p className="mt-4 text-xs font-medium uppercase tracking-[0.2em] text-ink/40">
-        Что предлагаем построить
-      </p>
-      <ol className="hero-roadmap mt-3">
-        {content.roadmap.map((phase, index) => (
-          <motion.li
-            key={phase}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...motionTransition.slow, delay: 0.16 + index * 0.06 }}
-            className="hero-roadmap-step"
-          >
-            <span className="hero-roadmap-dot">{index + 1}</span>
-            {phase}
-          </motion.li>
-        ))}
-      </ol>
+      <div className="hero-card-split">
+        <div className="hero-card-pane">
+          <p className="hero-card-label">Что берёт на себя система</p>
+          <ul className="hero-automations">
+            {profile.automations.map((item) => (
+              <li key={item}>
+                <span className="hero-automations-dot" aria-hidden="true" />
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="hero-card-pane">
+          <p className="hero-card-label">Порядок сборки</p>
+          <ol className="hero-roadmap">
+            {content.roadmap.map((phase, index) => (
+              <motion.li
+                key={phase}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ ...motionTransition.slow, delay: 0.16 + index * 0.06 }}
+                className="hero-roadmap-step"
+              >
+                <span className="hero-roadmap-dot">{String(index + 1).padStart(2, "0")}</span>
+                {phase}
+              </motion.li>
+            ))}
+          </ol>
+        </div>
+      </div>
 
       {degraded ? (
-        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-2xl border border-amber-300/40 bg-amber-50/70 px-3 py-2.5 text-xs text-amber-700">
-          <span className="flex-1 min-w-[12rem]">AI-сервис временно недоступен — показан базовый разбор AEVIX.</span>
-          <button
-            type="button"
-            onClick={onRetry}
-            className="inline-flex items-center gap-1.5 font-semibold text-amber-800 underline-offset-2 hover:underline"
-          >
+        <div className="hero-card-degraded">
+          <span>AI-сервис временно недоступен — показан базовый разбор AEVIX.</span>
+          <button type="button" onClick={onRetry}>
             <RotateCcw className="h-3.5 w-3.5" /> Повторить с AI
           </button>
         </div>
       ) : null}
 
-      <div className="mt-5 flex flex-col gap-2.5 sm:flex-row">
-        <Button type="button" onClick={onContinue} className="w-full sm:w-auto">
-          Продолжить полный разбор
-          <ArrowRight className="ml-2 h-4 w-4 transition group-hover:translate-x-1" />
-        </Button>
-      </div>
-    </motion.div>
+      <footer className="hero-card-foot">
+        <p>
+          Разбор — сценарий под нишу, не обещание результата. Точные сроки и стоимость после
+          разговора.
+        </p>
+        <div className="hero-card-actions">
+          <a href="#стоимость" className="hero-card-secondary">
+            Показать стоимость
+          </a>
+          <Button type="button" onClick={onContinue}>
+            Продолжить полный разбор
+            <ArrowRight className="ml-2 h-4 w-4 transition group-hover:translate-x-1" />
+          </Button>
+        </div>
+      </footer>
+    </motion.article>
   );
 }
 
+/**
+ * Локальная фаза разбора — компактной строкой под полем, а не отдельной колонкой: макет героя
+ * одноколоночный. Такты те же и в том же количестве (`ANALYSIS_SEQUENCE`), поэтому они
+ * по-прежнему называют работу, которая действительно происходит на устройстве.
+ */
 function HeroAnalysisSequence({ stage }: { stage: number }) {
   return (
-    <div
-      className="hero-result glass-panel relative mx-auto flex w-full max-w-xl flex-col justify-center gap-5 p-7 md:p-8"
-      role="status"
-      aria-live="polite"
-    >
-      <div className="flex items-center gap-3">
-        <span className="hero-loading-mark flex h-12 w-12 items-center justify-center rounded-2xl bg-violet/12 text-violet">
-          <BrainCircuit className="h-6 w-6" />
-        </span>
-        <div>
-          <p className="text-xs font-medium uppercase tracking-[0.2em] text-violet">AEVIX анализ</p>
-          <p className="text-base font-semibold text-ink">{ANALYSIS_SEQUENCE[stage]}…</p>
-        </div>
-      </div>
-      <ol className="grid gap-2.5">
+    <div className="hero-sequence" role="status" aria-live="polite">
+      <span className="hero-loading-mark" aria-hidden="true">
+        <BrainCircuit className="h-4 w-4" />
+      </span>
+      <ol className="hero-sequence-list">
         {ANALYSIS_SEQUENCE.map((label, index) => {
           const state = index < stage ? "done" : index === stage ? "active" : "todo";
           return (
             <li key={label} className={cn("hero-sequence-step", `is-${state}`)}>
               <span className="hero-sequence-dot">
-                {state === "done" ? <Check className="h-3.5 w-3.5" /> : index + 1}
+                {state === "done" ? <Check className="h-3 w-3" /> : index + 1}
               </span>
               {label}
             </li>
@@ -1150,7 +1137,16 @@ export function HeroAnalyzer() {
 
   const handleReset = () => {
     reset();
+    setInput("");
     requestAnimationFrame(() => textareaRef.current?.focus());
+  };
+
+  /** Чип подставляет описание и запускает ОБЫЧНЫЙ разбор — нишу по-прежнему решает резолвер. */
+  const pickExample = (example: string) => {
+    if (isAnalyzing) return;
+    setInput(example);
+    setEmptyHint(false);
+    void analyze(example);
   };
 
   const continueToFullAnalysis = () => {
@@ -1166,19 +1162,19 @@ export function HeroAnalyzer() {
   const BadgeIcon = personalized ? categoryIcons[profile.category] : BrainCircuit;
 
   return (
-    <div className="grid w-full items-center gap-8 lg:grid-cols-[1.02fr_0.98fr]">
-      <div data-reveal className="relative z-10">
-        <div className="hero-badge mb-7 inline-flex items-center gap-2 rounded-full border border-ink/10 bg-white/46 px-3 py-2 text-sm text-ink/62 backdrop-blur-xl">
+    <div className="hero-stage">
+      <div data-reveal className="hero-lede">
+        <div className="hero-badge inline-flex items-center gap-2 rounded-full border border-ink/10 bg-white/46 px-3 py-2 text-sm text-ink/62 backdrop-blur-xl">
           <BadgeIcon className="h-4 w-4 text-violet" />
-          {personalized ? content.persona : "AEVIX · AI-платформа для малого бизнеса"}
+          {personalized ? content.persona : "Операционная система для бизнеса"}
         </div>
-        <h1 className="hero-title text-balance font-semibold text-ink">
-          <span data-heading-line className="heading-line">Опишите бизнес —</span>{" "}
-          <span data-heading-line className="heading-line">AEVIX подберёт</span>{" "}
-          <span data-heading-line className="heading-line">автоматизацию.</span>
+        <h1 className="hero-title mt-7 text-balance font-semibold text-ink">
+          <span data-heading-line className="heading-line">Расскажите,</span>{" "}
+          <span data-heading-line className="heading-line">как работает</span>{" "}
+          <span data-heading-line className="heading-line">ваш бизнес</span>
         </h1>
-        <p className="mt-5 max-w-xl text-balance text-lg leading-8 text-ink/64 md:text-xl md:leading-9">
-          Не вы изучаете сайт — сайт изучает ваш бизнес и предлагает решения под него.
+        <p className="hero-lead mt-5 text-balance text-lg leading-8 text-ink/64 md:text-xl md:leading-9">
+          Пара предложений. Дальше система разберёт процессы и покажет, что можно снять с людей.
         </p>
 
         <form
@@ -1235,11 +1231,11 @@ export function HeroAnalyzer() {
               {isAnalyzing ? (
                 <>
                   <LoadingDots className="mr-2" />
-                  Анализ
+                  Разбираю
                 </>
               ) : (
                 <>
-                  Анализировать
+                  Разобрать
                   <ArrowRight className="ml-2 h-4 w-4 transition group-hover:translate-x-1" />
                 </>
               )}
@@ -1256,6 +1252,25 @@ export function HeroAnalyzer() {
           </p>
         </form>
 
+        {/* Быстрые примеры и возврат к своему описанию. Оба пути ведут через один резолвер. */}
+        <div className="hero-chips" role="group" aria-label="Примеры описаний">
+          {HERO_NICHE_CHIPS.map((chip) => (
+            <button
+              key={chip.label}
+              type="button"
+              className="hero-chip"
+              disabled={isAnalyzing}
+              onClick={() => pickExample(chip.example)}
+            >
+              {chip.label}
+            </button>
+          ))}
+          <button type="button" className="hero-chip is-own" onClick={handleReset}>
+            <PencilLine className="h-3.5 w-3.5" />
+            Ввести свою нишу
+          </button>
+        </div>
+
         <ul className="hero-trust mt-6">
           {[
             [ShieldCheck, "Без обязательств"],
@@ -1270,15 +1285,12 @@ export function HeroAnalyzer() {
         </ul>
       </div>
 
-      {/* Not a [data-reveal] target: this column swaps content (dashboard → sequence →
-          result), and a scroll-reveal's ResizeObserver refresh would reset it to hidden on
-          each height change. The dashboard and result carry their own entrance animations. */}
-      <div data-parallax="-4" className="relative">
-        {status === "idle" ? (
-          <HeroDashboard />
-        ) : isAnalyzing ? (
+      {/* Не цель [data-reveal]: блок меняет содержимое (этапы → карточка), а обновление
+          ScrollTrigger по изменению высоты сбрасывало бы его в скрытое состояние. */}
+      <div className="hero-outcome">
+        {isAnalyzing ? (
           <HeroAnalysisSequence stage={stage} />
-        ) : profile && content ? (
+        ) : status === "ready" && profile && content ? (
           <HeroAnalysisResult
             profile={profile}
             content={content}
@@ -1292,70 +1304,6 @@ export function HeroAnalyzer() {
         ) : null}
       </div>
     </div>
-  );
-}
-
-function HeroDashboard() {
-  return (
-    <MagneticShell className="relative mx-auto w-full max-w-xl">
-      <div className="dark-glass relative overflow-hidden rounded-[2rem] p-5 text-porcelain">
-        <div className="relative flex items-center justify-between border-b border-white/10 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10">
-              <Command className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-sm font-medium">AEVIX OS</p>
-              <p className="text-xs text-porcelain/48">Демонстрация процесса</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-porcelain/72">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
-            сценарий
-          </div>
-        </div>
-        <div className="relative grid gap-3 py-4 sm:grid-cols-3">
-          {[
-            ["Входящие обращения", "единый поток"],
-            ["Рутинные задачи", "автоматизированы"],
-            ["Контроль процессов", "в одном интерфейсе"],
-          ].map(([title, sub]) => (
-            <div key={title} className="rounded-3xl border border-white/8 bg-white/[0.06] p-4">
-              <p className="text-lg font-semibold leading-tight text-porcelain">{title}</p>
-              <p className="mt-2 text-xs text-porcelain/46">{sub}</p>
-            </div>
-          ))}
-        </div>
-        <div className="relative rounded-[1.5rem] border border-white/8 bg-black/22 p-4">
-          <p className="mb-4 text-xs uppercase tracking-[0.22em] text-porcelain/38">
-            Как работает сценарий
-          </p>
-          <div className="grid gap-3">
-            {[
-              ["Клиент написал", "Хочу записаться на стрижку сегодня"],
-              ["AI понял запрос", "Нужна услуга, время и контакт"],
-              ["Предложил действие", "Уточнить мастера и доступное окно"],
-              ["Передал заявку", "Команда видит статус и контекст"],
-              ["Запустил напоминание", "Клиент получает подтверждение"],
-            ].map(([title, text], index) => (
-              <motion.div
-                key={title}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.08 }}
-                className="flex gap-3 rounded-2xl border border-white/8 bg-white/[0.055] p-3"
-              >
-                <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-violet" />
-                <div>
-                  <p className="text-sm font-medium">{title}</p>
-                  <p className="mt-1 text-sm text-porcelain/48">{text}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </MagneticShell>
   );
 }
 
@@ -2024,7 +1972,7 @@ export function AiConsultantScene({
   );
 }
 
-/** Same fine-pointer/desktop convention used by usePremiumMotion/MagneticShell elsewhere in
+/** Same fine-pointer/desktop convention used by usePremiumMotion elsewhere in
  * this file — the 3D scene renders fewer sphere segments and skips a few expensive layers below
  * this breakpoint rather than running two separate rendering paths. */
 function useEcosystemQuality(): "high" | "low" {

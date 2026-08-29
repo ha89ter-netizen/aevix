@@ -159,10 +159,28 @@ test.describe("site personalisation", () => {
   test("recognised business is stated qualitatively, no numeric confidence", async ({ page }) => {
     await analyzeBarber(page);
     const result = page.locator(RESULT);
-    // Header states understanding qualitatively; no numeric recognition % anywhere on the card.
-    await expect(result.getByText("AEVIX понял")).toBeVisible();
+    // Никаких чисел уверенности — ни в каком виде.
     await expect(result.locator(".hero-confidence")).toHaveCount(0);
-    await expect(result.getByText("Что поняли")).toBeVisible();
+    await expect(result.locator(".hero-metric")).toHaveCount(0);
+
+    /**
+     * Три категории обязаны оставаться РАЗЛИЧИМЫМИ (Wave 4). Проверяется суть, а не подпись:
+     * в новом макете «что поняли» переехало из строки списка в шапку карточки — ярлык «AEVIX
+     * понял» плюс распознанное имя и описание ниши. Проверка на литерал «Что поняли» ловила бы
+     * переезд, а не смешение категорий, ради которого правило и написано.
+     */
+    // KNOWN — что поняли про этот бизнес.
+    await expect(result.getByText("AEVIX понял")).toBeVisible();
+    await expect(result.locator(".hero-card-title")).toHaveText("Барбершоп");
+    await expect(result.locator(".hero-card-sub")).not.toBeEmpty();
+
+    // INFERRED — вывод из ниши, и оговорка при нём обязана сохраниться: без слова «обычно»
+    // догадка читается как факт об этом бизнесе.
+    const inferred = result.locator(".hero-understanding-row").first();
+    await expect(inferred.locator(".hero-understanding-label")).toContainText(/обычно/i);
+
+    // PROPOSED — что предлагаем построить, отдельным блоком.
+    await expect(result.getByText("Что берёт на себя система")).toBeVisible();
   });
 
   test("unrecognised business is honest, not fake niche expertise", async ({ page }) => {

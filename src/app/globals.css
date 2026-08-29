@@ -11006,3 +11006,356 @@ a.shell-account:hover {
   line-height: 1.45;
   font-weight: 450;
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Hero лендинга: одна колонка по центру (новый макет).
+   Прежняя схема была двухколоночной — слева текст, справа переключающаяся
+   панель. Панель-демо ушла вместе с макетом, поэтому текст живёт по центру, а
+   результат разбора разворачивается под ним на всю меру.
+   ────────────────────────────────────────────────────────────────────────── */
+.hero-stage {
+  display: grid;
+  justify-items: center;
+  gap: 2.5rem;
+  width: 100%;
+}
+.hero-lede {
+  display: flex;
+  width: 100%;
+  max-width: 46rem;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+/* Заголовок центрирован и меряется своей колонкой, а не половиной экрана. */
+.hero-lede .hero-title {
+  max-width: min(20ch, 100%);
+}
+.hero-lead {
+  max-width: 46ch;
+}
+.hero-lede .hero-analyzer-form {
+  width: 100%;
+  max-width: 40rem;
+  text-align: left;
+}
+/* `margin: 0` у `.hero-trust` перебивает утилиту `mt-6`, потому что объявлен позже: задаём
+   отступ здесь, иначе строка доверия слипается с чипами в один нечитаемый блок. */
+.hero-lede .hero-trust {
+  justify-content: center;
+  margin-top: 1.75rem;
+}
+.hero-outcome {
+  width: 100%;
+}
+
+/* Быстрые примеры ниш. Чип подставляет описание и запускает обычный разбор —
+   нишу по-прежнему решает единственный резолвер. */
+.hero-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1.4rem;
+}
+.hero-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(9, 8, 7, 0.1);
+  background: rgba(255, 255, 255, 0.62);
+  padding: 0.5rem 0.95rem;
+  color: rgba(9, 8, 7, 0.7);
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: border-color var(--motion-base) var(--ease-premium),
+    color var(--motion-base) var(--ease-premium), background-color var(--motion-base) var(--ease-premium);
+}
+.hero-chip:hover:not(:disabled) {
+  border-color: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.3);
+  color: rgba(9, 8, 7, 0.92);
+}
+.hero-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.hero-chip.is-own {
+  border-style: dashed;
+  border-color: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.32);
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.07);
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+  font-weight: 600;
+}
+.hero-chip.is-own:hover {
+  border-color: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.55);
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.11);
+}
+
+/* Локальная фаза разбора — компактной строкой, а не отдельной колонкой. */
+.hero-sequence {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem 0.9rem;
+  border-radius: var(--radius-2xl);
+  border: 1px solid rgba(9, 8, 7, 0.08);
+  background: rgba(255, 255, 255, 0.66);
+  padding: 1rem 1.25rem;
+  backdrop-filter: blur(14px);
+}
+.hero-sequence-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+/* Карточка разбора. Поверхность своя, а не glass-panel: она теперь на всю меру
+   героя и несёт внутренние разделители. */
+.hero-card {
+  overflow: hidden;
+  border-radius: var(--radius-2xl);
+  border: 1px solid rgba(9, 8, 7, 0.1);
+  background: #fff;
+  box-shadow: 0 26px 70px rgba(9, 8, 7, 0.1);
+}
+.hero-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  border-bottom: 1px solid rgba(9, 8, 7, 0.06);
+  padding: 1.5rem 1.75rem;
+}
+.hero-card-mark {
+  display: inline-flex;
+  height: 2.75rem;
+  width: 2.75rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.12);
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+}
+.hero-card-eyebrow {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+}
+.hero-card-title {
+  margin-top: 0.35rem;
+  font-size: 1.6rem;
+  font-weight: 640;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: var(--ink, #090807);
+}
+.hero-card-sub {
+  margin-top: 0.35rem;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: rgba(9, 8, 7, 0.6);
+}
+.hero-card-reset {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(9, 8, 7, 0.1);
+  background: rgba(255, 255, 255, 0.7);
+  padding: 0.45rem 0.9rem;
+  color: rgba(9, 8, 7, 0.62);
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: border-color var(--motion-base) var(--ease-premium), color var(--motion-base) var(--ease-premium);
+}
+.hero-card-reset:hover {
+  border-color: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.28);
+  color: rgba(9, 8, 7, 0.9);
+}
+.hero-card-summary {
+  padding: 1.25rem 1.75rem 0;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: rgba(9, 8, 7, 0.7);
+}
+.hero-card .hero-enriching {
+  padding: 0 1.75rem;
+  margin-top: 0.6rem;
+}
+
+/* Три категории уверенности — тремя колонками, но с теми же ролями и подписями. */
+.hero-card-grid {
+  display: grid;
+  margin-top: 1.25rem;
+  border-top: 1px solid rgba(9, 8, 7, 0.06);
+  border-bottom: 1px solid rgba(9, 8, 7, 0.06);
+}
+@media (min-width: 40rem) {
+  .hero-card-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.hero-card-grid .hero-understanding-row {
+  display: block;
+  padding: 1.15rem 1.5rem;
+  border-bottom: 1px solid rgba(9, 8, 7, 0.06);
+}
+.hero-card-grid .hero-understanding-row:last-child {
+  border-bottom: none;
+}
+@media (min-width: 40rem) {
+  .hero-card-grid .hero-understanding-row {
+    border-bottom: none;
+    border-right: 1px solid rgba(9, 8, 7, 0.06);
+  }
+  .hero-card-grid .hero-understanding-row:last-child {
+    border-right: none;
+  }
+}
+.hero-card-grid .hero-understanding-row.is-accent {
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.07);
+}
+.hero-card-grid .hero-understanding-row.is-accent .hero-understanding-label {
+  color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+}
+.hero-card-grid .hero-understanding-text {
+  margin-top: 0.5rem;
+}
+
+.hero-card-split {
+  display: grid;
+}
+@media (min-width: 48rem) {
+  .hero-card-split {
+    grid-template-columns: 1.15fr 0.85fr;
+  }
+}
+.hero-card-pane {
+  padding: 1.4rem 1.75rem;
+  border-bottom: 1px solid rgba(9, 8, 7, 0.06);
+}
+.hero-card-pane:last-child {
+  border-bottom: none;
+}
+@media (min-width: 48rem) {
+  .hero-card-pane {
+    border-bottom: none;
+    border-right: 1px solid rgba(9, 8, 7, 0.06);
+  }
+  .hero-card-pane:last-child {
+    border-right: none;
+  }
+}
+.hero-card-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: rgba(9, 8, 7, 0.4);
+}
+.hero-automations {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1rem;
+  padding: 0;
+  list-style: none;
+}
+.hero-automations li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  font-size: 0.86rem;
+  line-height: 1.4;
+  color: rgba(9, 8, 7, 0.85);
+}
+.hero-automations-dot {
+  margin-top: 0.45rem;
+  height: 0.375rem;
+  width: 0.375rem;
+  flex: none;
+  border-radius: 999px;
+  background: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
+}
+/* В карточке порядок сборки читается сверху вниз, а не строкой пилюль. */
+.hero-card-pane .hero-roadmap {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.hero-card-pane .hero-roadmap-step {
+  display: flex;
+  border-radius: var(--radius-md);
+  background: rgba(255, 250, 242, 0.6);
+}
+
+.hero-card-degraded {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  border-top: 1px solid rgba(9, 8, 7, 0.06);
+  background: rgba(254, 243, 199, 0.5);
+  padding: 0.85rem 1.75rem;
+  color: #92400e;
+  font-size: 0.8rem;
+}
+.hero-card-degraded button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+  color: #92400e;
+  text-underline-offset: 2px;
+}
+.hero-card-degraded button:hover {
+  text-decoration: underline;
+}
+
+.hero-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-top: 1px solid rgba(9, 8, 7, 0.06);
+  background: rgba(255, 250, 242, 0.7);
+  padding: 1.15rem 1.75rem;
+}
+.hero-card-foot > p {
+  max-width: 38ch;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: rgba(9, 8, 7, 0.45);
+}
+.hero-card-actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.hero-card-secondary {
+  display: inline-flex;
+  height: 3rem;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(9, 8, 7, 0.1);
+  background: rgba(255, 255, 255, 0.7);
+  padding: 0 1.25rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink, #090807);
+  transition: border-color var(--motion-base) var(--ease-premium);
+}
+.hero-card-secondary:hover {
+  border-color: rgb(var(--accent-r) var(--accent-g) var(--accent-b) / 0.28);
+}
