@@ -25,8 +25,57 @@ export type ProjectStore = {
   /** `signal` отменяет запрос, если сохранение вытеснено более новым состоянием (защита от
    *  устаревшего ответа, который иначе перезаписал бы актуальное состояние). */
   save(projects: Project[], signal?: AbortSignal): Promise<void>;
+  /**
+   * Досохранение при уходе со страницы: правка, которая ещё не доехала до хранилища.
+   *
+   * Отдельный метод, а не `save`, потому что у выгрузки другие правила. Локально запись обязана
+   * лечь СИНХРОННО (иначе «правка → мгновенный reload» теряет последнее), а серверу нельзя
+   * отправить весь набор: `keepalive`-запрос ограничен по размеру, и на большом наборе он не
+   * уходит вовсе. Поэтому обеим реализациям нужен не только `pending`, но и `confirmed` — то,
+   * что хранилище уже подтвердило: разница между ними и есть то немногое, что надо довезти.
+   */
+  flush(pending: Project[], confirmed: Project[]): Promise<void>;
   clear(): Promise<void>;
 };
+
+/** Что именно надо довезти: изменённые проекты и id тех, кого человек удалил. */
+export type ProjectsDelta = { upsert: Project[]; remove: string[] };
+
+/**
+ * Разница между подтверждённым набором и текущим.
+ *
+ * Сравнение по ССЫЛКЕ, а не по содержимому, и это не экономия на спичках: каждая правка создаёт
+ * новый объект проекта (`touch` в projects.tsx), а нетронутые проходят через `map` тем же самым
+ * объектом. Сравнение по JSON пришлось бы делать в момент закрытия вкладки — ровно тогда, когда
+ * времени на работу меньше всего. Ошибка сравнения по ссылке возможна только в безопасную
+ * сторону: незамеченным изменение не останется, максимум уедет лишний проект.
+ */
+export function projectsDelta(confirmed: Project[], pending: Project[]): ProjectsDelta {
+  const before = new Map(confirmed.map((project) => [project.id, project]));
+  const kept = new Set(pending.map((project) => project.id));
+  return {
+    upsert: pending.filter((project) => before.get(project.id) !== project),
+    remove: confirmed.filter((project) => !kept.has(project.id)).map((project) => project.id),
+  };
+}
+
+export function isEmptyDelta(delta: ProjectsDelta): boolean {
+  return delta.upsert.length === 0 && delta.remove.length === 0;
+}
+
+/**
+ * Потолок для `keepalive`-запроса.
+ *
+ * Спецификация fetch даёт браузеру 64КБ на ВСЕ keepalive-запросы страницы разом; превышение
+ * означает не медленную отправку, а отказ. Берём с запасом: на выгрузке рядом может уйти ещё
+ * что-нибудь (например, аналитика), и лучше отправить обычным запросом, чем не отправить никак.
+ */
+const KEEPALIVE_BUDGET_BYTES = 48_000;
+
+function byteLength(body: string): number {
+  return new TextEncoder().encode(body).length;
+}
+
 const STORAGE_KEY = "aevix.projects";
 const STORAGE_VERSION = 1;
 
@@ -88,6 +137,21 @@ export const localProjectStore: ProjectStore = {
       // ignore
     }
   },
+
+  /**
+   * Локально дифф не нужен: `localStorage` синхронен и не ограничен размером запроса, а вот
+   * успеть до закрытия документа обязан. Поэтому здесь именно полная запись, и она происходит
+   * ДО возврата из функции, а не в промисе — обещание отдаётся уже выполненным.
+   */
+  async flush(pending: Project[]): Promise<void> {
+    if (typeof window === "undefined") return;
+    const envelope: StoredEnvelope = { version: STORAGE_VERSION, projects: pending };
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
+    } catch {
+      // Та же политика fail-open, что у save().
+    }
+  },
 };
 
 /**
@@ -119,6 +183,34 @@ export const serverProjectStore: ProjectStore = {
   async clear(): Promise<void> {
     const response = await fetch("/api/projects", { method: "DELETE" });
     if (!response.ok) throw new Error("Не удалось очистить проекты");
+  },
+
+  /**
+   * Выгрузка отправляет ТОЛЬКО разницу, и отправляет её `PATCH`'ем.
+   *
+   * Полный набор здесь не проходит по двум причинам сразу. Во-первых, `keepalive` — единственный
+   * способ пережить закрытие документа — ограничен по размеру, и набор проектов с концептами
+   * упирается в этот потолок молча: запрос не уходит, а человек уверен, что правка сохранена.
+   * Во-вторых, полная замена на выгрузке — это ещё и чужая работа: вторая вкладка того же
+   * человека успела создать проект, о котором эта не знает, и `PUT` стёр бы его. Дифф трогает
+   * ровно то, к чему прикасались здесь.
+   */
+  async flush(pending: Project[], confirmed: Project[]): Promise<void> {
+    const delta = projectsDelta(confirmed, pending);
+    if (isEmptyDelta(delta)) return;
+
+    const body = JSON.stringify(delta);
+    // Если даже дифф не помещается в потолок — отправляем обычным запросом. Шанс невелик
+    // (документ закрывается), но он есть: `pagehide` случается и при переходе в bfcache, откуда
+    // страница возвращается живой. Отправить с заведомо превышенным keepalive — гарантированный
+    // отказ, то есть потеря без единого шанса.
+    const response = await fetch("/api/projects", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body,
+      keepalive: byteLength(body) <= KEEPALIVE_BUDGET_BYTES,
+    });
+    if (!response.ok) throw new Error("Не удалось сохранить проекты");
   },
 };
 

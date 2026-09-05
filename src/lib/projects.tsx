@@ -9,7 +9,6 @@ import {
   readLocalProjectsForMigration,
   serverProjectStore,
   storeFor,
-  localProjectStore,
 } from "./project-repository";
 import {
   generationStages,
@@ -365,6 +364,11 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
         const stored = await storeFor(signedIn).load();
         if (cancelled) return;
 
+        // Подтверждённым считается то, что лежит в хранилище, а не то, что оказалось на экране:
+        // проект, созданный ПОКА шла загрузка, слиянием попадает в состояние, но хранилище о нём
+        // ещё не знает — и он обязан остаться в диффе на выгрузку.
+        confirmedRef.current = stored;
+
         if (!signedIn) {
           applyLoaded(stored);
           setIsLoaded(true);
@@ -387,6 +391,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
           await serverProjectStore.save(merged);
           await clearLocalProjectsAfterMigration();
           if (cancelled) return;
+          confirmedRef.current = merged;
           applyLoaded(merged);
         } catch {
           // Ничего не удалено: локальная копия цела, перенос можно повторить входом заново.
@@ -416,6 +421,14 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
    * задержка перед отправкой создаёт окно, в которое правка живёт только в памяти.
    */
   const pendingRef = useRef<Project[] | null>(null);
+  /**
+   * То, что хранилище уже подтвердило. Нужен досохранению на выгрузке: отправлять туда весь
+   * набор нельзя (`keepalive` ограничен по размеру), а разницу с подтверждённым — можно.
+   *
+   * Обновляется ровно в двух местах: после удачного сохранения и после загрузки. Если сохранение
+   * не удалось, ссылка остаётся прежней — и в дифф попадёт всё, что с тех пор накопилось.
+   */
+  const confirmedRef = useRef<Project[]>([]);
   /** Монотонный счётчик поколений сохранения — для защиты от устаревшего ответа (см. эффект ниже). */
   const saveGenRef = useRef(0);
 
@@ -442,6 +455,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
         .then(() => {
           if (!isCurrent()) return; // вытеснено более новой правкой — не трогаем состояние
           pendingRef.current = null;
+          confirmedRef.current = projects;
           const remaining = Math.max(0, 350 - (Date.now() - started));
           window.setTimeout(() => {
             if (isCurrent()) setSaveState("saved");
@@ -480,22 +494,18 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
       const pending = pendingRef.current;
       if (!pending) return;
       pendingRef.current = null;
-      if (signedIn) {
-        // Серверу — keepalive: свойство именно этого, последнего запроса, чтобы он пережил закрытие
-        // документа. (Ограничение keepalive по размеру payload — известный остаточный край, см. долг.)
-        void fetch("/api/projects", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ projects: pending }),
-          keepalive: true,
-        }).catch(() => {});
-      } else {
-        // Локально запись синхронна и на pagehide успевает лечь В ХРАНИЛИЩЕ. Без этого «правка →
-        // мгновенный reload» теряла последнюю правку: обычная запись отложена на макротаск
-        // (setTimeout 0), а флаша для локального пути раньше не было — ровно это делало
-        // переименование флаки (этап 6). Теперь reload сразу после правки видит актуальное имя.
-        void localProjectStore.save(pending);
-      }
+      // Что именно уходит — решает хранилище: локальному нужна синхронная запись целиком,
+      // серверному — дифф с подтверждённым набором, потому что keepalive-запрос ограничен по
+      // размеру и на большом наборе не уходит вовсе (см. ProjectStore.flush).
+      void storeFor(signedIn)
+        .flush(pending, confirmedRef.current)
+        .catch(() => {
+          // `pagehide` случается и при переходе в bfcache, откуда страница возвращается живой.
+          // Тогда правка обязана снова числиться неотправленной, а человек — увидеть ошибку:
+          // молчаливая потеря здесь неотличима от «сохранено».
+          pendingRef.current = pending;
+          setSaveState("error");
+        });
     };
     window.addEventListener("pagehide", flush);
     return () => window.removeEventListener("pagehide", flush);
