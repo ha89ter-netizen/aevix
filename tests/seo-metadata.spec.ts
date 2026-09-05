@@ -1,3 +1,4 @@
+import { readFileSync, statSync } from "node:fs";
 import { test, expect } from "@playwright/test";
 import { ENTRY, SITE } from "./support/routes";
 import { OG_IMAGE, PUBLIC_CONTACT_EMAIL, SITE_ORIGIN, absoluteUrl } from "../src/lib/site";
@@ -121,6 +122,38 @@ test.describe("социальная карточка", () => {
     expect(await metaOf(page, 'meta[property="og:image:width"]')).toBe(String(OG_IMAGE.width));
     expect(await metaOf(page, 'meta[property="og:image:height"]')).toBe(String(OG_IMAGE.height));
     expect(await metaOf(page, 'meta[property="og:image:alt"]')).toBeTruthy();
+  });
+
+  test("шрифт карточки лежит в репозитории, а не скачивается при отрисовке", () => {
+    /**
+     * Сторож против самого тихого дефекта этой поверхности.
+     *
+     * `next/og` несёт с собой только латиницу и за кириллицей ходит в Google Fonts прямо во время
+     * отрисовки. Когда этот запрос отваливается, ничего не «ломается»: PNG нужного размера
+     * отдаётся, статус 200, проверка выше зелёная — а вся русская фраза на карточке нарисована
+     * пустыми квадратами. Маршрут пре-рендерится статически, поэтому одна неудачная сборка
+     * раздаёт такую карточку всему деплою. Ровно это и случилось на живой сборке.
+     *
+     * По картинке отличить квадраты от букв дёшево нельзя, поэтому проверяется причина, а не
+     * следствие: шрифт объявлен явно и прочитан с диска. Если кто-то вернёт динамическую
+     * загрузку, тест покраснеет здесь, а не у человека, которому переслали ссылку.
+     */
+    const source = readFileSync("src/app/opengraph-image.tsx", "utf8");
+    // Комментарии вырезаются: они объясняют и сам дефект, и отвергнутый способ его починить, —
+    // поэтому содержат и хост Google Fonts, и `fetch(`. Проверять надо код, а не рассказ о нём.
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+
+    expect(code).toContain("fonts:");
+    expect(code).toMatch(/readFile\(join\(process\.cwd\(\)/);
+    // Сетевого запроса при отрисовке нет вовсе — именно он и был причиной.
+    expect(code).not.toMatch(/\bfetch\(/);
+
+    // Файлы на месте и это настоящие шрифты, а не пустышки: без них сборка обязана упасть
+    // громко, и это осознанный размен на прежний тихий брак.
+    for (const file of ["assets/manrope-regular.ttf", "assets/manrope-bold.ttf"]) {
+      expect(statSync(file).size).toBeGreaterThan(10_000);
+      expect(readFileSync(file).subarray(0, 4).toString("hex")).toBe("00010000");
+    }
   });
 });
 
