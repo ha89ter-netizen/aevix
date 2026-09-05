@@ -1,14 +1,11 @@
 import { Resend } from "resend";
 import { NextResponse } from "next/server";
+import { mailFrom } from "@/lib/mail";
 
 export const runtime = "nodejs";
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 5;
-// Отправитель по умолчанию — sandbox-адрес Resend. ВАЖНО: он доставляет ТОЛЬКО на адрес владельца
-// учётки Resend и НЕ является production-ready sender для писем произвольным адресатам. Для прода
-// нужен отправитель с подтверждённого домена через `LEAD_EMAIL_FROM` (см. CLAUDE.md).
-const DEFAULT_FROM = "AEVIX <onboarding@resend.dev>";
 // Получатель заявок (`LEADS_TO_EMAIL`) — ОБЯЗАТЕЛЬНАЯ server-side конфигурация, читается в POST на
 // каждый запрос. Хардкод-фолбэка на личный адрес НЕТ: без переменной письмо не отправляется вовсе.
 
@@ -174,7 +171,7 @@ export async function POST(request: Request) {
   try {
     const resend = new Resend(apiKey);
     const { error } = await resend.emails.send({
-      from: process.env.LEAD_EMAIL_FROM || DEFAULT_FROM,
+      from: mailFrom(),
       to: recipient,
       replyTo: lead.contact.includes("@") ? lead.contact : undefined,
       subject: `Новая заявка с сайта AEVIX — ${lead.name}`,

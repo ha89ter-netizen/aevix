@@ -1,12 +1,12 @@
 import { Resend } from "resend";
 import { NextResponse } from "next/server";
 import { createLoginCode, isAuthConfigured, normalizeEmail, pruneLoginTokens } from "@/lib/auth";
+import { mailFrom } from "@/lib/mail";
 
 export const runtime = "nodejs";
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 5;
-const DEFAULT_FROM = "AEVIX <onboarding@resend.dev>";
 
 // See the identical note in api/business-analysis/route.ts: per-instance only, not a hard cap.
 const requestBuckets = new Map<string, { count: number; resetAt: number }>();
@@ -109,7 +109,7 @@ export async function POST(request: Request) {
     const resend = new Resend(apiKey);
     const message = renderEmail(code);
     const { error } = await resend.emails.send({
-      from: process.env.LEAD_EMAIL_FROM || DEFAULT_FROM,
+      from: mailFrom(),
       to: email,
       subject: message.subject,
       html: message.html,
