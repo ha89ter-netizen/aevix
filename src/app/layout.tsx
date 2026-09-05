@@ -6,6 +6,7 @@ import { BusinessProvider } from "@/lib/business-context";
 import { ProjectsProvider } from "@/lib/projects";
 import "./globals.css";
 import { ProductShell } from "@/components/shell/product-shell";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_ORIGIN, SITE_TITLE } from "@/lib/site";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,14 +21,13 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://aevix.vercel.app"),
+  metadataBase: new URL(SITE_ORIGIN),
   title: {
-    default: "AEVIX — цифровые системы для малого бизнеса",
+    default: SITE_TITLE,
     template: "%s — AEVIX",
   },
-  description:
-    "AEVIX создает AI-консультантов, Telegram и WhatsApp-ботов, сайты, CRM-интеграции, запись, напоминания и сбор отзывов для малого бизнеса.",
-  applicationName: "AEVIX",
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
   creator: "Kossybayev Alan",
   keywords: [
     "AEVIX",
@@ -42,19 +42,22 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: "AEVIX — цифровые системы для малого бизнеса",
-    description:
-      "AI-консультанты, боты, сайты, CRM-интеграции, запись, напоминания и сбор отзывов для малого бизнеса.",
-    url: "https://aevix.vercel.app",
-    siteName: "AEVIX",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    url: SITE_ORIGIN,
+    siteName: SITE_NAME,
     locale: "ru_RU",
     type: "website",
   },
+  /**
+   * `summary_large_image`, а не `summary`: карточка со ссылкой на продукт показывается рядом с
+   * картинкой 1200×630 (см. opengraph-image.tsx), и маленькая квадратная превьюшка обрезала бы
+   * её по центру, оставив от заголовка середину слова.
+   */
   twitter: {
-    card: "summary",
-    title: "AEVIX — цифровые системы для малого бизнеса",
-    description:
-      "AEVIX помогает убрать повторяющуюся работу: заявки, ответы, запись, напоминания и CRM-сценарии.",
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
   },
   icons: {
     icon: "/icon.svg",

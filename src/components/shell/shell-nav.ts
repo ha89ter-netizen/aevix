@@ -47,7 +47,22 @@ export type ShellMode = "entry" | "landing" | "workspace" | "project";
 export const publicRoutes = {
   entry: "/" as Route,
   site: "/platform" as Route,
+  privacy: "/privacy" as Route,
+  terms: "/terms" as Route,
 } as const;
+
+/**
+ * Заголовок шапки для публичных страниц вне лендинга.
+ *
+ * Пока правовые документы жили модальным окном, «Главная» в шапке было правдой: человек не
+ * покидал лендинг. Как только у них появились свои адреса, эта же строка стала врать — читаешь
+ * политику, а шапка сообщает, что ты на главной. Незнакомый адрес (то есть 404) не называется
+ * никак: страницы нет, и придумывать ей имя незачем.
+ */
+const PUBLIC_PAGE_TITLES: Record<string, string> = {
+  [publicRoutes.privacy]: "Конфиденциальность",
+  [publicRoutes.terms]: "Условия",
+};
 
 export type ShellNavItem = {
   /** In-page anchor on the landing, a real route everywhere else. */
@@ -168,7 +183,8 @@ export function shellTitle(pathname: string, projectName?: string | null): strin
     if (pathname.startsWith("/app/login")) return "Вход";
     return "Workspace";
   }
-  return "Главная";
+  if (pathname === publicRoutes.site) return "Главная";
+  return PUBLIC_PAGE_TITLES[pathname] ?? "AEVIX";
 }
 
 /** Section label for the project header's subtitle, or null outside a project. */

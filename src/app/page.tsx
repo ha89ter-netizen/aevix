@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SITE_DESCRIPTION, SITE_TITLE, pageMetadata } from "@/lib/site";
 import { EntryScreen } from "@/components/entry/entry-screen";
 
 /**
@@ -7,12 +8,14 @@ import { EntryScreen } from "@/components/entry/entry-screen";
  * Содержание живёт на `/platform`, поэтому описание здесь короткое и ведёт туда же: страница
  * существует ради первого впечатления, а не ради текста.
  */
-export const metadata: Metadata = {
-  title: "AEVIX — операционная система для бизнеса",
-  description:
-    "AEVIX собирает разбор, сайт, процессы и стоимость в одно рабочее пространство и держит их согласованными, пока бизнес растёт.",
-  alternates: { canonical: "/" },
-};
+export const metadata: Metadata = pageMetadata({
+  // Заголовок и описание входного экрана — они же значения по умолчанию для всего продукта:
+  // это его главная страница, и вторая формулировка того же самого только разошлась бы с первой.
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  path: "/",
+  titleIsWhole: true,
+});
 
 export default function Home() {
   return <EntryScreen />;

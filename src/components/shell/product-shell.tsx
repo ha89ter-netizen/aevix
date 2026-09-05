@@ -98,6 +98,16 @@ export function ProductShell({ children }: { children: ReactNode }) {
    */
   useEffect(() => {
     if (mode !== "landing") return;
+    /**
+     * Разделы лендинга есть только НА лендинге. Правовые страницы и общий 404 живут в том же
+     * режиме оболочки — у них та же шапка и та же боковая навигация, — но своих секций у них
+     * нет, и подсветка застревала на первом пункте: меню сообщало «вы в разделе Главная»
+     * человеку, читающему политику конфиденциальности. Пусто — честнее.
+     */
+    if (pathname !== publicRoutes.site) {
+      setActiveSection("");
+      return;
+    }
     const sections = landingSections
       .map((item) => document.getElementById(item.id))
       .filter((section): section is HTMLElement => Boolean(section));

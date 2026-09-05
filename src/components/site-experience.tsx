@@ -53,6 +53,7 @@ import type { EcosystemDevice } from "@/components/ecosystem-scene/EcosystemScen
 import { EcosystemArrows, EcosystemDial, useEcosystemGestureNav } from "@/components/ecosystem-scene/EcosystemNav";
 import { ecosystemProcesses } from "@/components/ecosystem-scene/data";
 import { cn } from "@/lib/utils";
+import { PUBLIC_CONTACT_EMAIL, SITE_NAME, SITE_ORIGIN, absoluteUrl } from "@/lib/site";
 import { usePrefersReducedMotion } from "@/lib/use-prefers-reduced-motion";
 import {
   getBusinessContent,
@@ -148,10 +149,18 @@ export const contacts = {
     value: "@ksalnww47",
     href: "https://t.me/ksalnww47",
   },
+  /**
+   * Публичный адрес приходит из канонического источника (`@/lib/site`), а не написан здесь
+   * литералом. Он же уходит в JSON-LD и на правовые страницы, поэтому копия строки означала бы,
+   * что однажды сайт и structured data покажут разные адреса.
+   *
+   * Это НЕ получатель заявок: письма доставляет серверная `LEADS_TO_EMAIL`, которая в браузер
+   * не попадает вовсе.
+   */
   email: {
     label: "Email",
-    value: "hello@aevix.org",
-    href: "mailto:hello@aevix.org",
+    value: PUBLIC_CONTACT_EMAIL,
+    href: `mailto:${PUBLIC_CONTACT_EMAIL}`,
   },
 };
 
@@ -3176,8 +3185,18 @@ function ContactScene() {
                           : "Отправить заявку"}
                     {leadStatus === "sending" ? null : <ArrowRight className="ml-2 h-4 w-4" />}
                   </Button>
+                  {/* Правовой контекст стоит РЯДОМ с кнопкой, а не спрятан в подвале: человек
+                      отправляет отсюда имя и контакт, и узнать, что с ними будет, он должен до
+                      нажатия, а не после. Ни отдельной галочки, ни согласия на рассылку здесь
+                      нет намеренно: рассылки у AEVIX не существует, а заранее отмеченное
+                      согласие на неё было бы согласием, которого человек не давал. */}
                   <p className="lead-note">
-                    Заявка придёт нам на почту. Или напишите напрямую:{" "}
+                    Отправляя заявку, вы соглашаетесь, что мы свяжемся с вами по указанному
+                    контакту. Что происходит с данными — в{" "}
+                    <Link href="/privacy">политике конфиденциальности</Link>.
+                  </p>
+                  <p className="lead-note">
+                    Или напишите напрямую:{" "}
                     <a href={contacts.telegram.href} target="_blank" rel="noreferrer">Telegram</a>
                     {" · "}
                     <a href={contacts.email.href}>почта</a>.
@@ -3193,8 +3212,6 @@ function ContactScene() {
 }
 
 function FooterScene() {
-  const [legal, setLegal] = useState<"privacy" | "terms" | null>(null);
-
   return (
     <footer className="premium-footer">
       <div className="mx-auto max-w-7xl">
@@ -3216,8 +3233,10 @@ function FooterScene() {
           <nav aria-label="Ресурсы AEVIX">
             <p>Ресурсы</p>
             <a href="#faq">FAQ</a>
-            <button type="button" onClick={() => setLegal("privacy")}>Privacy Policy</button>
-            <button type="button" onClick={() => setLegal("terms")}>Terms</button>
+            {/* Настоящие страницы, а не модальное окно: у документа должен быть адрес, который
+                можно переслать, открыть напрямую и покинуть кнопкой «назад». */}
+            <Link href="/privacy">Конфиденциальность</Link>
+            <Link href="/terms">Условия</Link>
           </nav>
           <nav aria-label="Контакты AEVIX">
             <p>Контакты</p>
@@ -3231,116 +3250,7 @@ function FooterScene() {
           <span>Built by Alan Kossybayev</span>
         </div>
       </div>
-      <LegalModal document={legal} onClose={() => setLegal(null)} />
     </footer>
-  );
-}
-
-const PRIVACY_SECTIONS: Array<{ title: string; body: ReactNode }> = [
-  {
-    title: "Какие данные собираются",
-    body: (
-      <p>
-        Через форму заявки и AI-консультанта мы получаем то, что вы сами вводите: имя, контакт
-        (телефон, Telegram или WhatsApp), необязательные email, описание бизнеса и задачи.
-        Никакие данные не собираются автоматически и без вашего ввода.
-      </p>
-    ),
-  },
-  {
-    title: "Для чего используются",
-    body: (
-      <p>
-        Только чтобы ответить на обращение, подготовить предварительный расчёт и обсудить проект.
-        Мы не продаём и не передаём данные третьим лицам для маркетинга.
-      </p>
-    ),
-  },
-  {
-    title: "Какие внешние сервисы участвуют",
-    body: (
-      <ul>
-        <li>
-          <strong>OpenAI</strong> — получает только описание бизнеса и задачи (для AI-анализа и
-          генерации концепта сайта). Имя, телефон, Telegram, WhatsApp и email в OpenAI не
-          передаются.
-        </li>
-        <li>
-          <strong>Resend</strong> — используется только чтобы продублировать заявку с формы на
-          рабочую почту студии; данные обрабатывает исключительно для этой доставки.
-        </li>
-      </ul>
-    ),
-  },
-  {
-    title: "Cookies и аналитика",
-    body: <p>Сайт не использует рекламные cookies и системы отслеживания посетителей.</p>,
-  },
-  {
-    title: "Хранение и удаление",
-    body: (
-      <p>
-        Данные заявки хранятся ровно столько, сколько нужно, чтобы обсудить и завершить проект.
-        Чтобы запросить удаление или уточнить, какие данные о вас есть, напишите на{" "}
-        <a href={contacts.email.href}>{contacts.email.value}</a>.
-      </p>
-    ),
-  },
-];
-
-const TERMS_SECTIONS: Array<{ title: string; body: ReactNode }> = [
-  {
-    title: "Предварительный характер расчётов",
-    body: (
-      <p>
-        Стоимость, сроки и состав работ на сайте — ориентировочные и основаны на введённых вами
-        данных. Это не окончательная оферта: финальные условия фиксируются после разбора задачи.
-      </p>
-    ),
-  },
-  {
-    title: "AI-анализ и концепты сайтов",
-    body: (
-      <p>
-        Ответы AI-консультанта и сгенерированные концепты сайтов — иллюстративные сценарии
-        автоматизации и предварительные визуальные макеты, а не готовый продукт и не гарантия
-        конкретного результата, роста выручки или сроков.
-      </p>
-    ),
-  },
-  {
-    title: "Связь и обращения",
-    body: (
-      <p>
-        Отправляя заявку через сайт, WhatsApp, Telegram или email, вы соглашаетесь, что мы можем
-        связаться с вами по указанному контакту, чтобы обсудить проект.
-      </p>
-    ),
-  },
-];
-
-function LegalModal({ document: activeDocument, onClose }: { document: "privacy" | "terms" | null; onClose: () => void }) {
-  const sections = activeDocument === "privacy" ? PRIVACY_SECTIONS : TERMS_SECTIONS;
-
-  return (
-    <PremiumModal
-      open={activeDocument !== null}
-      onClose={onClose}
-      titleId="legal-modal-title"
-      panelClassName="md:h-auto md:max-h-[85svh] md:max-w-2xl"
-    >
-      <div className="legal-modal">
-        <h2 id="legal-modal-title">{activeDocument === "privacy" ? "Privacy Policy" : "Terms"}</h2>
-        <div className="legal-modal-body">
-          {sections.map((section) => (
-            <section key={section.title}>
-              <h3>{section.title}</h3>
-              {section.body}
-            </section>
-          ))}
-        </div>
-      </div>
-    </PremiumModal>
   );
 }
 
@@ -3349,8 +3259,9 @@ function StructuredData() {
     () => ({
       "@context": "https://schema.org",
       "@type": "ProfessionalService",
-      name: "AEVIX",
-      url: "https://aevix.vercel.app",
+      name: SITE_NAME,
+      url: SITE_ORIGIN,
+      logo: absoluteUrl("/icon.svg"),
       founder: {
         "@type": "Person",
         name: "Kossybayev Alan",
