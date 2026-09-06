@@ -2,6 +2,8 @@ import type { Dictionary } from "./ru";
 
 /** Английский. Ключи обязаны совпадать с русским словарём — за этим следит тип `Dictionary`. */
 export const en: Dictionary = {
+  "entry.meta.title": "AEVIX — an operating system for business",
+
   "entry.nav.home": "Back to the AEVIX entry screen",
   "entry.nav.language": "Interface language",
   "entry.nav.languageScope": "Entry screen only for now",
@@ -14,6 +16,10 @@ export const en: Dictionary = {
   "entry.hero.secondary": "Sign in / Register",
 
   "entry.scene.name": "Process map",
+
+  "entry.nav.legal": "Legal documents",
+  "entry.legal.privacy": "Privacy",
+  "entry.legal.terms": "Terms",
 
   "eco.aria.scene": "Living map of AEVIX capabilities. Use arrow keys to move between them.",
   "eco.cap.ai": "AI assistant",

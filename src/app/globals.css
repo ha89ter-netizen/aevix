@@ -11488,3 +11488,45 @@ a.shell-account:hover {
   outline: 2px solid rgb(var(--accent-r) var(--accent-g) var(--accent-b));
   outline-offset: 3px;
 }
+
+/* Правовые ссылки в основании входного экрана.
+
+   Стоят на той же волосяной линии, что и имя сцены, и намеренно тише его: это служебная строка,
+   а не второе меню. Порядок в разметке — линия, ссылки, имя сцены — совпадает с визуальным, и
+   с клавиатуры фокус проходит их до имени, а не после. */
+.entry-base-legal {
+  display: flex;
+  gap: var(--mk-space-4);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.entry-base-legal a {
+  color: var(--mk-text-faint);
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.entry-base-legal a:hover,
+.entry-base-legal a:focus-visible {
+  color: var(--mk-text);
+}
+
+/* На телефоне строка основания перестаёт быть строкой: линия во всю ширину, под ней ссылки и
+   имя сцены. Иначе три элемента в ряд сжимают друг друга и упираются в края. */
+@media (max-width: 599px) {
+  .entry-base {
+    flex-wrap: wrap;
+    gap: var(--mk-space-3);
+  }
+
+  .entry-base-rule {
+    flex-basis: 100%;
+  }
+
+  .entry-base-name {
+    margin-left: auto;
+  }
+}

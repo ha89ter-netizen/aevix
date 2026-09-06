@@ -140,9 +140,23 @@ test.describe("входной экран", () => {
     await expect(base).toBeVisible();
     await expect(page.locator("#entry-scene-name")).toHaveText("Карта процессов");
 
-    // Основание — линия и одно имя. Появление здесь второй навигации означало бы возврат того,
-    // от чего этот экран как раз отказался.
-    await expect(base.locator("a, button")).toHaveCount(0);
+    // В основании допустимы РОВНО две ссылки — на правовые документы. Раньше здесь не
+    // допускалось ни одной, и это было слишком строго: у экрана свой адрес, на него приходят по
+    // прямой ссылке, и человек обязан иметь возможность узнать, что происходит с его данными, не
+    // уходя на другую страницу.
+    //
+    // А вот запрет на вторую навигацию остаётся, и проверяется он по существу: ссылка на раздел
+    // лендинга — это якорь либо адрес внутри `/platform`, и ни того, ни другого здесь быть не
+    // должно. Проверка счётчика без проверки адресов пропустила бы ровно две ссылки на разделы.
+    const hrefs = await base.locator("a").evaluateAll((els) =>
+      els.map((el) => el.getAttribute("href") ?? ""),
+    );
+    expect(hrefs.sort()).toEqual(["/privacy", "/terms"]);
+    for (const href of hrefs) {
+      expect(href.startsWith("#"), `якорь на раздел в основании: ${href}`).toBe(false);
+      expect(href.startsWith("/platform"), `ссылка на раздел лендинга: ${href}`).toBe(false);
+    }
+    await expect(base.locator("button")).toHaveCount(0);
 
     // Линия действительно закрывает композицию: она под кнопками и во всю ширину содержания.
     const [rule, actions] = await Promise.all([
@@ -156,6 +170,8 @@ test.describe("входной экран", () => {
     await page.locator(".entry-lang-trigger").click();
     await page.getByRole("menuitemradio", { name: /English/ }).click();
     await expect(page.locator("#entry-scene-name")).toHaveText("Process map");
+    // Правовые ссылки переводятся вместе с экраном, а не остаются русскими посреди английского.
+    await expect(base.locator('a[href="/privacy"]')).toHaveText("Privacy");
   });
 
   test("на экране нет обещаний того, чего на нём ещё нет", async ({ page }) => {

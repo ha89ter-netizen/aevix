@@ -2,6 +2,8 @@ import type { Dictionary } from "./ru";
 
 /** Қазақша. Ключи обязаны совпадать с русским словарём — за этим следит тип `Dictionary`. */
 export const kk: Dictionary = {
+  "entry.meta.title": "AEVIX — бизнеске арналған операциялық жүйе",
+
   "entry.nav.home": "AEVIX бастапқы экранына оралу",
   "entry.nav.language": "Интерфейс тілі",
   "entry.nav.languageScope": "Әзірге тек бастапқы экран аударылған",
@@ -14,6 +16,10 @@ export const kk: Dictionary = {
   "entry.hero.secondary": "Кіру / Тіркелу",
 
   "entry.scene.name": "Процестер картасы",
+
+  "entry.nav.legal": "Құқықтық құжаттар",
+  "entry.legal.privacy": "Құпиялылық",
+  "entry.legal.terms": "Шарттар",
 
   "eco.aria.scene": "AEVIX мүмкіндіктерінің тірі картасы. Бағыттауыш пернелермен жүріңіз.",
   "eco.cap.ai": "AI-көмекші",

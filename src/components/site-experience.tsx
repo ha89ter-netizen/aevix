@@ -2035,14 +2035,21 @@ const aevixFlowSteps = [
 
 /** Replaces the old three-in-a-row sections (recognition / "what is AEVIX" / results intro),
  * which repeated the same underlying idea. One compact section now carries all of it: the
- * familiar symptoms as a tag row, the single "not a chatbot" claim, and the 4-step flow. */
+ * familiar symptoms as a tag row, the single "not a chatbot" claim, and the 4-step flow.
+ *
+ * Единственная секция лендинга с ЦЕНТРИРОВАННЫМ контейнером — отсюда `mx-auto` у заголовка.
+ * Он там не для красоты: у `.section-title` своя мера (`max-width: 19ch`), и как только она
+ * становится уже контейнера, блок прижимается к левому краю. `text-align: center` центрует
+ * текст ВНУТРИ блока, а не сам блок, поэтому на узком окне заголовок уезжал влево примерно
+ * на 105px при внешне симметричных отступах. Общим правилом в CSS это чинить нельзя:
+ * заголовки остальных пяти секций выравнены по левому краю, и авто-поля их сломают. */
 function WhatIsAevixScene() {
   return (
     <section id="что-такое-aevix" className="scene what-is-scene flex items-center">
       <div className="mx-auto w-full max-w-6xl">
         <div data-reveal className="mx-auto max-w-2xl text-center">
           <p className="mb-4 text-sm font-medium uppercase tracking-[0.28em] text-violet">Что такое AEVIX</p>
-          <h2 className="section-title text-balance font-semibold">
+          <h2 className="section-title mx-auto text-balance font-semibold">
             <span data-heading-line className="heading-line">Не отдельный чат-бот —</span>{" "}
             <span data-heading-line className="heading-line">единый рабочий контур бизнеса</span>
           </h2>
