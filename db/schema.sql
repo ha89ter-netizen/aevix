@@ -21,6 +21,15 @@ create table if not exists users (
 alter table users add column if not exists name text;
 alter table users add column if not exists password text;
 
+-- Когда владение адресом доказано входом по коду из письма.
+--
+-- Пусто у аккаунта, который кто-то ЗАНЯЛ регистрацией: завести запись на чужой адрес может любой,
+-- а доказать доступ к ящику — только владелец. Пока пусто, вход по паролю закрыт: иначе пароль,
+-- заданный посторонним, открывал бы чужую почту. Аккаунты, существовавшие до появления проверки,
+-- помечаются подтверждёнными — они уже входили по коду, иначе бы их не было.
+alter table users add column if not exists email_verified_at timestamptz;
+update users set email_verified_at = created_at where email_verified_at is null;
+
 create table if not exists projects (
   id          text primary key,
   user_id     text not null references users(id) on delete cascade,
@@ -53,6 +62,15 @@ create table if not exists login_tokens (
 
 -- Для баз, созданных до появления кодов.
 alter table login_tokens add column if not exists attempts integer not null default 0;
+
+-- Имя и пароль, заданные при регистрации, ждут ЗДЕСЬ, а не в users.
+--
+-- Пароль применяется к аккаунту только вместе с кодом, который регистрация отправила на этот
+-- адрес, — то есть только после доказательства владения. Владелец, запросивший код сам, гасит
+-- чужие неиспользованные коды (см. createLoginCode), а с ними пропадает и чужой пароль: аккаунт
+-- достаётся ему без пароля, и он задаёт свой в настройках.
+alter table login_tokens add column if not exists pending_password text;
+alter table login_tokens add column if not exists pending_name text;
 
 -- Для регулярной уборки просроченных.
 create index if not exists login_tokens_expires on login_tokens (expires_at);

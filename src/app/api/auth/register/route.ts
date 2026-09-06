@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { isAuthConfigured, normalizeEmail, passwordProblem, registerUser, sessionCookie } from "@/lib/auth";
+import { Resend } from "resend";
+import { createLoginCode, isAuthConfigured, normalizeEmail, passwordProblem, registerUser } from "@/lib/auth";
+import { mailFrom } from "@/lib/mail";
 
 export const runtime = "nodejs";
 
@@ -98,9 +100,43 @@ export async function POST(request: Request) {
       );
     }
 
-    const response = NextResponse.json({ user: result.user });
-    response.cookies.set(sessionCookie(result.user));
-    return response;
+    /**
+     * Сессия здесь НЕ выдаётся, и это главное в маршруте.
+     *
+     * Завести запись на чужой адрес может кто угодно — почта на этом шаге ничем не подтверждена.
+     * Раньше регистрация сразу пускала внутрь, и посторонний, указавший чужой адрес, работал в
+     * аккаунте, в который потом входил настоящий владелец: `findOrCreateUser` после законного
+     * входа по коду находил ту же строку. Доступ теперь даёт только код из письма, то есть
+     * доказанное владение ящиком.
+     *
+     * Имя и пароль едут ВМЕСТЕ С КОДОМ и применяются при его вводе. Если код запросит настоящий
+     * владелец, он погасит чужой неиспользованный код, а с ним и чужой пароль.
+     */
+    const code = await createLoginCode(email, { name, password });
+    const apiKey = process.env.RESEND_API_KEY;
+
+    if (!apiKey) {
+      // Тот же осознанный путь, что у входа по коду: локально письмо отправить нечем, и код
+      // печатается в консоль сервера. Ответ честно называет способ доставки.
+      console.warn(`[auth] RESEND_API_KEY не настроен. Код подтверждения ${email}: ${code}`);
+      return NextResponse.json({ verify: true, delivery: "console" });
+    }
+
+    const resend = new Resend(apiKey);
+    const { error } = await resend.emails.send({
+      from: mailFrom(),
+      to: email,
+      subject: `Код подтверждения AEVIX: ${code}`,
+      text: `Код подтверждения: ${code}\n\nВведите его, чтобы завершить регистрацию. Код действует 15 минут.\nЕсли регистрацию начинали не вы — просто не вводите код, аккаунт останется недоступным.`,
+      html: `<p>Код подтверждения: <b style="font-size:22px;letter-spacing:.18em">${code}</b></p><p>Введите его, чтобы завершить регистрацию. Код действует 15 минут.</p><p>Если регистрацию начинали не вы — просто не вводите код, аккаунт останется недоступным.</p>`,
+    });
+
+    if (error) {
+      console.error("[auth] Не удалось отправить код подтверждения", error);
+      return NextResponse.json({ error: "Не удалось отправить письмо. Попробуйте ещё раз." }, { status: 502 });
+    }
+
+    return NextResponse.json({ verify: true, delivery: "email" });
   } catch (error) {
     console.error("[auth] Регистрация не удалась", error);
     return NextResponse.json({ error: "Не удалось создать аккаунт. Попробуйте ещё раз." }, { status: 500 });

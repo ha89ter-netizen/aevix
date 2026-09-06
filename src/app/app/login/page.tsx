@@ -73,7 +73,14 @@ function AuthForm() {
     if (busy) return;
     const { ok, data } = await post("/api/auth/register", { name, email, password, confirm });
     if (!ok) return fail(data as { error?: string; field?: string });
-    await done();
+    /**
+     * Регистрация больше не пускает внутрь сама: адрес ещё не подтверждён, а завести запись на
+     * чужую почту может кто угодно. Доступ даёт код из письма — поэтому отсюда человек попадает
+     * не в аккаунт, а на ввод кода, уже отправленного на указанный адрес.
+     */
+    setDelivery((data.delivery as "email" | "console") ?? "email");
+    setMode("code");
+    setCodeSent(true);
   };
 
   const submitSignIn = async (event: FormEvent) => {
@@ -81,8 +88,10 @@ function AuthForm() {
     if (busy) return;
     const { ok, data } = await post("/api/auth/password", { email, password });
     if (!ok) {
-      // Аккаунт без пароля — не тупик: уводим туда, где он откроется.
-      if (data.reason === "no-password") setMode("code");
+      // Аккаунт без пароля или с неподтверждённой почтой — не тупик: уводим туда, где он
+      // откроется. Во втором случае это ещё и единственный честный путь: пароль на
+      // неподтверждённом адресе мог задать не владелец.
+      if (data.reason === "no-password" || data.reason === "unverified") setMode("code");
       return fail(data as { error?: string; field?: string });
     }
     await done();

@@ -193,7 +193,17 @@ function generateCode(): string {
  * Создаёт одноразовый код входа и возвращает его — он существует только в этот момент и в
  * письме; в базе лежит лишь подпись.
  */
-export async function createLoginCode(email: string): Promise<string> {
+export async function createLoginCode(
+  email: string,
+  /**
+   * Имя и пароль, заданные при регистрации. Едут ВМЕСТЕ С КОДОМ и применяются к аккаунту только
+   * при его вводе — то есть только после доказательства владения почтой.
+   *
+   * Владелец, запросивший код сам, стирает чужие неиспользованные коды строкой ниже, а с ними и
+   * чужой отложенный пароль: аккаунт достанется ему без пароля, и он задаст свой в настройках.
+   */
+  pending?: { name: string; password: string },
+): Promise<string> {
   const code = generateCode();
   const expiresAt = new Date(Date.now() + LOGIN_TOKEN_TTL_MS);
   const sql = db();
@@ -201,8 +211,12 @@ export async function createLoginCode(email: string): Promise<string> {
   // что старый больше не работает.
   await sql`delete from login_tokens where email = ${email} and used_at is null`;
   await sql`
-    insert into login_tokens (token_hash, email, expires_at)
-    values (${hashCode(email, code)}, ${email}, ${expiresAt.toISOString()})
+    insert into login_tokens (token_hash, email, expires_at, pending_name, pending_password)
+    values (
+      ${hashCode(email, code)}, ${email}, ${expiresAt.toISOString()},
+      ${pending?.name ?? null},
+      ${pending ? hashPassword(pending.password) : null}
+    )
   `;
   return code;
 }
@@ -221,23 +235,41 @@ export type ConsumeResult =
  * сгорает. Без этого шесть цифр перебирались бы за миллион запросов.
  */
 export async function consumeLoginCode(email: string, code: unknown): Promise<ConsumeResult> {
+  /**
+   * Ввод не той формы — НЕ догадка о коде, и лимит попыток он не тратит.
+   *
+   * Раньше тратил, и это был бесплатный способ отобрать вход у чужого человека: посторонний,
+   * знающий только адрес, слал шесть строк мусора и гасил код, которого не видел. Перебору это
+   * послабление ничего не даёт — перебирают шестизначные числа, а они формой проходят и
+   * считаются по-прежнему.
+   */
   if (typeof code !== "string" || !/^\d{6}$/.test(code.trim())) {
-    await registerFailedAttempt(email);
     return { ok: false, reason: "invalid" };
   }
 
   const sql = db();
   const hash = hashCode(email, code.trim());
   const rows = (await sql`
-    select email, expires_at, used_at, attempts from login_tokens where token_hash = ${hash}
-  `) as Array<{ email: string; expires_at: string; used_at: string | null; attempts: number }>;
+    select email, expires_at, used_at, attempts, pending_name, pending_password
+    from login_tokens where token_hash = ${hash}
+  `) as Array<{
+    email: string;
+    expires_at: string;
+    used_at: string | null;
+    attempts: number;
+    pending_name: string | null;
+    pending_password: string | null;
+  }>;
 
   const row = rows[0];
   if (!row) {
     // Код не подошёл. Промашка засчитывается живому коду этой почты, иначе счётчик никогда бы
     // не рос: у неверного кода своей строки в базе нет.
-    const burned = await registerFailedAttempt(email);
-    return { ok: false, reason: burned ? "attempts" : "invalid" };
+    const outcome = await registerFailedAttempt(email);
+    // «Исчерпан» говорится и тогда, когда лимит был исчерпан раньше: иначе человек, чей код уже
+    // сгорел, получал бы «неверный код» и вводил его снова и снова вместо того, чтобы запросить
+    // новый.
+    return { ok: false, reason: outcome === "alive" ? "invalid" : "attempts" };
   }
   if (row.used_at) return { ok: false, reason: "used" };
   if (new Date(row.expires_at).getTime() < Date.now()) return { ok: false, reason: "expired" };
@@ -249,11 +281,29 @@ export async function consumeLoginCode(email: string, code: unknown): Promise<Co
   `) as Array<{ email: string }>;
   if (!claimed[0]) return { ok: false, reason: "used" };
 
-  return { ok: true, user: await findOrCreateUser(row.email) };
+  /**
+   * Код введён — владение адресом доказано. Здесь и только здесь применяется то, что ждало
+   * вместе с кодом, и аккаунт помечается подтверждённым.
+   */
+  const user = await findOrCreateUser(row.email);
+  await sql`
+    update users set
+      email_verified_at = coalesce(email_verified_at, now()),
+      name = coalesce(${row.pending_name}, name),
+      password = coalesce(${row.pending_password}, password)
+    where id = ${user.id}
+  `;
+  return { ok: true, user: { ...user, name: row.pending_name ?? user.name } };
 }
 
-/** Засчитывает неверный ввод. Возвращает true, если код после этого сгорел. */
-async function registerFailedAttempt(email: string): Promise<boolean> {
+/**
+ * Засчитывает неверную ДОГАДКУ о коде.
+ *
+ * Три исхода, а не два: код жив, код сгорел прямо сейчас, кода уже нет (сгорел или использован
+ * раньше). Последний нужен, чтобы не отвечать «неверный код» человеку, чей код давно исчерпан, —
+ * он бы вводил правильный код снова и снова, вместо того чтобы запросить новый.
+ */
+async function registerFailedAttempt(email: string): Promise<"alive" | "burned" | "gone"> {
   const sql = db();
   const rows = (await sql`
     update login_tokens set attempts = attempts + 1
@@ -261,12 +311,12 @@ async function registerFailedAttempt(email: string): Promise<boolean> {
     returning attempts
   `) as Array<{ attempts: number }>;
 
-  const attempts = rows[0]?.attempts ?? 0;
-  if (attempts < MAX_CODE_ATTEMPTS) return false;
+  if (!rows[0]) return "gone";
+  if (rows[0].attempts < MAX_CODE_ATTEMPTS) return "alive";
 
   // Исчерпан — гасим так же, как использованный: строка остаётся, чтобы ответить внятно.
   await sql`update login_tokens set used_at = now() where email = ${email} and used_at is null`;
-  return true;
+  return "burned";
 }
 
 async function findOrCreateUser(email: string): Promise<SessionUser> {
@@ -298,9 +348,15 @@ export type RegisterResult = { ok: true; user: SessionUser } | { ok: false; reas
 export async function registerUser(email: string, name: string, password: string): Promise<RegisterResult> {
   const sql = db();
   const id = randomUUID();
+  /**
+   * Пароль здесь НЕ записывается: он поедет вместе с кодом подтверждения и применится только при
+   * его вводе. Регистрация занимает адрес и заводит запись — но не выдаёт доступ к ящику,
+   * которым регистрирующий, возможно, не владеет.
+   */
+  void password;
   const inserted = (await sql`
-    insert into users (id, email, name, password)
-    values (${id}, ${email}, ${name}, ${hashPassword(password)})
+    insert into users (id, email, name)
+    values (${id}, ${email}, ${name})
     on conflict (email) do nothing
     returning id, email, name
   `) as SessionUser[];
@@ -311,7 +367,7 @@ export async function registerUser(email: string, name: string, password: string
 
 export type SignInResult =
   | { ok: true; user: SessionUser }
-  | { ok: false; reason: "unknown" | "wrong" | "no-password" };
+  | { ok: false; reason: "unknown" | "wrong" | "no-password" | "unverified" };
 
 /**
  * Вход по паролю.
@@ -323,11 +379,18 @@ export type SignInResult =
 export async function signInWithPassword(email: string, password: string): Promise<SignInResult> {
   const sql = db();
   const rows = (await sql`
-    select id, email, name, password from users where email = ${email}
-  `) as Array<SessionUser & { password: string | null }>;
+    select id, email, name, password, email_verified_at from users where email = ${email}
+  `) as Array<SessionUser & { password: string | null; email_verified_at: string | null }>;
 
   const row = rows[0];
   if (!row) return { ok: false, reason: "unknown" };
+  /**
+   * Пока владение адресом не доказано, пароль не открывает аккаунт.
+   *
+   * Завести запись на чужой адрес может любой — это регистрация. Доказать доступ к ящику может
+   * только владелец. Без этой проверки пароль, заданный посторонним, был бы ключом от чужой почты.
+   */
+  if (!row.email_verified_at) return { ok: false, reason: "unverified" };
   if (!row.password) return { ok: false, reason: "no-password" };
   if (!verifyPassword(password, row.password)) return { ok: false, reason: "wrong" };
   return { ok: true, user: { id: row.id, email: row.email, name: row.name } };
