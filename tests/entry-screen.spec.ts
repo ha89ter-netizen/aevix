@@ -213,6 +213,39 @@ test.describe("входной экран", () => {
     expect(outline).not.toBe("none");
   });
 
+  test("заголовок вкладки следует за языком и не остаётся на соседней странице", async ({ page }, testInfo) => {
+    // Проверяется поведение заголовка, а не раскладка, и от ширины окна оно не зависит. На
+    // мобильном профиле мешает только оверлей dev-режима Next: его значок стоит в нижнем углу
+    // поверх правовых ссылок и перехватывает клик. В собранном приложении его нет, поэтому
+    // гнаться за ним `force: true` значило бы прятать будущее НАСТОЯЩЕЕ перекрытие.
+    test.skip(testInfo.project.name !== "desktop", "оверлей dev-режима перекрывает ссылку на узком экране");
+    await page.goto(ENTRY);
+    const ru = await page.title();
+    expect(ru).toContain("операционная система");
+
+    // Клик во время гидратации теряется: серверная разметка кликабельна до того, как React
+    // навесит обработчики. Повторяем открытие меню, пока пункт не появится.
+    const english = page.getByRole("menuitemradio", { name: /English/ });
+    await expect(async () => {
+      await page.locator(".entry-lang-trigger").click();
+      await expect(english).toBeVisible({ timeout: 1500 });
+    }).toPass({ timeout: 20_000, intervals: [300, 700, 1200] });
+    await english.click();
+    await expect.poll(() => page.title()).toContain("operating system");
+
+    /**
+     * И главное: заголовок входного экрана не должен пережить уход с него.
+     *
+     * Проверяется именно ПЕРЕХОД ПО ССЫЛКЕ, а не прямая загрузка. Прямая загрузка берёт
+     * заголовок с сервера и была зелёной, когда возврат заголовка на размонтировании
+     * перебивал уже поставленный Next заголовок новой страницы: `/privacy`, открытая кликом с
+     * входного экрана, показывала заголовок входного экрана. Тест на `goto` этого не увидел бы.
+     */
+    await page.locator('a[href="/privacy"]').click();
+    await expect(page).toHaveURL(/\/privacy$/);
+    await expect.poll(() => page.title()).toContain("Политика конфиденциальности");
+  });
+
   test("меню языка закрывается по Escape", async ({ page }) => {
     await page.goto(ENTRY);
     await page.locator(".entry-lang-trigger").click();
