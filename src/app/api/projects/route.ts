@@ -58,9 +58,49 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Некорректные данные." }, { status: 400 });
   }
 
+  /**
+   * Сколько проектов НАМ ПРИСЛАЛИ — до нормализации и до всякой обрезки.
+   *
+   * Именно с этим числом сверяется результат записи в конце. Раньше сверка шла с уже
+   * нормализованным списком, и всё, что нормализация отбросила, из сравнения исчезало вместе с
+   * поводом ответить ошибкой: сервер отвечал «сохранено» на запрос, часть которого потерял.
+   */
+  const submitted = (body as { projects?: unknown })?.projects;
+  const submittedCount = Array.isArray(submitted) ? submitted.length : null;
+
+  /**
+   * Тело без пригодного списка — это ошибка клиента, а НЕ команда «удалить всё».
+   *
+   * Разница стоила бы аккаунта: `{projects: null}`, промах в рефакторинге или сбой сериализации
+   * давали пустой список, а пустой список уходил в `delete` без условия. Пустой НАБОР —
+   * законное состояние (человек удалил последний проект) и приходит массивом `[]`; отсутствие
+   * массива законным состоянием не является никогда.
+   */
+  if (submittedCount === null) {
+    return NextResponse.json({ error: "Некорректные данные." }, { status: 400 });
+  }
+
+  /**
+   * Потолок — отказ, а не тихая обрезка.
+   *
+   * Обрезка здесь опаснее отказа: отвергнутый запрос человек повторит, а обрезанный — нет,
+   * потому что ему ответили «сохранено». Лишние проекты при этом исчезали с сервера тем же
+   * запросом (`delete ... id <> all(ids)`), а следом клиент стирал локальную копию.
+   */
+  if (submittedCount > MAX_PROJECTS) {
+    return NextResponse.json({ error: "Слишком много проектов." }, { status: 413 });
+  }
+
   // Нормализуем присланное вместо того, чтобы верить клиенту: он может прислать что угодно,
   // а форму проекта мы знаем сами.
-  const projects = normalizeProjects((body as { projects?: unknown })?.projects).slice(0, MAX_PROJECTS);
+  const projects = normalizeProjects(submitted);
+
+  // Нормализация что-то отбросила — записывать частичный набор нельзя: `delete` ниже удалит
+  // всё, чего нет в `ids`, то есть отброшенное пропало бы и с сервера.
+  if (projects.length !== submittedCount) {
+    console.error(`[projects] Отброшено при нормализации: ${submittedCount - projects.length} из ${submittedCount}`);
+    return NextResponse.json({ error: "Часть проектов не удалось сохранить." }, { status: 422 });
+  }
 
   try {
     const sql = db();
@@ -137,7 +177,20 @@ export async function PATCH(request: Request) {
   }
 
   const payload = (body ?? {}) as { upsert?: unknown; remove?: unknown };
-  const upsert = normalizeProjects(payload.upsert).slice(0, MAX_PROJECTS);
+
+  // То же правило, что в PUT: сверяемся с присланным, а не с тем, что осталось после
+  // нормализации. Здесь это важнее вдвойне — сюда приходит досохранение при закрытии вкладки,
+  // и повторить молча потерянную правку уже некому.
+  const submittedUpsert = payload.upsert;
+  const submittedUpsertCount = Array.isArray(submittedUpsert) ? submittedUpsert.length : 0;
+  if (submittedUpsertCount > MAX_PROJECTS) {
+    return NextResponse.json({ error: "Слишком много проектов." }, { status: 413 });
+  }
+  const upsert = normalizeProjects(submittedUpsert);
+  if (upsert.length !== submittedUpsertCount) {
+    console.error(`[projects] PATCH: отброшено при нормализации ${submittedUpsertCount - upsert.length} из ${submittedUpsertCount}`);
+    return NextResponse.json({ error: "Часть проектов не удалось сохранить." }, { status: 422 });
+  }
   const remove = Array.isArray(payload.remove)
     ? payload.remove.filter((id): id is string => typeof id === "string" && id.length > 0).slice(0, MAX_PROJECTS)
     : [];
