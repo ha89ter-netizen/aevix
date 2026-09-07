@@ -431,6 +431,19 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
   const confirmedRef = useRef<Project[]>([]);
   /** Монотонный счётчик поколений сохранения — для защиты от устаревшего ответа (см. эффект ниже). */
   const saveGenRef = useRef(0);
+  /**
+   * Очередь сохранений: в полёте одновременно не больше одного.
+   *
+   * `AbortController` отменяет запрос НА КЛИЕНТЕ, но не отзывает тот, который сервер уже принял.
+   * Измерено: два PUT подряд, где ранний тяжелее, — сервер шесть раз из шести заканчивал ранним,
+   * то есть на сервере оставалось УСТАРЕВШЕЕ состояние, а клиент об этом не узнавал (ответ он
+   * просто игнорировал как вытесненный).
+   *
+   * Порядка на сервере нет и взяться ему неоткуда: он пишет то, что пришло. Единственный способ
+   * не получить перестановку — не отправлять второе, пока не ответило первое. Отсюда цепочка:
+   * каждое сохранение ждёт предыдущего, а вытесненное более новой правкой не уходит в сеть вовсе.
+   */
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
 
   // Skip the very first run (before the load above has happened) so it can't stomp real stored
   // data with the initial empty array.
@@ -449,10 +462,15 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
     const isCurrent = () => !cancelled && generation === saveGenRef.current;
 
     const timer = window.setTimeout(() => {
-      const started = Date.now();
-      store
-        .save(projects, controller.signal)
-        .then(() => {
+      // Встаём в очередь за предыдущим сохранением. `.catch` на предыдущем — чтобы чужая ошибка
+      // не рвала цепочку: своё состояние каждый прогон проверяет сам.
+      saveChainRef.current = saveChainRef.current.catch(() => {}).then(async () => {
+        // Пока ждали очереди, могла прийти более новая правка. Тогда отправлять нечего: её
+        // собственный прогон уже стоит в очереди следом и отправит актуальное состояние.
+        if (!isCurrent()) return;
+        const started = Date.now();
+        try {
+          await store.save(projects, controller.signal);
           if (!isCurrent()) return; // вытеснено более новой правкой — не трогаем состояние
           pendingRef.current = null;
           confirmedRef.current = projects;
@@ -460,14 +478,14 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
           window.setTimeout(() => {
             if (isCurrent()) setSaveState("saved");
           }, remaining);
-        })
-        .catch(() => {
-          // Отмена вытеснением — не ошибка: более новая правка уже сохраняется своим прогоном.
+        } catch {
+          // Отмена вытеснением — не ошибка: более новая правка сохранится своим прогоном.
           if (controller.signal.aborted || !isCurrent()) return;
           // Локальная запись не умеет не удаваться, серверная умеет. Показать это обязательно:
           // иначе человек продолжит работать в уверенности, что всё сохранено.
           setSaveState("error");
-        });
+        }
+      });
     }, signedIn ? SAVE_DEBOUNCE_MS : 0);
 
     return () => {

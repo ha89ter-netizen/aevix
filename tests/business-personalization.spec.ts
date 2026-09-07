@@ -762,3 +762,32 @@ test.describe("product navigation", () => {
     await expect(persona.getByText(/Барбершоп/)).toBeVisible();
   });
 });
+
+test.describe("примеры ниш под полем ввода", () => {
+  test("чип подставляет текст, но разбор не запускает", async ({ page }) => {
+    /**
+     * Чип несёт ШАБЛОН («на 3 мастера, запись веду вручную»), а не описание нажавшего. Запуск
+     * разбора прямо с чипа давал сценарий выдуманного бизнеса под видом своего — при том, что
+     * страница просит рассказать именно про свой.
+     *
+     * Проверяется по существу: ушёл ли запрос на разбор. Проверка «нет карточки результата»
+     * прошла бы и на медленном ответе, ничего не доказав.
+     */
+    let analysisStarted = false;
+    page.on("request", (req) => {
+      if (req.url().includes("/api/business-analysis")) analysisStarted = true;
+    });
+
+    await page.goto(SITE);
+    await page.locator(".hero-chip", { hasText: "Барбершоп" }).first().click();
+
+    const field = page.locator("#hero-business-input");
+    await expect(field, "текст обязан оказаться в поле").toHaveValue(/барбершоп/i);
+    await page.waitForTimeout(1200);
+    expect(analysisStarted, "чип запустил разбор, которого человек не просил").toBe(false);
+
+    // И этот же текст можно поправить под себя, прежде чем запускать.
+    await field.fill("У меня барбершоп на 5 мастеров, запись через Instagram");
+    await expect(field).toHaveValue(/5 мастеров/);
+  });
+});
