@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { SITE_DESCRIPTION, SITE_TITLE, pageMetadata } from "@/lib/site";
 import { EntryScreen } from "@/components/entry/entry-screen";
+import { StructuredData } from "@/components/structured-data";
 
 /**
  * Публичный входной экран — часть 1 публичного слоя и первое, что видит человек.
@@ -18,5 +19,12 @@ export const metadata: Metadata = pageMetadata({
 });
 
 export default function Home() {
-  return <EntryScreen />;
+  return (
+    <>
+      {/* Разметка организации принадлежит главной странице: именно её адрес стоит в `url`
+          внутри самой разметки. Раньше она была только на `/platform`. */}
+      <StructuredData />
+      <EntryScreen />
+    </>
+  );
 }

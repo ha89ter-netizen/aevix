@@ -53,8 +53,19 @@ export type NicheId =
 
 /** Сигнал: текст + вес (weak) + регистрозависимость (cs, для аббревиатур) + негатив (neg) +
  *  метка подтипа (sub), которую сигнал зажигает, если попал в победившую нишу. */
-type Signal = { t: string; w?: boolean; cs?: boolean; neg?: boolean; sub?: string };
+type Signal = { t: string; w?: boolean; cs?: boolean; neg?: boolean; sub?: string; x?: boolean };
 const s = (t: string, sub?: string): Signal => ({ t, sub });
+/**
+ * Совпадение только с ЦЕЛЫМ токеном, независимо от длины.
+ *
+ * Нужен там, где слово короткое, но его начало открывает совсем другое слово: «розы» внутри
+ * «розыгрыша», «пион» внутри «пионерского». Это тот же класс, что подстрочная ловушка «сто» в
+ * «ресторане» (QA-1), просто на длине, где префиксный матчинг уже разрешён.
+ *
+ * Цена честная: падежи такого сигнала перестают совпадать. Поэтому применять его к слову, у
+ * которого падежи важны, нельзя — там нужен более длинный префикс («тренировк» вместо «трен»).
+ */
+const exact = (t: string, sub?: string): Signal => ({ t, x: true, sub });
 const weak = (t: string, sub?: string): Signal => ({ t, w: true, sub });
 const acronym = (t: string, sub?: string): Signal => ({ t, cs: true, sub });
 const neg = (t: string): Signal => ({ t, neg: true });
@@ -69,18 +80,25 @@ const neg = (t: string): Signal => ({ t, neg: true });
 const REGISTRY: Array<{ id: NicheId; signals: Signal[] }> = [
   { id: "coffee", signals: [s("кофейн"), s("кофе"), s("kofe"), s("бариста"), s("эспрессо"), s("капучино"), s("латте"), s("coffee"), s("roast")] },
   { id: "bakery", signals: [s("пекарн"), s("кондитер"), s("выпечк"), s("bakery"), s("pastry"), weak("торт"), weak("десерт"), weak("хлеб")] },
-  { id: "restaurant", signals: [s("ресторан"), s("restoran"), s("кафе", "cafe"), s("cafe", "cafe"), s("пицц", "pizzeria"), s("суши", "sushi"), s("кухн"), s("гастро"), s("бистро", "bistro"), s("столов"), s("restaurant"), s("food"), weak("бар", "bar"), weak("еда"), weak("еды"), weak("обед")] },
+  { id: "restaurant", signals: [s("ресторан"), s("restoran"), s("кафе", "cafe"), s("cafe", "cafe"), s("пицц", "pizzeria"), s("суши", "sushi"), s("кухн"), s("гастро"), s("бистро", "bistro"), s("столов"), s("restaurant"), s("food"), weak("бар", "bar"), weak("еда"), weak("еды"), weak("обед"),
+    // «кухня» — ещё и мебель. Кухни на заказ рестораном не делает ни один сигнал, кроме этого.
+    neg("мебел"), neg("гарнитур"), neg("столешниц")] },
   { id: "barbershop", signals: [s("барбер"), s("barber"), s("стриж"), s("бород"), s("брадобрей")] },
   { id: "beauty", signals: [s("красот"), s("krasot"), s("парикмахер", "hair"), s("маникюр", "nails"), s("ногт", "nails"), s("nail", "nails"), s("бров", "brows"), s("ресниц", "lashes"), s("космет", "cosmetology"), s("визаж", "makeup"), s("макияж", "makeup"), s("массаж", "spa"), s("beauty"), weak("салон"), weak("spa", "spa"), weak("спа", "spa"), neg("автомобил"), neg("машин"), neg("запчаст")] },
   { id: "dental", signals: [s("стоматолог"), s("stomatolog"), s("зубн"), s("зуб"), s("дент"), s("dental"), s("ортодонт"), s("имплант"), s("брекет")] },
-  { id: "medical", signals: [s("медицин"), s("клиник"), s("clinic"), s("поликлиник"), s("диагност", "diagnostics"), s("терапевт"), s("педиатр"), s("узи"), s("анализ"), weak("врач"), weak("доктор"), weak("приём"), neg("зубн"), neg("стоматолог"), neg("ветеринар"), neg("автомобил")] },
+  { id: "medical", signals: [s("медицин"), s("клиник"), s("clinic"), s("поликлиник"), s("диагност", "diagnostics"), s("терапевт"), s("педиатр"), s("узи"), s("анализ"), weak("врач"), weak("доктор"), weak("приём"), neg("зубн"), neg("стоматолог"), neg("ветеринар"),
+    // «анализ» бывает не только медицинским: рыночный, конкурентов, данных. Само слово
+    // многозначно, и префикс тут ни при чём — отличает только соседнее слово.
+    neg("рынка"), neg("рынок"), neg("маркетинг"), neg("конкурент"), neg("данных"), neg("автомобил")] },
   { id: "pet", signals: [s("груминг", "grooming"), s("grooming", "grooming"), s("зоосалон", "grooming"), s("зоомагазин"), s("грумер", "grooming"), s("ветеринар", "vet"), s("ветклиник", "vet"), weak("питомц"), weak("собак"), weak("кошк"), weak("pet")] },
-  { id: "fitness", signals: [s("фитнес"), s("fitness"), s("спорт"), s("трен"), s("gym"), s("йога", "yoga"), s("yoga", "yoga"), s("кроссфит", "crossfit"), s("crossfit", "crossfit"), s("пилатес", "pilates"), weak("зал")] },
+  { id: "fitness", signals: [s("фитнес"), s("fitness"), s("спорт"), s("тренер"), s("тренировк"), s("тренаж"), s("gym"), s("йога", "yoga"), s("yoga", "yoga"), s("кроссфит", "crossfit"), s("crossfit", "crossfit"), s("пилатес", "pilates"), weak("зал")] },
   { id: "hotel", signals: [s("отель"), s("гостиниц"), s("hotel"), s("хостел"), s("апарт"), s("resort"), weak("номер")] },
-  { id: "flowers", signals: [s("цветоч"), s("цветы"), s("цветов"), s("cvety"), s("tsvety"), s("букет"), s("флор"), s("flower"), s("розы"), s("пион"), s("тюльпан")] },
+  { id: "flowers", signals: [s("цветоч"), s("цветы"), s("цветов"), s("cvety"), s("tsvety"), s("букет"), s("флор"), s("flower"), exact("розы"), exact("роз"), exact("пион"), exact("пионы"), s("тюльпан")] },
   { id: "perfume", signals: [s("парфюм"), s("аромат"), s("sillage"), s("духи"), s("perfume"), s("селектив"), weak("ниша")] },
   { id: "legal", signals: [s("юрист", "law"), s("yurist", "law"), s("юридическ", "law"), s("адвокат", "law"), s("нотариус", "law"), s("бухгалтер", "accounting"), s("бухучёт", "accounting"), s("аудит", "accounting"), s("консалтинг", "consulting"), s("консалт", "consulting"), s("law", "law"), s("legal", "law"), s("accounting", "accounting"), s("consulting", "consulting")] },
-  { id: "education", signals: [s("образовательн"), s("курс"), s("репетитор", "tutoring"), s("языков", "language"), s("language", "language"), s("english"), s("обучени"), s("лицей"), s("гимнази"), s("подготовк"), weak("школ")] },
+  { id: "education", signals: [s("образовательн"), s("курс"), s("репетитор", "tutoring"), s("языков", "language"), s("language", "language"), s("english"), s("обучени"), s("лицей"), s("гимнази"), s("подготовк"), weak("школ"),
+    // «курс» — ещё и валютный: обмен валют образованием не является.
+    neg("валют"), neg("обмен"), neg("доллар")] },
   { id: "photo", signals: [s("фотограф", "photo"), s("фотостуди", "photo"), s("фотосъ", "photo"), s("фотосесс", "photo"), s("фото", "photo"), s("photo"), s("photograph"), s("дизайн-студи", "design"), s("видеосъ", "video"), s("видеограф", "video")] },
   { id: "cleaning", signals: [s("клининг", "cleaning"), s("cleaning", "cleaning"), s("уборк", "cleaning"), s("сантехник", "plumber"), s("plumb", "plumber"), s("электрик", "electrician"), s("электромонтаж", "electrician"), weak("мойк")] },
   { id: "auto", signals: [s("автосервис"), s("автосалон"), s("автомобил"), s("avtoservis"), s("avtomobil"), s("шином", "tire"), s("детейлинг", "detailing"), s("детейл", "detailing"), s("detailing", "detailing"), s("мотор"), s("ремонт авто"), s("ремонт машин"), s("car service"), s("auto service"), s("auto repair"), s("car repair"), s("автомойк", "wash"), acronym("СТО")] },
@@ -103,6 +121,7 @@ const wordSplit = (text: string, re: RegExp) => text.split(re).filter(Boolean);
 
 function matchesToken(signal: Signal, lowTokens: string[], rawTokens: string[], low: string): boolean {
   if (signal.cs) return rawTokens.includes(signal.t); // аббревиатура в исходном регистре: «СТО»
+  if (signal.x) return lowTokens.includes(signal.t); // целое слово: префикс открыл бы чужое
   if (signal.t.includes(" ") || signal.t.includes("-")) return low.includes(signal.t); // фраза / дефис («дизайн-студи»): токенайзер режет по дефису, ищем по строке
   if (signal.t.length <= 3) return lowTokens.includes(signal.t); // короткий — только целый токен
   return lowTokens.some((token) => token.startsWith(signal.t)); // длинный — префикс (падежи)

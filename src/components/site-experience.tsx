@@ -53,6 +53,7 @@ import type { EcosystemDevice } from "@/components/ecosystem-scene/EcosystemScen
 import { EcosystemArrows, EcosystemDial, useEcosystemGestureNav } from "@/components/ecosystem-scene/EcosystemNav";
 import { ecosystemProcesses } from "@/components/ecosystem-scene/data";
 import { cn } from "@/lib/utils";
+import { StructuredData } from "@/components/structured-data";
 import { PUBLIC_CONTACT_EMAIL, SITE_NAME, SITE_ORIGIN, absoluteUrl } from "@/lib/site";
 import { usePrefersReducedMotion } from "@/lib/use-prefers-reduced-motion";
 import {
@@ -607,7 +608,16 @@ function calculateEstimate(form: EstimateForm) {
     form.branchCount === "2–5" ? 1.2 : form.branchCount === "6–10" ? 1.4 : 1;
   const requiresCustom = form.branchCount === "больше 10";
   const adjustedTotal = Math.round(baseTotal * branchMultiplier);
-  const discount = Math.round(baseTotal * FIRST_PROJECT_DISCOUNT);
+  /**
+   * Скидка считается от той суммы, из которой вычитается, — от `adjustedTotal`.
+   *
+   * Раньше она бралась от `baseTotal`, а вычиталась из `adjustedTotal` (с множителем точек
+   * 1.2 / 1.4). Число оставалось одно, а базы было две, и обещанные 10% превращались в 8.3% и
+   * 7.1% — при том, что рядом показаны и старая цена, и новая, и экономия: сойтись они не могли.
+   *
+   * Скидка обязана быть настоящей, а «настоящая» значит «от цены, которую человек видит».
+   */
+  const discount = Math.round(adjustedTotal * FIRST_PROJECT_DISCOUNT);
   const discountedTotal = adjustedTotal - discount;
   const rangeMin = Math.max(0, discountedTotal);
   const rangeMax = Math.max(rangeMin, adjustedTotal);
@@ -2713,7 +2723,7 @@ export function PricingCalculatorScene({
                       <p className="mt-3 text-4xl font-semibold tracking-[-0.05em]">{finalEstimate.estimatedRange}</p>
                       {oldPrice && newPrice ? (
                         <div className="mt-5 grid gap-2 text-sm text-ink/58">
-                          <p>Скидка на базовую стоимость первых проектов: {Math.round(FIRST_PROJECT_DISCOUNT * 100)}%.</p>
+                          <p>Скидка на первый проект: {Math.round(FIRST_PROJECT_DISCOUNT * 100)}% от стоимости конфигурации.</p>
                           <p>Старая цена: <span className="line-through">{formatKzt(oldPrice)}</span></p>
                           <p>Новая цена: <span className="font-semibold text-ink">{formatKzt(newPrice)}</span></p>
                           <p>Экономия: <span className="font-semibold text-violet">{formatKzt(localEstimate.discount)}</span></p>
@@ -3261,42 +3271,6 @@ function FooterScene() {
   );
 }
 
-function StructuredData() {
-  const data = useMemo(
-    () => ({
-      "@context": "https://schema.org",
-      "@type": "ProfessionalService",
-      name: SITE_NAME,
-      url: SITE_ORIGIN,
-      logo: absoluteUrl("/icon.svg"),
-      founder: {
-        "@type": "Person",
-        name: "Kossybayev Alan",
-        jobTitle: "Founder & CEO",
-      },
-      email: contacts.email.value,
-      sameAs: [contacts.telegram.href, contacts.whatsapp.href],
-      areaServed: "Kazakhstan",
-      description:
-        "AEVIX создает цифровые системы для малого бизнеса: AI-консультанты, боты, сайты, CRM-интеграции, запись, напоминания и сбор отзывов.",
-      serviceType: [
-        "AI-консультанты",
-        "Telegram и WhatsApp-боты",
-        "Автоматизация записи и заявок",
-        "Сайты",
-        "CRM-интеграции",
-      ],
-    }),
-    [],
-  );
-
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
-    />
-  );
-}
 
 /**
  * Owns the live accent. When a business is recognised, its accent RGB is written to the

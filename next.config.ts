@@ -37,6 +37,28 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+
+  /**
+   * Технический адрес развёртывания не должен быть вторым сайтом.
+   *
+   * `aevix.vercel.app` отдавал весь сайт целиком, с `Allow: /` и без `X-Robots-Tag`. Canonical
+   * на `aevix.org` это смягчал, но canonical — предпочтение, а не директива: поисковик вправе
+   * его проигнорировать, а обход поддомена тратится в любом случае. Постоянный редирект убирает
+   * двойника, а не просит о нём не думать.
+   *
+   * Условие по заголовку `host`, а не по origin из `lib/site`: правило должно сработать именно
+   * на техническом адресе, каким бы ни был настроенный домен продукта.
+   */
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "aevix.vercel.app" }],
+        destination: "https://aevix.org/:path*",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
